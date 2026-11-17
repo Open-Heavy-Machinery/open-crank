@@ -1,0 +1,94 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  host:
+    name: host (${{ matrix.compiler }}, ${{ matrix.build_type }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [gcc, clang]
+        build_type: [Debug, Release]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: >
+          cmake -S . -B build
+          -DCMAKE_C_COMPILER=${{ matrix.compiler }}
+          -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+          -DOC_WERROR=ON
+      - name: Build
+        run: cmake --build build -j
+      - name: Unit and closed-loop tests
+        run: ctest --test-dir build --output-on-failure
+      - name: Trace of the hoist scenario
+        if: matrix.compiler == 'gcc' && matrix.build_type == 'Release'
+        run: ./build/open-crank-run scenarios/hoist_step.csv --trace hoist_step_trace.csv
+      - name: Upload trace
+        if: matrix.compiler == 'gcc' && matrix.build_type == 'Release'
+        uses: actions/upload-artifact@v4
+        with:
+          name: hoist-step-trace
+          path: hoist_step_trace.csv
+
+  readme:
+    name: README instructions, verbatim
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and test as the README says
+        run: |
+          cmake -S . -B build
+          cmake --build build
+          ctest --test-dir build --output-on-failure
+      - name: Headless run as the README says
+        run: |
+          ./build/open-crank-run scenarios/hoist_step.csv
+          ./build/open-crank-run scenarios/overspeed.csv --trace overspeed.csv
+
+  sanitizers:
+    name: sanitizers (ASan, UBSan, float-cast-overflow)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Keep ASan working on kernels with high ASLR entropy
+        run: sudo sysctl -w vm.mmap_rnd_bits=28
+      - name: Configure
+        run: >
+          cmake -S . -B build
+          -DCMAKE_C_COMPILER=clang
+          -DCMAKE_BUILD_TYPE=Debug
+          -DOC_WERROR=ON
+          "-DCMAKE_C_FLAGS=-fsanitize=address,undefined,float-cast-overflow -fno-sanitize-recover=all -fno-omit-frame-pointer"
+          "-DCMAKE_EXE_LINKER_FLAGS=-fsanitize=address,undefined"
+      - name: Build
+        run: cmake --build build -j
+      - name: Tests
+        run: ctest --test-dir build --output-on-failure
+
+  portable-cortex-m4f:
+    name: portable/ on Cortex-M4F
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install the Arm GNU toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends gcc-arm-none-eabi binutils-arm-none-eabi
+      - name: Build for the MCU, check undefined symbols and includes
+        run: tools/check_portable.sh
+
+  mutation:
+    name: mutation sanity (tests can fail)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Break each safety-relevant behaviour; the tests must catch it
+        run: tools/mutation_check.sh

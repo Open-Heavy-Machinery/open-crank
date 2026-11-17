@@ -1,6 +1,6 @@
 # Architecture
 
-This document explains how open-crank is structured and, for each decision, *why*. Where a decision departs from the earlier README or the first vertical-slice branch, it says so. Interface sketches are **proposals for v0.1**, not frozen APIs.
+This document explains how open-crank is structured and, for each decision, *why*. Where a decision departs from the earlier README or the first vertical-slice branch, it says so. The interfaces described here are what v0.1 implements; they are not frozen.
 
 ## 1. Goals the architecture must serve
 
@@ -20,19 +20,26 @@ flowchart LR
         MC["Level 1: machine controller"]
         EF["Level 2: engine ECU firmware (v0.4)"]
     end
-    subgraph SIM["sim/ (host)"]
+    subgraph SIM["sim/ (host): the bench"]
+        OP["operator panel"]
         ECU["engine_ecu (simulated)"]
-        PLANT["plant core + loads"]
+        PLANT["plant core"]
+        PUMP["hydraulic pump"]
     end
-    MC <-->|"J1939: TSC1 in, EEC1 / ET1 / EFL-P1 out"| ECU
-    ECU -->|"fuel_pct"| PLANT
-    PLANT -->|"rpm, torque, temperatures"| ECU
+    MC <-->|"J1939: TSC1 in; EEC1, ET1, EFL/P1 out"| ECU
+    OP -->|"OC_OPERATOR"| MC
+    MC -->|"OC_PUMP_CMD"| PUMP
+    ECU -->|"fuel, starter"| PLANT
+    PUMP -->|"load torque"| PLANT
+    PLANT -->|"speed"| ECU
     EF <-->|"crank / cam, sensors, actuators"| PLANT
 ```
 
 **Why two levels.** In a real engine, the *engine's own ECU* speaks J1939 and the machine's controller talks to it. The first draft let the plant publish J1939 directly and let the "ECU under test" command throttle over CAN, which no real machine does. That blurred who is under test and made a Level 2 future impossible. Making the levels explicit fixes the meaning of every message and shows where the plant ends and the controller begins.
 
 **Why Level 1 first.** EMS and PMS are supervisory controllers, so Level 1 matches the stated use case. It needs only a CAN bus, so it works with `vcan` and no special hardware, and it is where the learning value is cheapest.
+
+**Why the controller drives the pump.** On a real crane the machine controller sits between the operator's lever and the hydraulic pump, and that is where energy-management work happens (power limiting, anti-stall). If the scenario drove the pump directly, the controller under test could never influence its own load. In v0.1 the reference controller passes the lever through and zeroes it outside RUN; the path exists so that better strategies can be developed against it.
 
 ## 3. The three zones and the dependency rule
 
@@ -48,40 +55,44 @@ flowchart LR
 
 | Zone | Contains | May depend on | Must not contain |
 |---|---|---|---|
-| `portable/` | J1939 codec, machine-controller logic | nothing but the C standard headers `<stdint.h>`, `<stdbool.h>`, `<stddef.h>` | `printf`, `malloc`, files, sockets, OS calls, the plant, `double` where avoidable |
-| `sim/` | plant physics, plants, loads, simulated engine ECU, clock modes, scenario runner | `portable/` | sockets, a specific OS, firmware HALs |
-| `platforms/` | SocketCAN, Renode glue, STM32G4 HAL, FPGA glue | `portable/` and `sim/` | control logic, physics |
+| `portable/` | J1939 codec, bench messages, machine-controller logic | nothing but `<stdint.h>`, `<stdbool.h>`, `<stddef.h>` | `printf`, `malloc`, files, sockets, OS calls, the plant, `double` |
+| `sim/` | plant physics, plants, loads, simulated engine ECU, bench, scenarios, trace | `portable/`, the C standard library | sockets, a specific OS, firmware HALs |
+| `platforms/` | host runner, SocketCAN, (later) Renode glue, STM32G4 HAL, FPGA glue | `portable/` and `sim/` | control logic, physics |
 
 **The rule: dependencies point one way, and `portable/` depends on nothing else in the repo.**
 
 **Why.** Without a hard rule, the reference controller drifts into a Linux program: it picks up `printf`, `atof`, sockets and `double` math, and then it cannot be compiled for the STM32 or run in Renode. That is exactly what happened in the first slice, where the "reference firmware" was a Linux process. A folder boundary plus an enforced rule costs almost no code and protects goal 1.
 
-**Enforcement (CI, not promises).**
+**Enforcement (CI, not promises): [`tools/check_portable.sh`](tools/check_portable.sh).**
 
-1. Compile `portable/` with `arm-none-eabi-gcc -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard -ffreestanding -Wall -Wextra -Wpedantic -Wconversion -Wdouble-promotion`.
-2. Fail if the resulting objects have **undefined symbols** (`arm-none-eabi-nm -u`). A stray `printf` or `memcpy` shows up immediately.
-3. Fail if any file in `portable/` has an `#include` pointing into `sim/` or `platforms/`.
+1. `portable/` builds on its own (`portable/CMakeLists.txt`) for Cortex-M4F with [`cmake/arm-none-eabi.cmake`](cmake/arm-none-eabi.cmake): `-mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard -ffreestanding`, `-Wconversion -Wdouble-promotion` as errors, in Debug and MinSizeRel.
+2. Its objects, linked together, may need only `memcpy`, `memmove`, `memset` and `memcmp` from outside. GCC requires those four from every freestanding environment (it emits calls to them for struct copies), so forbidding them would only produce false alarms. Anything else fails, in particular `__aeabi_d*` helpers, which mean a `double` operation emulated in software.
+3. Every `#include` in `portable/` names one of the three allowed standard headers or a header inside `portable/`.
 
-**Numeric choices.** `sim/` uses `double`: it is host code and precision is free. `portable/` uses `float`: the STM32G431 has a single-precision FPU, and `double` there is emulated in software and slow. The two are bridged at the boundary (the J1939 codec takes physical values as `float`).
+**Numeric choices.** `sim/` uses `double`: it is host code and precision is free. `portable/` uses `float`: the STM32G431 has a single-precision FPU, and `double` there is emulated in software and slow. The two are bridged at the boundary (the codec takes physical values as `float`). The whole tree is ISO C11 without GNU extensions, which among other things stops GCC from silently fusing multiply-adds, so host and target results differ only for real reasons.
 
 ## 4. Modules
 
 ### 4.1 Plant core (`sim/core`, `sim/plants`)
 
-Physics only. One state variable (crankshaft speed) plus placeholder thermal and oil states:
+Physics only. Two dynamic states (crankshaft speed and air-path boost) plus placeholder coolant and oil states:
 
 ```
-J * d(omega)/dt = T_combustion(rpm, fuel) - T_friction(rpm) - T_load - (T_starter while engaged)
-T_combustion    = full_load_torque(rpm) * fuel_pct / 100
+J * dω/dt     = T_ind - T_fric - T_load + T_starter
+T_ind         = min(fuel, air) * (T_fl_brake(n) + T_fric(n))      (0 on a stationary shaft)
+air           = boost_floor + (1 - boost_floor) * boost
+dboost/dt     = (min(fuel, air) - boost) / boost_tau
+T_fric        = c0 + c1 * n           (static, up to c0, at standstill)
+T_starter     = T_stall * (1 - n / n_no_load)   while engaged, 0 above n_no_load
 ```
 
-Contract (v0.1):
+Contract:
 
 ```c
 typedef struct {
-    double fuel_pct;        /* 0..100, clamped by the plant */
-    double load_torque_nm;  /* resistive torque from the load */
-    bool   starter_active;
+    double fuel_pct;        /* 0..100 % of full-load fuelling, clamped by the plant */
+    double load_torque_nm;  /* resistive torque; negative values drive the engine */
+    bool   starter_engaged; /* decided outside the plant */
 } PlantInputs;
 
 void plant_step(PlantState *s, const PlantParams *p, const PlantInputs *in, double dt);
@@ -89,102 +100,147 @@ void plant_step(PlantState *s, const PlantParams *p, const PlantInputs *in, doub
 
 Rules: no I/O, no clock, no allocation, no global state, fixed step. Same inputs give the same outputs, bit for bit.
 
-**Why physics only.** The first slice put an idle governor inside the plant's torque function, so the engine would start by itself from 0 rpm with no starter. Two problems: a real engine does not do that, and a hidden governor makes it impossible to tell whether the controller under test or the plant kept the engine alive. The plant must respond; an ECU must decide.
+**Why physics only.** The first slice put an idle governor inside the plant's torque function, so the engine started itself from 0 rpm with no fuel and no starter (it reached about 700 rpm in 2 s). A real engine does not do that, and a hidden governor makes it impossible to tell whether the controller under test or the plant kept the engine alive. The plant must respond; an ECU must decide. For the same reason the starter is now engaged from outside: the first slice's plant dropped it at a hard-coded 400 rpm.
 
-**Why mean-value, one state.** A 1-state model already produces everything a speed loop needs (droop, recovery, overshoot, stall) and costs a few multiplications per step. Cycle-resolved combustion is out of scope (see README non-goals). The torque envelope is a lookup table; every number needs provenance (see `docs/parameters.md`).
+**Why the table is brake torque.** Datasheets give full-load **brake** torque. The first slice treated that table as combustion torque and subtracted friction again, so the engine delivered about 207 kW instead of the class's ~240 kW. Now indicated torque is built as brake plus friction, and a test checks that full fuel gives the table back. The governor break-off region (2200 rpm → 300 Nm) was removed from the physics: the governed ceiling belongs to the ECU.
+
+**Why a second state.** One state already produces droop, recovery, overshoot and stall, but without the turbocharger an engine accepts a load step instantly. That makes the "load step" scenario too easy to pass and leaves nothing for anti-stall logic to work against. The air-path state costs a few lines. Because the turbo spools on burnt fuel, the effective load-acceptance time constant from zero boost is `boost_tau / boost_floor` (about 2.7 s for `d936la6`).
+
+**Why mean-value.** Cycle-resolved combustion is out of scope (see the README's non-goals). Every number needs provenance: [`docs/parameters.md`](docs/parameters.md).
 
 ### 4.2 Loads (`sim/loads`)
 
-A load is a pluggable torque source: `torque = f(rpm, demand, dt)`. v0.1 ships a hydraulic pump (`T = Vg * dP / (2*pi*eta)`, with pressure following valve demand). Propeller law and dynamometer follow with later plants.
+A load is a torque source: `torque = f(command, environment, rpm, dt)`. v0.1 ships a load-sensing variable-displacement hoist pump: the machine controller commands displacement (flow), the load on the hook sets pressure, and
 
-**Why a separate module.** The architecture rule in the README says nothing in the core may assume a particular load. Keeping loads outside the plant is how the 2-stroke marine engine will reuse the same core with a propeller instead of a pump.
+```
+T = ratio * Vg_max * displacement * p / (2 * pi * eta_hm)
+```
+
+With no function active the pump destrokes to a small standby displacement and holds standby pressure, so its idle torque is small (the first slice held full displacement at standby, about 50 Nm at idle).
+
+**Why a separate module.** Nothing in the core may assume a particular load. Keeping loads outside the plant is how the 2-stroke marine engine will reuse the same core with a propeller instead of a pump.
 
 ### 4.3 Simulated engine ECU (`sim/engine_ecu`)
 
-The engine-side brain: low-idle governor, a PI speed governor driven by TSC1, a governed-speed ceiling, overspeed trip (latched until the engine stops), no fuel below cranking speed, and **ignoring stale commands** (TSC1 older than a timeout makes the engine revert to idle).
+The engine-side brain:
 
-It lives in `sim/` (host code, `double`), not in `portable/`, because in Level 1 it is part of the *simulated world*, not the device under test.
+- starter control: cranks while START is held, releases above the running speed, gives up after a time limit
+- no fuel below the speed at which it can synchronise
+- low-idle governor, and a PI speed governor with anti-windup driven by external speed requests, clamped to the governed range
+- optional droop (`droop_pct`, 0 = isochronous), needed for generator-set load sharing in v0.6
+- stale requests ignored: after a timeout the engine returns to low idle on its own
+- overspeed trip, latched until the engine has stopped
+- stall detection
+- it reports who controls its speed (J1939 SPN 1483)
+
+States: `OFF` (key off) → `STOPPED` → `CRANKING` → `RUNNING`, and back to `STOPPED` on stall or after a trip.
+
+It lives in `sim/` (host code, `double`), not in `portable/`, because in Level 1 it is part of the *simulated world*, not the device under test. It knows nothing about J1939 frames: the bench decodes TSC1 and hands it an `EngineEcuRequest`. It keeps its own millisecond time, advanced only by its step function.
 
 **Why it exists as its own module.** It is what lets the plant stay pure and the controller under test talk standard J1939. In Level 2 this module is bypassed (the user's firmware replaces it) and the plant receives fuel commands directly through the I/O backend.
 
-**Implemented modes:** TSC1 override mode `speed control`. Torque and limit modes are treated as "override disabled" (idle) until they are implemented, and this is documented rather than silently approximated.
+**Implemented override modes:** speed control. Torque control and speed/torque limits are treated as "override disabled" (low idle) until they are implemented, and this is documented rather than silently approximated.
 
-### 4.4 J1939 codec (`portable/j1939`)
+### 4.4 J1939 codec and bench messages (`portable/j1939`)
 
-Encode and decode of the v0.1 message set. Pure functions on small structs; saturating conversions (values outside range clamp instead of wrapping), "not available" patterns handled on decode.
+Encode and decode of the v0.1 message set into small structs with `float` physical values. Identifiers are composed and parsed by PGN and destination, not compared as fixed numbers. Encoders saturate (out-of-range values clamp; they never wrap, and NaN maps low); decoders reject frames of the wrong PGN or length and report "not available" and error values as invalid.
 
-| Message | PGN | Direction (from the engine) | Rate | Content |
+| Message | PGN | Direction (seen from the engine) | Rate | Content |
 |---|---|---|---|---|
-| TSC1 | 0 | in | 10-20 ms while active | override mode, requested speed (SPN 898), requested torque (SPN 518) |
-| EEC1 | 61444 | out | 10 ms | engine speed (SPN 190), actual and demanded torque (SPN 513 / 512, percent) |
+| TSC1 | 0 | in | 10 ms while overriding | override mode (SPN 695), requested speed (SPN 898), requested torque (SPN 518) |
+| EEC1 | 61444 | out | 10 ms | torque mode (SPN 899), demand and actual percent torque (SPN 512, 513), engine speed (SPN 190), controlling address (SPN 1483) |
 | ET1 | 65262 | out | 1000 ms | coolant temperature (SPN 110) |
 | EFL/P1 | 65263 | out | 500 ms | oil pressure (SPN 100) |
 
-Source addresses: engine `0x00`, machine controller `0x03`. **These layouts are derived from public sources and must be verified against your copy of J1939-71.** The repo ships no spec text.
+Two **bench messages**, which are *not* J1939, use J1939 framing in the Proprietary B range:
 
-**Why four messages, not six.** The first README promised "six PGNs" without naming them. A number picked in advance is not a requirement; each message is added when a scenario or test needs it. **Why TSC1 means what the standard says.** The first slice sent a throttle percentage in the byte that carries requested speed, while declaring "speed control" mode. That works only against its own simulator and teaches the wrong protocol, which defeats the purpose of practising on a realistic bus.
+| Message | PGN | From | Rate | Content |
+|---|---|---|---|---|
+| OC_OPERATOR | 65312 (`0xFF20`) | bench, `0xFC` | 20 ms | hand-throttle target speed, hoist lever, fault-reset button |
+| OC_PUMP_CMD | 65313 (`0xFF21`) | machine controller | 10 ms | pump displacement command |
+
+Addresses: engine `0x00`, machine controller `0x27`, bench `0xFC`. The first slice used `0x03` for the controller, which is the preferred address of Transmission #1. Byte layouts, timing and engine behaviour are specified in [`docs/bus-interface.md`](docs/bus-interface.md). **These layouts are derived from public sources and must be verified against your copy of J1939-71.** The repo ships no spec text.
+
+**Why four PGNs, not six.** The first README promised "six PGNs" without naming them. A number picked in advance is not a requirement; each message is added when a scenario or test needs it.
+
+**Why TSC1 means what the standard says.** The first slice sent a throttle percentage in the byte that carries requested speed, while declaring "speed control" mode. A real engine would have read about 8000 rpm, which falls in the reserved range. That works only against its own simulator and teaches the wrong protocol.
+
+**Why bench messages.** In Level 1 the device under test only sees the bus. If operator inputs came from a command line or a file, a controller on a real board (v0.3) would have no way to receive them. Over CAN, the same controller works unchanged on a laptop, in Renode and on hardware. They are named `OC_*` and documented as project-specific so nobody mistakes them for J1939.
+
+**Not yet implemented, on purpose.** TSC1 message counter and checksum (SPN 4206/4207, sent as "not available"), DM1 diagnostics, transport protocol: see the roadmap, v0.3.
 
 ### 4.5 Machine-controller core (`portable/machine_ctrl`)
 
-The reference Level 1 controller: asks for an engine speed with a slew-limited request, tracks engine status from EEC1, and handles faults:
+The reference Level 1 controller. It is plain C with no I/O: the platform feeds it every received frame and calls `mc_step()` every 10 ms; it returns the frames to send.
 
 ```
-WAIT_ENGINE --(valid EEC1, engine running)--> RUN
-RUN         --(EEC1 timeout | overspeed)----> FAULT   (releases the override; engine returns to idle)
-FAULT       --(explicit clear)--------------> WAIT_ENGINE
+WAIT_ENGINE --(valid EEC1, speed >= running for run_confirm)--> RUN
+RUN --(EEC1 timeout | overspeed | stall | override not honoured)--> FAULT
+FAULT --(fault-reset button press, or mc_clear_fault())--> WAIT_ENGINE
 ```
 
-It is plain C with no I/O: the platform layer feeds it decoded messages and a tick, and sends whatever TSC1 it returns. This is the code that is meant to end up on the STM32.
+In RUN it asks the engine for the operator's target speed through TSC1 (speed control, slew-limited) and passes the hoist lever to the pump. Outside RUN it releases the override (TSC1 mode "disabled"), so the engine returns to its own idle governor, and commands zero displacement. Time is a wrap-safe millisecond counter supplied by the caller.
+
+**Why it checks SPN 1483.** Sending TSC1 is not the same as being in control: the frames can be lost, or the engine can refuse the override. Without the check, a controller would keep "running" a machine it no longer controls. The check also catches the loss of the speed command from the controller's side.
 
 **Why a reference controller at all.** It is both an example for newcomers and the test fixture that proves the interface works end to end. Users are expected to replace it with their own.
 
 ### 4.6 Runtime (`sim/runtime`)
 
-Two pieces: an **abstract clock** and a **scenario runner**.
+**Bench.** The simulated machine as seen from the bus: plant, engine ECU and pump, plus the operator panel. `oc_bench_rx()` takes frames from the device under test; `oc_bench_step()` advances one fixed step and returns the frames the machine transmits. The bench is the same code in the tests, in `open-crank-run` and in `open-crank-sil`.
 
-**Clock modes.**
+**Time.** The bench owns simulated time as an integer millisecond count and never reads a clock. A **driver** decides how fast that time passes:
 
-| Mode | Used for | Version |
-|---|---|---|
-| free-run | tests and CI: as fast as possible, deterministic, no wall clock | v0.1 |
-| paced | interactive demos: wall-clock paced (soft real time) | v0.1 |
-| virtual | emulator-driven: time advances when the emulator says so | v0.2 |
-| hard | FPGA rigs: fixed step with a measured jitter budget | v0.4 |
+| Driver | Used for | Where | Version |
+|---|---|---|---|
+| free-run | tests, CI, headless runs: as fast as possible, deterministic | `sim/runtime/loop.c`, `platforms/host` | v0.1 |
+| paced | interactive SIL: one step per 10 ms of wall clock (soft real time) | `platforms/linux-socketcan/pacer.c` | v0.1 |
+| virtual | emulator-driven: step when the emulator's time says so | `platforms/renode` | v0.2 |
+| hard | FPGA rigs: fixed step with a measured jitter budget | `platforms/fpga` | v0.4 |
 
-Proposed interface:
+**Why the bench owns time instead of reading an abstract clock.** In the first slice the 10 ms step was glued to the wall clock inside `main`, which made CI slow and blocked Renode. The earlier plan was a clock interface (`now`, `wait_until`). That fits free-run and paced, but not an emulator: co-simulating with Renode means "advance by N, then exchange frames" in lockstep, not "wait until T". With a step function that never reads time, every driver is a short loop around the same code.
 
-```c
-typedef struct {
-    uint64_t (*now_ns)(void *ctx);
-    void     (*wait_until_ns)(void *ctx, uint64_t t_ns);  /* no-op in free-run */
-    void      *ctx;
-} OcClock;
-```
+**In-memory loop** (`loop.c`). The bench and the reference controller in one process, joined by an in-memory bus. Every frame goes through the real encoders and decoders; only the socket is missing. Frames from the bench reach the controller in the same step; frames from the controller reach the bench at the start of the next one.
 
-**Why abstract the clock now.** In the first slice the 10 ms step was glued to the wall clock inside `main`, which makes CI slow and flaky and blocks Renode: Renode has its own *virtual* time, and a plant paced by the PC's clock will drift against firmware paced by the emulator. Deciding the clock interface early is cheap; retrofitting it later touches everything.
-
-**Scenario runner.** Scenarios are time-ordered events in a plain CSV (no parser dependencies):
+**Scenarios** are time-ordered signal changes in plain CSV:
 
 ```csv
 time_s,signal,value
 0.0,key_on,1
-5.0,hoist_demand,0.85
-15.0,hoist_demand,0.0
-20.0,mc_tx_enable,0
+0.5,start,1
+3.0,start,0
+8.0,hoist_demand_pct,85
+25.0,end,0
 ```
 
-Signals are named inputs (`key_on`, `hoist_demand`, `target_rpm`, `mc_tx_enable`, ...). **Why data, not code.** The hoist profile used to be hard-coded in `main.c`. The same scenario must run in CI tests, in the SIL demo, in Renode and on hardware; if it is code, each of those gets its own copy and they diverge. CSV is trivial to read from C and from Python.
+| Signal | Meaning |
+|---|---|
+| `key_on`, `start` | key switch; key held in START |
+| `target_rpm` | operator hand throttle |
+| `hoist_demand_pct` | operator hoist lever |
+| `hoist_load_bar` | pressure the load on the hook requires |
+| `fault_reset` | operator fault-reset button |
+| `fault.mc_tx_lost` | frames from the device under test are lost |
+| `fault.engine_tx_lost` | the engine stops transmitting |
+| `fault.ecu_ignores_tsc1` | the engine ECU ignores speed requests |
+| `fault.overrun_torque_nm` | external torque driving the crankshaft |
+| `end` | end of the scenario |
+
+Unknown signals, bad numbers, decreasing times and events after `end` are errors with a line number: a typo must fail loudly, not run a different test.
+
+**Why data, not code.** The hoist profile used to be hard-coded in `main.c`. The same scenario must run in CI tests, in the SIL demo, in Renode and on hardware; if it is code, each of those gets its own copy and they diverge. The files in `scenarios/` are the ones the closed-loop tests load. CSV is trivial to read from C and from Python.
+
+**Trace** (`trace.c`). One CSV row per step: inputs, plant, ECU, pump and, when the controller runs in the same process, its state.
 
 ### 4.7 Platforms (`platforms/*`)
 
 Thin glue per target; no control logic or physics.
 
-- `linux-socketcan`: opens a non-blocking raw CAN socket, sends and receives 29-bit frames, hosts the wall-clock-paced SIL executables.
-- `renode` *(planned, v0.2)*: platform description, scripts and a virtual-time clock bridge.
-- `stm32g4` *(planned, v0.3)*: FDCAN driver and board startup, building `portable/` unchanged.
+- `host`: `open-crank-run`, the free-running closed loop. Plain C, builds anywhere.
+- `linux-socketcan`: `open-crank-sil` (bench) and `open-crank-mc` (reference controller), each paced by the wall clock on a non-blocking raw CAN socket with 29-bit frames.
+- `renode` *(planned, v0.2)*: platform description, scripts and a virtual-time driver.
+- `stm32g4` *(planned, v0.3)*: FDCAN driver and board startup, building `portable/` unchanged with the same toolchain file.
 - `fpga` *(reserved, v0.4)*: time and I/O backend for hard real time.
-
-A bus backend only needs to send and receive frames. An in-memory loopback bus is also provided for tests, so closed-loop tests exercise the real encode and decode paths without sockets.
 
 ## 5. Timing model
 
@@ -192,27 +248,35 @@ A bus backend only needs to send and receive frames. An in-memory loopback bus i
 |---|---|---|
 | Plant step | 10 ms, explicit Euler | 1 ms (v0.4); revisit the integrator if stiffness appears |
 | Simulated ECU | every plant step | same |
-| Machine controller | 20 ms | configurable |
-| EEC1 | every 10 ms | per J1939 |
+| Machine controller | 10 ms (TSC1 and OC_PUMP_CMD every period) | configurable |
+| EEC1 / EFL/P1 / ET1 | 10 / 500 / 1000 ms | per J1939 |
+| OC_OPERATOR | 20 ms | |
+| Timeouts | TSC1 at the engine 200 ms; EEC1 and OC_OPERATOR at the controller 200 ms; pump command 200 ms | |
 
-**Why 10 ms now.** It matches the fastest J1939 message period and keeps the loop easy to reason about. The state is slow compared to the step (inertia of the order of 1-3 kg*m^2), so explicit Euler is adequate. Moving to 1 ms is a configuration change, not a redesign.
+**Why 10 ms.** It matches the fastest message period and keeps the loop easy to reason about. The states are slow compared with the step (inertia of the order of 1–3 kg·m², air path of the order of a second), so explicit Euler is adequate. Moving to 1 ms is a configuration change, not a redesign. The controller runs at 10 ms rather than the 20 ms first planned because 10 ms is the TSC1 rate commonly given for engines (verify against J1939-71).
 
 **What the FPGA is actually for.** The plant's equations (tens of states at about 1 kHz) fit easily on a CPU, so v0.4 does *not* put the plant on the FPGA. The FPGA exists for what a CPU does poorly: crank and cam waveforms with microsecond jitter, deterministic analog and digital I/O, and timestamped CAN. Plant on a CPU or SoC core, timing on the FPGA is the usual HIL split.
 
 ## 6. Testing strategy
 
-| Layer | What it checks | How |
+| Layer | What it checks | Where |
 |---|---|---|
-| Codec | known test vectors, round trips, saturation, "not available", short frames | unit tests |
-| Plant | no self-start with zero fuel, monotonic spin-down, fuel clamping, determinism | unit tests |
-| Closed loop | cold start; load step and release; command loss; status loss; overspeed | headless, free-run clock, loopback bus |
-| Portability | `portable/` builds for Cortex-M4F with no undefined symbols | CI job (section 3) |
+| Codec | identifiers, known vectors, round trips, saturation, "not available", short and foreign frames, bench messages | `tests/test_j1939.c` |
+| Plant | no self-start, cranking speed, monotonic spin-down, fuel clamping, full fuel gives the brake table, air-path lag, static friction, determinism | `tests/test_plant.c` |
+| Pump | torque formula, standby, relief, lag, standstill | `tests/test_hydraulic_pump.c` |
+| Engine ECU | key off, fuel enable, start and idle, speed requests, clamping, timeout, override modes, overspeed latch, stall, droop | `tests/test_engine_ecu.c` |
+| Controller | state machine, confirmations, slew limit, clamping, timeouts, override check, reset on press, time wrap-around | `tests/test_machine_ctrl.c` |
+| Bench, scenarios | message periods, routing, fault switches; CSV parser and every shipped scenario file | `tests/test_bench.c`, `tests/test_scenario.c` |
+| Closed loop | cold start; load step and release; speed-command loss; engine-status loss; overspeed; ignored override; determinism | `tests/test_closed_loop.c` |
+| Portability | `portable/` on Cortex-M4F, symbols, includes | `tools/check_portable.sh` |
+| Undefined behaviour | ASan, UBSan, float-cast-overflow | CI `sanitizers` job |
+| Tests can fail | 18 deliberate mutations, each must fail the suite | `tools/mutation_check.sh` |
 | Golden traces | speed traces from SIL vs Renode within a stated tolerance | v0.2 |
 
 Conventions:
 
-- **Tests never use `assert()`.** A `CHECK` macro that always runs is used, because `assert` disappears under `-DNDEBUG` (typical Release builds) and tests would silently stop testing.
-- **Mutation sanity.** Before trusting a test, break the code on purpose (for example disable the command timeout) and confirm the test fails. A test that cannot fail proves nothing.
+- **Tests never use `assert()`.** `CHECK` (`tests/check.h`) always runs, because `assert` disappears under `-DNDEBUG` (typical Release builds) and tests would silently stop testing. CI runs the suite in Release too.
+- **Mutation sanity.** A test that cannot fail proves nothing. `tools/mutation_check.sh` breaks each safety-relevant behaviour in a scratch copy (disable the command timeout, unlatch the overspeed trip, keep the pump commanded in FAULT, ...) and requires the suite to fail. When code changes make a mutation pattern stale, the script says so.
 - A control regression must fail the build. That is the product promise ("a control regression fails a build instead of a shift").
 
 ## 7. Decisions and rationale
@@ -224,12 +288,18 @@ Conventions:
 | D3 | Three zones with a one-way dependency, enforced by CI | One flat `src/` | Protects "same code on laptop, emulator and board" |
 | D4 | `float` in `portable/`, `double` in `sim/` | `double` everywhere | G431 FPU is single precision |
 | D5 | TSC1 used per its standard meaning | Custom throttle frame | Teaches the real protocol |
-| D6 | Abstract clock with free-run mode | Wall-clock only | Fast deterministic CI; required for Renode virtual time |
-| D7 | Scenarios as CSV data | Hard-coded in `main`; YAML | One scenario everywhere; no parser dependency |
-| D8 | Four PGNs in v0.1 | "Six PGNs" | Add messages when something needs them |
+| D6 | The bench owns simulated time; drivers advance it | Wall clock in `main`; an abstract `now`/`wait_until` clock | Fast deterministic CI; lockstep with an emulator |
+| D7 | Scenarios as CSV data, shared by tests, SIL and runner | Hard-coded in `main`; YAML | One scenario everywhere; no parser dependency |
+| D8 | Four J1939 PGNs in v0.1 | "Six PGNs" | Add messages when something needs them |
 | D9 | `CHECK` macro instead of `assert` | `assert` | Survives Release builds |
 | D10 | One repository, one org-level profile | Many repos from day one | Split only when a second consumer exists |
 | D11 | FPGA for timing and I/O, not for the plant | Plant on FPGA | The plant is cheap on a CPU; jitter is the hard part |
+| D12 | Full-load table is brake torque; indicated = brake + friction | Table as indicated torque | Matches datasheets; removes double-counted friction |
+| D13 | Air-path state in the plant | One state | Load acceptance is otherwise unrealistically fast |
+| D14 | Operator inputs and pump command on the bus (bench messages) | Command-line arguments; scenario drives the pump | A board in the loop only sees the bus; the controller must be able to act on its load |
+| D15 | Controller confirms control through EEC1 SPN 1483 | Trust that TSC1 is honoured | Lost frames and refused overrides are real failures |
+| D16 | Allow `mem*` in `portable/`, forbid everything else | "No undefined symbols at all" | GCC requires those four in freestanding code; soft-double helpers are what matter |
+| D17 | Mutation checks in CI | Manual "break it once" | Keeps proving that tests can fail as code changes |
 
 ## 8. Migration map from the earlier trees
 
@@ -237,28 +307,31 @@ Conventions:
 |---|---|
 | `core/` | `sim/core/` |
 | `plants/d936la6/` | `sim/plants/d936la6/` |
-| `loads/` | `sim/loads/` |
+| `loads/hydraulic_pto` | `sim/loads/hydraulic_pump` |
 | `j1939/` | `portable/j1939/` |
-| `ecu/reference-fw/` | split: logic to `portable/machine_ctrl/`, glue to `platforms/linux-socketcan/` |
+| `ecu/reference-fw/` | split: logic to `portable/machine_ctrl/`, glue to `platforms/linux-socketcan/mc_main.c` |
 | `backends/sil-vcan/`, `io/vcan/` | `platforms/linux-socketcan/` |
-| `time/` | `sim/runtime/` (clock) |
+| `time/` | `sim/runtime/` (bench time) and `platforms/linux-socketcan/pacer.c` |
 | idle governor inside `d936la6.c` | `sim/engine_ecu/` |
 | hoist profile inside `main.c` | `scenarios/*.csv` |
 
-Migration order is in [ROADMAP.md](ROADMAP.md), section "v0.1".
+The migration itself is recorded in [ROADMAP.md](ROADMAP.md), section "v0.1".
 
 ## 9. Deliberately deferred
 
-- **Generic plant plugin contract.** With one plant, any abstraction would be a guess. Extract it from what the second plant needs (v0.5).
+- **Generic plant plugin contract.** With one plant, any abstraction would be a guess. Extract it from what the second plant needs (v0.5). The first slice's function-pointer hooks were removed for this reason.
 - **Protocol abstraction.** J1939 is the right protocol for the current plant. The 2-stroke uses a different control scheme; separate it then.
-- **Level 2 signal layer** (crank and cam waveforms, analog I/O). Designing it now would be speculation; it arrives with the HIL backend in v0.4.
+- **Level 2 signal layer** (crank and cam waveforms, analog I/O), including crank angle. Designing it now would be speculation; it arrives with the HIL backend in v0.4.
+- **TSC1 counter and checksum, DM1, transport protocol.** With fault injection on real hardware (v0.3).
+- **Smarter reference controller** (power limiting, anti-stall). The interface allows it; the reference stays minimal until the basics are proven.
 - **YAML profiles.** When added, they load in `sim/` only. `portable/` never reads files.
 - **FMI/FMU export.** Attractive for interoperability; revisit once the plant interface has settled.
 - **Aftertreatment, detailed thermal model.** Large modelling effort that does not exercise the skills the project exists for (control loops, protocol, timing). Backlog.
 
 ## 10. Known risks
 
-1. **Renode and the STM32G4 CAN peripheral are unconfirmed.** Public evidence found for Renode CAN is for other STM32 families (for example the STM32H7 reference platform); nothing confirmed for the G4's FDCAN. Verify before committing v0.2 to that target. Fallback: emulate a different CAN-capable MCU for firmware-in-the-loop, or compile the controller for the host, and keep the real G4 for v0.3. The `portable/` zone makes this cheap, which is also why D3 matters.
+1. **Renode and the STM32G4 CAN peripheral are unconfirmed.** Public evidence found for Renode CAN is for other STM32 families (for example the STM32H7 reference platform); nothing confirmed for the G4's FDCAN. Verify before committing v0.2 to that target, and before buying a board. Fallback: emulate a different CAN-capable MCU for firmware-in-the-loop, or compile the controller for the host, and keep the real G4 for v0.3. The `portable/` zone makes this cheap, which is also why D3 matters.
 2. **Parameter validity.** The plant is representative, not calibrated. Mitigation: provenance for every parameter, honest wording, hooks for calibration by someone with bench data.
-3. **Time synchronisation with an emulator.** Mitigation: the virtual clock mode (D6) and golden-trace comparison.
-4. **Scope.** The vision is large for a small team. Mitigation: milestones with explicit exit criteria and a standing list of non-goals.
+3. **Message layouts from public sources.** Mitigation: every layout is in one place ([`docs/bus-interface.md`](docs/bus-interface.md)) with known test vectors, so a correction from someone with the standard is a small change.
+4. **Time synchronisation with an emulator.** Mitigation: the bench never reads a clock (D6); golden-trace comparison in v0.2.
+5. **Scope.** The vision is large for a small team. Mitigation: milestones with explicit exit criteria and a standing list of non-goals.

@@ -1,0 +1,11 @@
+# The engine ignores the override.
+# The engine ECU never honours TSC1. The controller must not believe it is in
+# control: EEC1 SPN 1483 never shows its address, so it faults.
+# Used by tests/test_closed_loop.c.
+time_s,signal,value
+0.0,fault.ecu_ignores_tsc1,1
+0.0,key_on,1
+0.0,target_rpm,1500
+0.5,start,1
+3.0,start,0
+10.0,end,0

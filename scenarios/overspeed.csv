@@ -1,0 +1,13 @@
+# Overspeed protection.
+# An overrunning load (for example a failed counterbalance valve while lowering)
+# drives the engine for 1 s. The engine ECU must cut fuel and stay tripped until
+# the engine has stopped; the controller must fault.
+# Used by tests/test_closed_loop.c.
+time_s,signal,value
+0.0,key_on,1
+0.0,target_rpm,1500
+0.5,start,1
+3.0,start,0
+8.0,fault.overrun_torque_nm,400
+9.0,fault.overrun_torque_nm,0
+25.0,end,0
