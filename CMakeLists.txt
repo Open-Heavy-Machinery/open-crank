@@ -31,6 +31,9 @@ add_library(opencrank_sim STATIC
     sim/loads/src/hydraulic_pump.c
     sim/engine_ecu/src/engine_ecu.c
     sim/runtime/src/bench.c
+    sim/runtime/src/signals.c
+    sim/runtime/src/scenario.c
+    sim/runtime/src/loop.c
 )
 target_include_directories(opencrank_sim PUBLIC
     sim/core/include
@@ -61,7 +64,8 @@ target_link_libraries(open-crank-mc PRIVATE opencrank_portable opencrank_socketc
 # Tests
 # ------------------------------------------------------------------------------
 enable_testing()
-foreach(test_name test_j1939 test_machine_ctrl test_plant test_hydraulic_pump test_engine_ecu test_bench)
+foreach(test_name test_j1939 test_machine_ctrl test_plant test_hydraulic_pump test_engine_ecu test_bench
+                  test_scenario test_closed_loop)
     add_executable(${test_name} tests/${test_name}.c)
     target_link_libraries(${test_name} PRIVATE opencrank_sim m)
     add_test(NAME ${test_name} COMMAND ${test_name})

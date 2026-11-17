@@ -31,6 +31,27 @@ void oc_bench_init(OcBench *b, const OcBenchConfig *cfg) {
     hydraulic_pump_init(&b->pump, cfg->pump);
 }
 
+void oc_bench_set_scenario(OcBench *b, const OcScenario *s) {
+    b->scenario = s;
+    b->scenario_next = 0U;
+}
+
+bool oc_bench_scenario_done(const OcBench *b) {
+    return b->scenario != NULL && b->scenario->has_end && b->t_ms >= b->scenario->end_ms;
+}
+
+static void apply_due_events(OcBench *b) {
+    const OcScenario *s = b->scenario;
+    if (s == NULL) {
+        return;
+    }
+    while (b->scenario_next < s->n && s->events[b->scenario_next].t_ms <= b->t_ms) {
+        const OcEvent *e = &s->events[b->scenario_next];
+        oc_signals_set(&b->sig, e->signal, e->value);
+        b->scenario_next++;
+    }
+}
+
 double oc_bench_time_s(const OcBench *b) {
     return (double)b->t_ms / 1000.0;
 }
@@ -138,6 +159,9 @@ static size_t transmit(const OcBench *b, J1939Frame *tx, size_t cap) {
 size_t oc_bench_step(OcBench *b, J1939Frame *tx, size_t cap) {
     const OcBenchConfig *cfg = b->cfg;
     const double dt = (double)cfg->step_ms / 1000.0;
+
+    /* 0. Scenario events due at the start of this step. */
+    apply_due_events(b);
 
     /* 1. The engine ECU decides fuel and starter. */
     b->ecu.ignore_requests = b->sig.fault_ecu_ignores_tsc1;

@@ -25,6 +25,8 @@
 #include <opencrank/j1939.h>
 #include <opencrank/loads/hydraulic_pump.h>
 #include <opencrank/plant.h>
+#include <opencrank/runtime/scenario.h>
+#include <opencrank/runtime/signals.h>
 
 /** @brief What the bench simulates, and how. */
 typedef struct {
@@ -42,24 +44,11 @@ typedef struct {
 /** @brief The reference configuration: d936la6 plant and ECU, hoist pump. */
 extern const OcBenchConfig OC_BENCH_D936LA6;
 
-/** @brief Operator, environment and fault-injection inputs (set by a scenario). */
-typedef struct {
-    bool key_on;
-    bool start;                  /**< key held in START */
-    double target_rpm;           /**< operator hand throttle; <= 0 means not set */
-    double hoist_demand_pct;     /**< operator hoist lever, 0..100 */
-    double hoist_load_bar;       /**< pressure the load on the hook requires */
-    bool fault_reset;            /**< operator fault-reset button */
-
-    bool fault_mc_tx_lost;       /**< frames from the device under test never arrive */
-    bool fault_engine_tx_lost;   /**< the engine stops transmitting */
-    bool fault_ecu_ignores_tsc1; /**< the engine ECU ignores speed requests */
-    double fault_overrun_torque_nm; /**< external torque driving the crankshaft */
-} OcBenchSignals;
-
 typedef struct {
     const OcBenchConfig *cfg;
-    OcBenchSignals sig;
+    OcSignals sig;               /**< operator, environment and fault-injection inputs */
+    const OcScenario *scenario;  /**< optional: drives sig over time */
+    size_t scenario_next;
 
     PlantState plant;
     EngineEcu ecu;
@@ -77,6 +66,12 @@ typedef struct {
 } OcBench;
 
 void oc_bench_init(OcBench *b, const OcBenchConfig *cfg);
+
+/** @brief Lets a scenario drive the signals. Events apply at the start of the step they fall in. */
+void oc_bench_set_scenario(OcBench *b, const OcScenario *s);
+
+/** @brief True once the scenario's `end` time is reached (never true without a scenario or `end`). */
+bool oc_bench_scenario_done(const OcBench *b);
 
 /** @brief Hands the bench one frame received from the device under test. */
 void oc_bench_rx(OcBench *b, const J1939Frame *f);

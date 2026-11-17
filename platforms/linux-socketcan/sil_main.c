@@ -25,7 +25,7 @@ static void handle_sigint(int sig) {
 }
 
 /* Operating profile (moves to a scenario file in the next step). */
-static void apply_profile(OcBenchSignals *s, double t, double target_rpm) {
+static void apply_profile(OcSignals *s, double t, double target_rpm) {
     s->key_on = true;
     s->start = (t >= 0.5 && t < 3.0);
     s->target_rpm = (t >= 4.0) ? target_rpm : 0.0;
