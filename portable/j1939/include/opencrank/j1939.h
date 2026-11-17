@@ -33,10 +33,10 @@ typedef struct {
 #define J1939_ADDR_NULL 0xFEU
 #define J1939_ADDR_GLOBAL 0xFFU
 
-#define J1939_PGN_TSC1 0x00000UL   /**< Torque/Speed Control 1 (PGN 0) */
-#define J1939_PGN_EEC1 0x0F004UL   /**< Electronic Engine Controller 1 (PGN 61444) */
-#define J1939_PGN_ET1 0x0FEEEUL    /**< Engine Temperature 1 (PGN 65262) */
-#define J1939_PGN_EFLP1 0x0FEEFUL  /**< Engine Fluid Level/Pressure 1 (PGN 65263) */
+#define J1939_PGN_TSC1 0x00000U    /**< Torque/Speed Control 1 (PGN 0) */
+#define J1939_PGN_EEC1 0x0F004U    /**< Electronic Engine Controller 1 (PGN 61444) */
+#define J1939_PGN_ET1 0x0FEEEU     /**< Engine Temperature 1 (PGN 65262) */
+#define J1939_PGN_EFLP1 0x0FEEFU   /**< Engine Fluid Level/Pressure 1 (PGN 65263) */
 
 /** @name Identifier helpers
  * PDU1 PGNs (PF < 240) carry a destination address in PS; PDU2 PGNs are broadcast.

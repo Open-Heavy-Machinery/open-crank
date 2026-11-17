@@ -25,8 +25,8 @@
 
 #include <opencrank/j1939.h>
 
-#define OC_PGN_OPERATOR 0x0FF20UL  /**< Proprietary B, group extension 0x20 */
-#define OC_PGN_PUMP_CMD 0x0FF21UL  /**< Proprietary B, group extension 0x21 */
+#define OC_PGN_OPERATOR 0x0FF20U   /**< Proprietary B, group extension 0x20 */
+#define OC_PGN_PUMP_CMD 0x0FF21U   /**< Proprietary B, group extension 0x21 */
 
 #define OC_ADDR_MACHINE_CTRL 0x27U /**< default address of the machine controller */
 #define OC_ADDR_BENCH 0xFCU        /**< bench (operator panel, environment) */

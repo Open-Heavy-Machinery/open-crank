@@ -17,17 +17,17 @@ static uint8_t pf_of(uint32_t pgn) {
 uint32_t j1939_make_id(uint8_t priority, uint32_t pgn, uint8_t dest, uint8_t src) {
     uint32_t id = ((uint32_t)(priority & 0x07U) << 26);
     if (pf_of(pgn) < PDU2_MIN_PF) {
-        id |= ((pgn & 0x3FF00UL) << 8) | ((uint32_t)dest << 8);
+        id |= ((pgn & 0x3FF00U) << 8) | ((uint32_t)dest << 8);
     } else {
-        id |= (pgn & 0x3FFFFUL) << 8;
+        id |= (pgn & 0x3FFFFU) << 8;
     }
     return id | (uint32_t)src;
 }
 
 uint32_t j1939_id_pgn(uint32_t id) {
-    uint32_t pgn = (id >> 8) & 0x3FFFFUL;
+    uint32_t pgn = (id >> 8) & 0x3FFFFU;
     if (pf_of(pgn) < PDU2_MIN_PF) {
-        pgn &= 0x3FF00UL;
+        pgn &= 0x3FF00U;
     }
     return pgn;
 }
@@ -37,7 +37,7 @@ uint8_t j1939_id_source(uint32_t id) {
 }
 
 uint8_t j1939_id_dest(uint32_t id) {
-    const uint32_t pgn = (id >> 8) & 0x3FFFFUL;
+    const uint32_t pgn = (id >> 8) & 0x3FFFFU;
     return (pf_of(pgn) < PDU2_MIN_PF) ? (uint8_t)((id >> 8) & 0xFFU) : (uint8_t)J1939_ADDR_GLOBAL;
 }
 
