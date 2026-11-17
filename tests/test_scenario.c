@@ -74,9 +74,30 @@ static void test_events_apply_in_their_step(void) {
     CHECK(!oc_bench_scenario_done(&b));
 }
 
-int main(void) {
+/* Every scenario file shipped in scenarios/ (passed by the build) must parse and have an end. */
+static void check_files(int argc, char **argv) {
+    if (argc <= 1) {
+        return;
+    }
+    for (int i = 1; i < argc; i++) {
+        char err[600] = "";
+        const bool ok = oc_scenario_load(argv[i], &scn, err, sizeof(err));
+        CHECK(ok);
+        CHECK(scn.has_end);
+        if (!ok) {
+            fprintf(stderr, "  %s\n", err);
+        }
+    }
+}
+
+int main(int argc, char **argv) {
     RUN_TEST(test_parses_valid_text);
     RUN_TEST(test_rejects_bad_text);
     RUN_TEST(test_events_apply_in_their_step);
+    if (argc > 1) {
+        const int before = oc_failures;
+        check_files(argc, argv);
+        printf("%s  scenario files (%d)\n", oc_failures == before ? "PASS" : "FAIL", argc - 1);
+    }
     return check_report();
 }

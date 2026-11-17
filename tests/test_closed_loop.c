@@ -15,47 +15,18 @@
 #include <opencrank/plants/d936la6.h>
 #include <opencrank/runtime/loop.h>
 
-/* Engine started and asked for 1500 rpm; settled by about 6 s. */
-#define PREFIX                       \
-    "time_s,signal,value\n"          \
-    "0.0,key_on,1\n"                 \
-    "0.0,target_rpm,1500\n"          \
-    "0.0,hoist_load_bar,250\n"       \
-    "0.5,start,1\n"                  \
-    "3.0,start,0\n"
+#ifndef OC_SCENARIO_DIR
+#error "OC_SCENARIO_DIR must point at the scenarios/ directory"
+#endif
 
-static const char *const COLD_START = PREFIX "12.0,end,0\n";
-
-static const char *const HOIST_STEP = PREFIX
-    "8.0,hoist_demand_pct,85\n"
-    "18.0,hoist_demand_pct,0\n"
-    "25.0,end,0\n";
-
-static const char *const SPEED_COMMAND_LOSS = PREFIX
-    "8.0,fault.mc_tx_lost,1\n"
-    "14.0,fault.mc_tx_lost,0\n"
-    "14.5,fault_reset,1\n"
-    "15.0,fault_reset,0\n"
-    "25.0,end,0\n";
-
-static const char *const ENGINE_STATUS_LOSS = PREFIX
-    "6.0,hoist_demand_pct,50\n"
-    "8.0,fault.engine_tx_lost,1\n"
-    "14.0,end,0\n";
-
-static const char *const OVERSPEED = PREFIX
-    "8.0,fault.overrun_torque_nm,400\n"
-    "9.0,fault.overrun_torque_nm,0\n"
-    "25.0,end,0\n";
-
-static const char *const OVERRIDE_IGNORED =
-    "time_s,signal,value\n"
-    "0.0,fault.ecu_ignores_tsc1,1\n"
-    "0.0,key_on,1\n"
-    "0.0,target_rpm,1500\n"
-    "0.5,start,1\n"
-    "3.0,start,0\n"
-    "10.0,end,0\n";
+/* The scenario files are the same ones the SIL demo and open-crank-run use.
+ * In each, the engine is started and asked for 1500 rpm, settled by ~6 s. */
+#define COLD_START "cold_start.csv"
+#define HOIST_STEP "hoist_step.csv"
+#define SPEED_COMMAND_LOSS "speed_command_loss.csv"
+#define ENGINE_STATUS_LOSS "engine_status_loss.csv"
+#define OVERSPEED "overspeed.csv"
+#define OVERRIDE_IGNORED "override_ignored.csv"
 
 /* What happened during a stretch of simulated time. */
 typedef struct {
@@ -70,9 +41,11 @@ typedef struct {
 static OcScenario scn;
 static OcLoop loop;
 
-static void start(const char *text) {
-    char err[160] = "";
-    const bool ok = oc_scenario_parse(text, &scn, err, sizeof(err));
+static void start(const char *file) {
+    char path[512];
+    char err[600] = "";
+    snprintf(path, sizeof(path), "%s/%s", OC_SCENARIO_DIR, file);
+    const bool ok = oc_scenario_load(path, &scn, err, sizeof(err));
     CHECK(ok);
     if (!ok) {
         fprintf(stderr, "  scenario: %s\n", err);

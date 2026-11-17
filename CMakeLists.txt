@@ -34,6 +34,7 @@ add_library(opencrank_sim STATIC
     sim/runtime/src/signals.c
     sim/runtime/src/scenario.c
     sim/runtime/src/loop.c
+    sim/runtime/src/trace.c
 )
 target_include_directories(opencrank_sim PUBLIC
     sim/core/include
@@ -60,6 +61,9 @@ target_link_libraries(open-crank-sil PRIVATE opencrank_sim opencrank_socketcan)
 add_executable(open-crank-mc platforms/linux-socketcan/mc_main.c)
 target_link_libraries(open-crank-mc PRIVATE opencrank_portable opencrank_socketcan)
 
+add_executable(open-crank-run platforms/host/run_main.c)
+target_link_libraries(open-crank-run PRIVATE opencrank_sim)
+
 # ------------------------------------------------------------------------------
 # Tests
 # ------------------------------------------------------------------------------
@@ -70,3 +74,11 @@ foreach(test_name test_j1939 test_machine_ctrl test_plant test_hydraulic_pump te
     target_link_libraries(${test_name} PRIVATE opencrank_sim m)
     add_test(NAME ${test_name} COMMAND ${test_name})
 endforeach()
+target_compile_definitions(test_closed_loop PRIVATE OC_SCENARIO_DIR="${CMAKE_CURRENT_SOURCE_DIR}/scenarios")
+
+file(GLOB OC_SCENARIO_FILES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/scenarios/*.csv)
+if(NOT OC_SCENARIO_FILES)
+    message(FATAL_ERROR "no scenario files found in scenarios/")
+endif()
+add_test(NAME test_scenario_files COMMAND test_scenario ${OC_SCENARIO_FILES})
+add_test(NAME run_hoist_step COMMAND open-crank-run ${CMAKE_CURRENT_SOURCE_DIR}/scenarios/hoist_step.csv --quiet)
