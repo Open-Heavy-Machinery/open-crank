@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 /**
  * @file socketcan.c
- * @brief Thin Linux SocketCAN helpers shared by the SIL executables.
+ * @brief Thin Linux SocketCAN glue. See socketcan.h.
  */
 
 #define _POSIX_C_SOURCE 200809L
@@ -9,6 +9,7 @@
 
 #include "socketcan.h"
 
+#include <errno.h>
 #include <fcntl.h>
 #include <net/if.h>
 #include <string.h>
@@ -48,4 +49,35 @@ int oc_can_open(const char *ifname) {
         return -1;
     }
     return s;
+}
+
+bool oc_can_send(int sock, const J1939Frame *f) {
+    struct can_frame frame;
+    memset(&frame, 0, sizeof(frame));
+    frame.can_id = (f->id & CAN_EFF_MASK) | CAN_EFF_FLAG;
+    frame.can_dlc = (f->dlc <= 8U) ? f->dlc : 8U;
+    memcpy(frame.data, f->data, frame.can_dlc);
+    /* A full queue or bus-off loses the frame, as on a real bus. */
+    return write(sock, &frame, sizeof(frame)) == (ssize_t)sizeof(frame);
+}
+
+int oc_can_recv(int sock, J1939Frame *f) {
+    for (;;) {
+        struct can_frame frame;
+        ssize_t n = read(sock, &frame, sizeof(frame));
+        if (n < 0) {
+            return (errno == EAGAIN || errno == EWOULDBLOCK) ? 0 : -1;
+        }
+        if (n != (ssize_t)sizeof(frame)) {
+            continue;
+        }
+        if (!(frame.can_id & CAN_EFF_FLAG) || (frame.can_id & (CAN_RTR_FLAG | CAN_ERR_FLAG))) {
+            continue;
+        }
+        f->id = frame.can_id & CAN_EFF_MASK;
+        f->dlc = (frame.can_dlc <= 8U) ? frame.can_dlc : 8U;
+        memset(f->data, 0xFF, sizeof(f->data));
+        memcpy(f->data, frame.data, f->dlc);
+        return 1;
+    }
 }

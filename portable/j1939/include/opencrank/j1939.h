@@ -1,62 +1,121 @@
+/* SPDX-License-Identifier: Apache-2.0 */
 /**
  * @file j1939.h
- * @brief SAE J1939 CAN bus message definitions, encoders, and decoders for engine telemetry and control.
+ * @brief SAE J1939 codec for the v0.1 message set: TSC1, EEC1, ET1, EFL/P1.
+ *
+ * Portable zone: depends only on <stdint.h>, <stdbool.h>, <stddef.h>. Physical
+ * values are float. Encoders saturate (out-of-range values clamp, never wrap)
+ * and send "not available" for invalid fields; decoders reject frames of the
+ * wrong PGN or length and report "not available" / error values as invalid.
+ *
+ * Layouts are original work from public sources. Verify them against your
+ * copy of SAE J1939-71. Byte indices below are 0-based (J1939 documents
+ * count from 1).
  */
 
 #ifndef OPEN_CRANK_J1939_H
 #define OPEN_CRANK_J1939_H
 
-#include <stdint.h>
 #include <stdbool.h>
-#include <opencrank/plant.h>
+#include <stdint.h>
 
-/**
- * @name Standard 29-bit J1939 Extended CAN Identifiers
- * @brief Precomputed 29-bit identifiers combining Priority, PGN, and Source Address.
- * @{
- */
-#define J1939_ID_TSC1   0x0C000003U  /**< Torque/Speed Control 1 (PGN 0, incoming from ECU/controller) */
-#define J1939_ID_EEC1   0x0CF00400U  /**< Electronic Engine Controller 1 (PGN 61444, broadcasts engine RPM) */
-#define J1939_ID_ET1    0x18FEEE00U  /**< Engine Temperature 1 (PGN 65262, broadcasts coolant temperature) */
-#define J1939_ID_EFLP1  0x18FEEF00U  /**< Engine Fluid Level/Pressure 1 (PGN 65263, broadcasts oil pressure) */
+/** @brief One CAN frame with a 29-bit identifier. */
+typedef struct {
+    uint32_t id;      /**< 29-bit identifier (no EFF flag) */
+    uint8_t dlc;      /**< number of data bytes, 0..8 */
+    uint8_t data[8];
+} J1939Frame;
+
+#define J1939_PRIORITY_CONTROL 3U
+#define J1939_PRIORITY_INFO 6U
+
+#define J1939_ADDR_ENGINE_1 0x00U
+#define J1939_ADDR_NULL 0xFEU
+#define J1939_ADDR_GLOBAL 0xFFU
+
+#define J1939_PGN_TSC1 0x00000UL   /**< Torque/Speed Control 1 (PGN 0) */
+#define J1939_PGN_EEC1 0x0F004UL   /**< Electronic Engine Controller 1 (PGN 61444) */
+#define J1939_PGN_ET1 0x0FEEEUL    /**< Engine Temperature 1 (PGN 65262) */
+#define J1939_PGN_EFLP1 0x0FEEFUL  /**< Engine Fluid Level/Pressure 1 (PGN 65263) */
+
+/** @name Identifier helpers
+ * PDU1 PGNs (PF < 240) carry a destination address in PS; PDU2 PGNs are broadcast.
+ * @{ */
+uint32_t j1939_make_id(uint8_t priority, uint32_t pgn, uint8_t dest, uint8_t src);
+uint32_t j1939_id_pgn(uint32_t id);       /**< PGN with the destination stripped for PDU1 */
+uint8_t j1939_id_source(uint32_t id);
+uint8_t j1939_id_dest(uint32_t id);       /**< J1939_ADDR_GLOBAL for PDU2 */
+uint8_t j1939_id_priority(uint32_t id);
 /** @} */
 
-/**
- * @brief Decodes an incoming J1939 CAN frame from the ECU into engine plant control inputs.
- * 
- * @param can_id 29-bit extended CAN identifier of the received frame.
- * @param data 8-byte CAN payload array.
- * @param dlc Data Length Code (number of valid bytes in the payload).
- * @param inputs Pointer to the PlantInputs structure to update with decoded commands.
- * @return True if the CAN ID was recognized and successfully decoded; false otherwise.
- */
-bool j1939_decode_rx(uint32_t can_id, const uint8_t data[8], uint8_t dlc, PlantInputs *inputs);
+/** @brief Override control modes (SPN 695). */
+typedef enum {
+    J1939_OVERRIDE_DISABLED = 0,
+    J1939_OVERRIDE_SPEED = 1,
+    J1939_OVERRIDE_TORQUE = 2,
+    J1939_OVERRIDE_SPEED_TORQUE_LIMIT = 3
+} J1939OverrideMode;
 
 /**
- * @brief Encodes the Electronic Engine Controller 1 (EEC1) message from the current plant state.
- * 
- * @param state Pointer to the current engine PlantState.
- * @param out_id Pointer to store the resulting 29-bit J1939 CAN identifier.
- * @param out_data 8-byte buffer where the encoded CAN payload will be written.
+ * @brief TSC1, PGN 0, destination-specific. Byte 0: SPN 695 (bits 0-1),
+ *        SPN 696 (bits 2-3), SPN 897 (bits 4-5). Bytes 1-2: SPN 898,
+ *        0.125 rpm/bit. Byte 3: SPN 518, 1 %/bit, offset -125. Bytes 4-7
+ *        sent as 0xFF (byte 7: message counter and checksum, SPN 4206/4207,
+ *        "not available"; planned for v0.3).
  */
-void j1939_encode_eec1(const PlantState *state, uint32_t *out_id, uint8_t out_data[8]);
+typedef struct {
+    J1939OverrideMode override_mode;
+    uint8_t speed_conditions;     /**< SPN 696, 0..3 */
+    uint8_t mode_priority;        /**< SPN 897, 0 = highest .. 3 = lowest */
+    bool requested_speed_valid;
+    float requested_speed_rpm;    /**< SPN 898 */
+    bool requested_torque_valid;
+    float requested_torque_pct;   /**< SPN 518 */
+} J1939Tsc1;
 
 /**
- * @brief Encodes the Engine Temperature 1 (ET1) message from the current plant state.
- * 
- * @param state Pointer to the current engine PlantState.
- * @param out_id Pointer to store the resulting 29-bit J1939 CAN identifier.
- * @param out_data 8-byte buffer where the encoded CAN payload will be written.
+ * @brief EEC1, PGN 61444, broadcast. Byte 0 bits 0-3: SPN 899. Byte 1: SPN 512.
+ *        Byte 2: SPN 513 (both 1 %/bit, offset -125). Bytes 3-4: SPN 190,
+ *        0.125 rpm/bit. Byte 5: SPN 1483. Bytes 6-7 and unused bits: 0xFF.
  */
-void j1939_encode_et1(const PlantState *state, uint32_t *out_id, uint8_t out_data[8]);
+typedef struct {
+    uint8_t torque_mode;             /**< SPN 899, 0..15 (15 = not available) */
+    bool driver_demand_torque_valid;
+    float driver_demand_torque_pct;  /**< SPN 512 */
+    bool actual_torque_valid;
+    float actual_torque_pct;         /**< SPN 513 */
+    bool engine_speed_valid;
+    float engine_speed_rpm;          /**< SPN 190 */
+    uint8_t controlling_address;     /**< SPN 1483, 0xFF = not available */
+} J1939Eec1;
 
-/**
- * @brief Encodes the Engine Fluid Level/Pressure 1 (EFLP1) message from the current plant state.
- * 
- * @param state Pointer to the current engine PlantState.
- * @param out_id Pointer to store the resulting 29-bit J1939 CAN identifier.
- * @param out_data 8-byte buffer where the encoded CAN payload will be written.
- */
-void j1939_encode_eflp1(const PlantState *state, uint32_t *out_id, uint8_t out_data[8]);
+/** @brief ET1, PGN 65262. Byte 0: SPN 110, 1 degC/bit, offset -40. */
+typedef struct {
+    bool coolant_temp_valid;
+    float coolant_temp_c;
+} J1939Et1;
+
+/** @brief EFL/P1, PGN 65263. Byte 3: SPN 100, 4 kPa/bit. */
+typedef struct {
+    bool oil_pressure_valid;
+    float oil_pressure_kpa;
+} J1939Eflp1;
+
+/** @brief SPN 899 value "low idle governor / no request (default mode)". */
+#define J1939_TORQUE_MODE_LOW_IDLE 0U
+/** @brief SPN 899 value "not available". */
+#define J1939_TORQUE_MODE_NA 0x0FU
+
+void j1939_encode_tsc1(const J1939Tsc1 *m, uint8_t src, uint8_t dest, J1939Frame *f);
+bool j1939_decode_tsc1(const J1939Frame *f, J1939Tsc1 *m);
+
+void j1939_encode_eec1(const J1939Eec1 *m, uint8_t src, J1939Frame *f);
+bool j1939_decode_eec1(const J1939Frame *f, J1939Eec1 *m);
+
+void j1939_encode_et1(const J1939Et1 *m, uint8_t src, J1939Frame *f);
+bool j1939_decode_et1(const J1939Frame *f, J1939Et1 *m);
+
+void j1939_encode_eflp1(const J1939Eflp1 *m, uint8_t src, J1939Frame *f);
+bool j1939_decode_eflp1(const J1939Frame *f, J1939Eflp1 *m);
 
 #endif /* OPEN_CRANK_J1939_H */
