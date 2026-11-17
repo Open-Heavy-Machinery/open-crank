@@ -117,7 +117,9 @@ int main(int argc, char **argv) {
         tx.data[0] = 0x01; /* Byte 0: Override control mode (01b = Speed/Torque control active) */
         tx.data[1] = (uint8_t)((throttle_cmd / 100.0) * 250.0); /* Byte 1: Scaled command [0..250] */
 
-        (void)write(sock, &tx, sizeof(tx));
+        if (write(sock, &tx, sizeof(tx)) < 0) {
+            /* bus off or queue full: the frame is lost, as on a real bus */
+        }
 
         /* Print telemetry and controller status every 500 ms (25 ticks * 20 ms) */
         if (tick % 25 == 0) {

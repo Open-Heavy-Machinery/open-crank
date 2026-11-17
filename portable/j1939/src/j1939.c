@@ -13,7 +13,7 @@ bool j1939_decode_rx(uint32_t can_id, const uint8_t data[8], uint8_t dlc, PlantI
         if (cmd > 100.0) {
             cmd = 100.0;
         }
-        inputs->throttle_pct = cmd;
+        inputs->fuel_pct = cmd;
         return true;
     }
     return false;
