@@ -2,7 +2,7 @@
 
 > Open-source heavy-duty diesel engine plant and J1939 test bench, for developing machine controllers from a laptop to an FPGA rig. No engine required.
 
-**Status: pre-alpha, v0.1 in progress.** This README describes the v0.1 target. Anything marked *(planned)* does not exist yet. The honest list of what works and what doesn't is in [ROADMAP.md](ROADMAP.md).
+**Status: pre-alpha, v0.1 in progress.** The v0.1 vertical slice is implemented on the `wip/v0.1-vertical-slice` branch; anything marked *(planned)* does not exist yet. The honest list of what works, what is verified and what is not is in [ROADMAP.md](ROADMAP.md).
 
 `open-crank` is a simulated heavy-duty diesel engine that behaves enough like the real one to develop, test and break control software against it, on a laptop, in CI, and later on a real microcontroller board or an FPGA rig. It speaks SAE J1939 over CAN, the same way a real engine does.
 
@@ -16,21 +16,21 @@ The plant can sit in front of two different devices under test (DUT). This disti
 
 | | **Level 1: machine controller** | **Level 2: engine ECU** |
 |---|---|---|
-| Your firmware is... | the supervisory controller of the machine (crane, vessel, genset set). It *asks* the engine for speed and *reads* its status | the controller *inside* the engine. It reads sensors and commands fuel |
-| It talks to the plant via | J1939 over CAN (TSC1 in, EEC1 / ET1 / EFL-P1 out) | crank and cam signals, analog and digital sensors, actuator outputs |
+| Your firmware is... | the supervisory controller of the machine (crane, vessel, generator set). It *asks* the engine for speed, *reads* its status and drives the machine's loads | the controller *inside* the engine. It reads sensors and commands fuel |
+| It talks to the plant via | CAN: J1939 to the engine (TSC1 in, EEC1 / ET1 / EFL-P1 out) plus two documented bench messages (operator controls in, pump command out) | crank and cam signals, analog and digital sensors, actuator outputs *(planned)* |
 | Typical real-world analogue | crane controller, EMS, PMS | engine ECU |
-| Needs | a CAN bus (`vcan` is enough) | microsecond-accurate waveforms, so an FPGA or MCU I/O backend |
+| Needs | a CAN bus (`vcan` is enough), or nothing at all for headless runs | microsecond-accurate waveforms, so an FPGA or MCU I/O backend |
 | Milestones | **v0.1 to v0.3** | **v0.4** |
 
 EMS and PMS are supervisory controllers, so Level 1 is directly useful for them and is much cheaper to build first.
 
 ## What this is
 
-- A **plant model** of a heavy-duty diesel engine: mean-value torque production, crankshaft dynamics and a hydraulic-pump load. Thermal, air-path and aftertreatment models are later work.
-- A **simulated engine ECU** (idle and speed governor, limits, overspeed protection, command timeouts), so the plant stays pure physics and your controller faces a realistic engine-side peer.
-- A **J1939 peer**: the simulated engine publishes and consumes a small, documented set of PGNs.
-- A **portable reference controller** in plain C, written so the same source can run on the PC, in an emulator and on a real board *(emulator and board: planned)*.
-- A **scenario runner** and headless tests, so a control regression fails a build instead of a shift.
+- A **plant model** of a heavy-duty diesel engine: mean-value torque production with turbocharger lag, crankshaft dynamics, a starter, and a load-sensing hydraulic pump load. Detailed thermal, air-path and aftertreatment models are later work.
+- A **simulated engine ECU** (starter control, idle and speed governor, limits, overspeed protection, command timeouts), so the plant stays pure physics and your controller faces a realistic engine-side peer.
+- A **J1939 peer**: the simulated engine publishes and consumes a small, documented set of PGNs. The full bus contract is in [docs/bus-interface.md](docs/bus-interface.md).
+- A **portable reference controller** in plain C, written so the same source can run on the PC, in an emulator and on a real board *(emulator and board: planned)*. CI builds it for a Cortex-M4F on every push.
+- **Scenarios as data** and headless closed-loop tests, so a control regression fails a build instead of a shift.
 
 ## What this is not
 
@@ -65,7 +65,7 @@ Three zones with a one-way dependency rule, enforced in CI. Full details in [ARC
 flowchart LR
     P["portable/<br/>j1939, machine_ctrl<br/>(goes to firmware)"]
     S["sim/<br/>plant, loads, engine_ecu, runtime<br/>(PC only)"]
-    F["platforms/<br/>linux-socketcan, renode, stm32g4, fpga"]
+    F["platforms/<br/>host, linux-socketcan, renode, stm32g4, fpga"]
     S --> P
     F --> P
     F --> S
@@ -77,31 +77,33 @@ flowchart LR
 
 ```text
 open-crank/
-├── README.md  ARCHITECTURE.md  ROADMAP.md  LICENSE
-├── docs/          parameters.md, decision records (adr/)
+├── README.md  ARCHITECTURE.md  ROADMAP.md  CHANGELOG.md  LICENSE
+├── docs/          parameters.md (provenance), bus-interface.md (Level 1 contract)
 ├── portable/      zone 1: no OS, no libc I/O, no plant. Goes to firmware
-│   ├── j1939/       message codec
-│   └── machine_ctrl/  Level 1 controller logic
+│   ├── j1939/       message codec and bench messages
+│   └── machine_ctrl/  reference Level 1 controller
 ├── sim/           zone 2: host-only simulator
 │   ├── core/        plant physics (no I/O, no clock)
-│   ├── plants/      d936la6/, 9g95mec/ (later)
+│   ├── plants/      d936la6/ (plant and its engine-ECU calibration), 9g95mec/ (later)
 │   ├── loads/       hydraulic pump, propeller (later)
 │   ├── engine_ecu/  simulated engine ECU
-│   └── runtime/     clock modes, scenario runner
+│   └── runtime/     bench, scenarios, in-memory loop, trace
 ├── platforms/     zone 3: per-target glue
-│   ├── linux-socketcan/
+│   ├── host/        open-crank-run: headless closed loop
+│   ├── linux-socketcan/  open-crank-sil, open-crank-mc
 │   ├── renode/      (planned)
 │   ├── stm32g4/     (planned)
 │   └── fpga/        (reserved)
-├── scenarios/     operating profiles as data
-├── tests/         unit, closed-loop, golden traces
-├── tools/         trace viewer (later)
+├── scenarios/     operating profiles and fault cases, as CSV
+├── tests/         unit and closed-loop tests
+├── tools/         portability and mutation checks
+├── cmake/         toolchain file for Cortex-M4F
 └── .github/workflows/
 ```
 
 ## Building
 
-Target for v0.1 (CI will validate this before v0.1 is tagged):
+Any host with a C11 compiler and CMake 3.20 or newer:
 
 ```sh
 cmake -S . -B build
@@ -109,23 +111,45 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
-The simulator and the tests run on any host with a C11 compiler and CMake. The SocketCAN backend needs Linux. To try it on a virtual bus:
+## Running without a CAN bus
+
+`open-crank-run` runs a scenario closed loop with the reference controller, over an in-memory bus, as fast as the CPU allows (a 25 s scenario takes milliseconds):
+
+```sh
+./build/open-crank-run scenarios/hoist_step.csv
+./build/open-crank-run scenarios/overspeed.csv --trace overspeed.csv
+```
+
+The trace is a CSV with one row per 10 ms step: speed, fuel, torques, ECU state, pump, controller state. The scenarios in `scenarios/` are the same files the closed-loop tests use; see [ARCHITECTURE.md](ARCHITECTURE.md#46-runtime-simruntime) for the signals you can set.
+
+## Running on a virtual CAN bus
+
+The SocketCAN executables need Linux and the `vcan` kernel module. Start the controller first; it waits for the engine:
 
 ```sh
 sudo modprobe vcan
 sudo ip link add dev vcan0 type vcan && sudo ip link set up vcan0
-./build/open-crank-sil vcan0        # terminal 1: plant + simulated engine ECU
-./build/open-crank-mc vcan0 1500    # terminal 2: machine controller asking for 1500 rpm
-candump vcan0                       # terminal 3: watch the bus
+./build/open-crank-mc vcan0                               # terminal 1: reference machine controller
+./build/open-crank-sil vcan0 scenarios/hoist_step.csv     # terminal 2: plant, engine ECU, pump, operator panel
+candump vcan0                                             # terminal 3: watch the bus
 ```
+
+To test your own controller instead of `open-crank-mc`, follow [docs/bus-interface.md](docs/bus-interface.md).
+
+## Checks
+
+- `tools/check_portable.sh` builds `portable/` for Cortex-M4F and checks that it needs nothing from outside but `memcpy`/`memmove`/`memset`/`memcmp`, and includes nothing outside itself. Needs `arm-none-eabi-gcc`.
+- `tools/mutation_check.sh` breaks each safety-relevant behaviour on purpose and checks that the tests catch it.
+
+CI runs both, plus gcc and clang in Debug and Release with warnings as errors, and a sanitizer build.
 
 ## Legal and parameters
 
 - **Apache-2.0.** The patent grant matters here; an OEM legal department should be able to read the license and not flinch.
-- **SAE J1939 is a paywalled standard.** This repo does not include the spec text. PGN and SPN layouts here are original work from public sources; verify them against your own copy of J1939-71.
+- **SAE J1939 is a paywalled standard.** This repo does not include the spec text. PGN and SPN layouts here are original work from public sources; verify them against your own copy of J1939-71. The two bench messages (`OC_OPERATOR`, `OC_PUMP_CMD`) are this project's own and are not part of J1939.
 - **Not affiliated with Liebherr or MAN Energy Solutions.** Engine designations are used nominatively to identify the class of engine being modelled.
 - **MISRA C** applies to `portable/` only. The simulator is host code and is not held to it. MISRA rule texts are copyrighted and are not included in this repo.
 
 ## Contributing
 
-Pre-alpha, so the fastest way to help is a well-argued issue rather than a pull request. If you have bench access to either reference engine and can correct or source a parameter, say so and cite where the number comes from.
+Pre-alpha, so the fastest way to help is a well-argued issue rather than a pull request. If you have bench access to either reference engine and can correct or source a parameter, say so and cite where the number comes from. If you have the J1939 standard and find a layout that disagrees with [docs/bus-interface.md](docs/bus-interface.md), that is just as valuable.

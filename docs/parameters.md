@@ -64,3 +64,32 @@ Provenance labels:
 | `active_threshold_pct` | 1 % | Choice | Below this command no function is active. |
 | `displacement_tau_s` | 0.10 s | Estimate | Swash-plate response. |
 | `pressure_tau_s` | 0.25 s | Inherited | Was the hard-coded pressure ramp. |
+
+## Reference machine controller (`portable/machine_ctrl/src/machine_ctrl.c`, `MC_DEFAULT_PARAMS`)
+
+| Parameter | Value | Provenance | Notes |
+|---|---|---|---|
+| `source_address` | 0x27 | Choice | A supervisory-controller address from the J1939 preferred-address table. Not 0x03, which is the preferred address of Transmission #1. Verify against J1939 (Table B2) and change it if your network uses 0x27. |
+| `engine_address` | 0x00 | J1939 | Engine #1. |
+| `eec1_timeout_ms` | 200 ms | Choice | 20 missed EEC1 periods. |
+| `operator_timeout_ms` | 200 ms | Choice | 10 missed operator messages; then target falls to idle and the hoist command to zero. |
+| `run_confirm_ms` | 500 ms | Choice | Engine speed must stay above `running_rpm` this long before RUN. |
+| `override_confirm_ms` | 500 ms | Choice | Time allowed for EEC1 SPN 1483 to show this controller in control. |
+| `running_rpm` | 600 rpm | Choice | Between the ECU's running threshold (500) and low idle (750). |
+| `stall_rpm` | 400 rpm | Choice | Above the ECU's own stall threshold (300), so the controller notices first. |
+| `overspeed_rpm` | 2300 rpm | Choice | Above the governed ceiling (2100), below the ECU trip (2400). |
+| `request_min_rpm`, `request_max_rpm` | 750, 2100 rpm | Derived | The ECU's governed range. |
+| `slew_rpm_per_s` | 500 rpm/s | Choice | Idle to 1500 rpm in 1.5 s. |
+| control period | 10 ms | Choice | Platform loop period; TSC1 and OC_PUMP_CMD are sent every period. 10 ms is the TSC1 rate commonly given for engines; verify against J1939-71. |
+
+## Bench (`sim/runtime/src/bench.c`, `OC_BENCH_D936LA6`)
+
+| Parameter | Value | Provenance | Notes |
+|---|---|---|---|
+| `step_ms` | 10 ms | Choice | Physics step (explicit Euler). Matches the fastest message period. |
+| `eec1_period_ms` | 10 ms | J1939 | EEC1 rate given for engine speed. |
+| `eflp1_period_ms` | 500 ms | J1939 | |
+| `et1_period_ms` | 1000 ms | J1939 | |
+| `operator_period_ms` | 20 ms | Choice | Typical CAN joystick rate. |
+| `pump_cmd_timeout_ms` | 200 ms | Choice | A stale pump command counts as zero, as a de-energised proportional solenoid would. |
+| bench source address | 0xFC | Choice | Operator panel and environment. Chosen from the top of the address range, away from common preferred addresses; verify it is free on your network. |
