@@ -43,11 +43,13 @@ target_link_libraries(opencrank_sim PUBLIC opencrank_portable m)
 # ------------------------------------------------------------------------------
 add_executable(open-crank-sil
     platforms/linux-socketcan/sil_main.c
+    platforms/linux-socketcan/socketcan.c
 )
 target_link_libraries(open-crank-sil PRIVATE opencrank_sim)
 
 add_executable(open-crank-mc
     platforms/linux-socketcan/mc_main.c
+    platforms/linux-socketcan/socketcan.c
 )
 target_link_libraries(open-crank-mc PRIVATE opencrank_portable)
 

@@ -1,5 +1,6 @@
+/* SPDX-License-Identifier: Apache-2.0 */
 /**
- * @file main.c
+ * @file mc_main.c
  * @brief Reference Electronic Control Unit (ECU) firmware implementing a closed-loop PI speed governor
  *        over SAE J1939 (SocketCAN).
  */
@@ -21,6 +22,8 @@
 #include <linux/can.h>
 #include <linux/can/raw.h>
 
+#include "socketcan.h"
+
 /** @name Standard 29-bit J1939 Extended CAN Identifiers
  * @{
  */
@@ -41,42 +44,6 @@ static void handle_sigint(int sig) {
 }
 
 /**
- * @brief Opens and binds a non-blocking raw SocketCAN socket to the specified network interface.
- * 
- * @param ifname Name of the CAN interface (e.g., "vcan0", "can0").
- * @return Valid socket file descriptor on success, or -1 on error.
- */
-static int can_open(const char *ifname) {
-    int s = socket(PF_CAN, SOCK_RAW, CAN_RAW);
-    if (s < 0) {
-        return -1;
-    }
-
-    /* Configure socket for non-blocking I/O so polling does not stall the control loop */
-    int flags = fcntl(s, F_GETFL, 0);
-    fcntl(s, F_SETFL, flags | O_NONBLOCK);
-
-    /* Resolve network interface index by name */
-    struct ifreq ifr = {0};
-    strncpy(ifr.ifr_name, ifname, IFNAMSIZ - 1);
-    if (ioctl(s, SIOCGIFINDEX, &ifr) < 0) {
-        close(s);
-        return -1;
-    }
-
-    /* Bind socket to the resolved CAN interface */
-    struct sockaddr_can addr = {0};
-    addr.can_family = AF_CAN;
-    addr.can_ifindex = ifr.ifr_ifindex;
-
-    if (bind(s, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
-        close(s);
-        return -1;
-    }
-    return s;
-}
-
-/**
  * @brief Main ECU control loop: receives engine speed telemetry via EEC1, executes a 50 Hz
  *        PI speed governor with integral anti-windup, and broadcasts TSC1 throttle commands.
  */
@@ -87,7 +54,7 @@ int main(int argc, char **argv) {
     signal(SIGINT, handle_sigint);
 
     /* Initialize SocketCAN interface */
-    int sock = can_open(ifname);
+    int sock = oc_can_open(ifname);
     if (sock < 0) {
         perror("Error opening CAN interface");
         return 1;

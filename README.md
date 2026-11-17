@@ -115,7 +115,7 @@ The simulator and the tests run on any host with a C11 compiler and CMake. The S
 sudo modprobe vcan
 sudo ip link add dev vcan0 type vcan && sudo ip link set up vcan0
 ./build/open-crank-sil vcan0        # terminal 1: plant + simulated engine ECU
-./build/open-crank-ecu vcan0 1500   # terminal 2: machine controller asking for 1500 rpm
+./build/open-crank-mc vcan0 1500    # terminal 2: machine controller asking for 1500 rpm
 candump vcan0                       # terminal 3: watch the bus
 ```
 

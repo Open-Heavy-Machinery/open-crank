@@ -1,5 +1,5 @@
 /**
- * @file open_crank_plant.h
+ * @file plant.h
  * @brief Core definitions and simulation interface for an internal combustion engine plant.
  */
 
