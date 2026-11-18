@@ -2,7 +2,7 @@
 
 This is the contract between the simulated machine and a **Level 1 device under test**: a machine controller that asks the engine for speed and reads its status. If you write your own controller, this page is all it needs to know. The reference implementation is [`portable/machine_ctrl`](../portable/machine_ctrl).
 
-Everything travels as 29-bit CAN frames with J1939 framing, so the same controller works against the SIL on `vcan`, in an emulator, and (from v0.3) on a real board.
+Everything travels as 29-bit CAN frames with J1939 framing, so the same controller works against the SIL on `vcan`, in an emulator, and (from v0.2) on a real board.
 
 > **Verify against your copy of SAE J1939-71.** The J1939 layouts below are original work from public sources. The repository ships no spec text.
 

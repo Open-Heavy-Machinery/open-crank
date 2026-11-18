@@ -71,6 +71,21 @@ flowchart LR
 
 **Numeric choices.** `sim/` uses `double`: it is host code and precision is free. `portable/` uses `float`: the STM32G431 has a single-precision FPU, and `double` there is emulated in software and slow. The two are bridged at the boundary (the codec takes physical values as `float`). The whole tree is ISO C11 without GNU extensions, which among other things stops GCC from silently fusing multiply-adds, so host and target results differ only for real reasons.
 
+## 3a. Core, reference and community
+
+The project has three layers:
+
+| Layer | What it is |
+|---|---|
+| **Shared core** | plants, bench, bus contract, scenarios, fault injection, SIL |
+| **Optional reference** | a cheap board with its bill of materials, a guide and example firmware |
+| **Community** | everyone's own firmware, on any board, RTOS or language |
+
+Practising critical-firmware techniques is split between the core and the reference:
+
+- What can be checked **over the bus** comes from open-crank, as an acceptance suite for any device under test (v0.2.1).
+- What can only be checked **inside the firmware** (MISRA-oriented checks, stack usage, WCET) is shown by the reference firmware (v0.1.x, v0.2).
+
 ## 4. Modules
 
 ### 4.1 Plant core (`sim/core`, `sim/plants`)
@@ -127,7 +142,7 @@ The engine-side brain:
 - starter control: cranks while START is held, releases above the running speed, gives up after a time limit
 - no fuel below the speed at which it can synchronise
 - low-idle governor, and a PI speed governor with anti-windup driven by external speed requests, clamped to the governed range
-- optional droop (`droop_pct`, 0 = isochronous), needed for generator-set load sharing in v0.6
+- optional droop (`droop_pct`, 0 = isochronous), needed for generator-set load sharing in v0.7
 - stale requests ignored: after a timeout the engine returns to low idle on its own
 - overspeed trip, latched until the engine has stopped
 - stall detection
@@ -165,7 +180,7 @@ Addresses: engine `0x00`, machine controller `0x27`, bench `0xFC`. The first sli
 
 **Why TSC1 means what the standard says.** The first slice sent a throttle percentage in the byte that carries requested speed, while declaring "speed control" mode. A real engine would have read about 8000 rpm, which falls in the reserved range. That works only against its own simulator and teaches the wrong protocol.
 
-**Why bench messages.** In Level 1 the device under test only sees the bus. If operator inputs came from a command line or a file, a controller on a real board (v0.3) would have no way to receive them. Over CAN, the same controller works unchanged on a laptop, in Renode and on hardware. They are named `OC_*` and documented as project-specific so nobody mistakes them for J1939.
+**Why bench messages.** In Level 1 the device under test only sees the bus. If operator inputs came from a command line or a file, a controller on a real board (v0.2) would have no way to receive them. Over CAN, the same controller works unchanged on a laptop, in Renode and on hardware. They are named `OC_*` and documented as project-specific so nobody mistakes them for J1939.
 
 **Not yet implemented, on purpose.** TSC1 message counter and checksum (SPN 4206/4207, sent as "not available"), DM1 diagnostics, transport protocol: see the roadmap, v0.3.
 
@@ -195,7 +210,7 @@ In RUN it asks the engine for the operator's target speed through TSC1 (speed co
 |---|---|---|---|
 | free-run | tests, CI, headless runs: as fast as possible, deterministic | `sim/runtime/loop.c`, `platforms/host` | v0.1 |
 | paced | interactive SIL: one step per 10 ms of wall clock (soft real time) | `platforms/linux-socketcan/pacer.c` | v0.1 |
-| virtual | emulator-driven: step when the emulator's time says so | `platforms/renode` | v0.2 |
+| virtual | emulator-driven: step when the emulator's time says so | `platforms/renode` | Track R |
 | hard | FPGA rigs: fixed step with a measured jitter budget | `platforms/fpga` | v0.4 |
 
 **Why the bench owns time instead of reading an abstract clock.** In the first slice the 10 ms step was glued to the wall clock inside `main`, which made CI slow and blocked Renode. The earlier plan was a clock interface (`now`, `wait_until`). That fits free-run and paced, but not an emulator: co-simulating with Renode means "advance by N, then exchange frames" in lockstep, not "wait until T". With a step function that never reads time, every driver is a short loop around the same code.
@@ -238,9 +253,9 @@ Thin glue per target; no control logic or physics.
 
 - `host`: `open-crank-run`, the free-running closed loop. Plain C, builds anywhere.
 - `linux-socketcan`: `open-crank-sil` (bench) and `open-crank-mc` (reference controller), each paced by the wall clock on a non-blocking raw CAN socket with 29-bit frames.
-- `renode` *(planned, v0.2)*: platform description, scripts and a virtual-time driver.
-- `stm32g4` *(planned, v0.3)*: FDCAN driver and board startup, building `portable/` unchanged with the same toolchain file.
+- `stm32g4` *(planned, v0.2)*: FDCAN driver and board startup, building `portable/` unchanged with the same toolchain file. Bus-off handling and the watchdog follow in v0.3, the engine-ECU firmware in v0.4.
 - `fpga` *(reserved, v0.4)*: time and I/O backend for hard real time.
+- `renode` *(Track R)*: platform description, scripts and a virtual-time driver.
 
 ## 5. Timing model
 
@@ -252,6 +267,8 @@ Thin glue per target; no control logic or physics.
 | EEC1 / EFL/P1 / ET1 | 10 / 500 / 1000 ms | per J1939 |
 | OC_OPERATOR | 20 ms | |
 | Timeouts | TSC1 at the engine 200 ms; EEC1 and OC_OPERATOR at the controller 200 ms; pump command 200 ms | |
+
+**A board in the loop (v0.2)** needs no new driver: it runs against `open-crank-sil`, paced by the wall clock, unchanged. Only the bus changes, from `vcan` to a USB-CAN adapter. The plant step drops to 1 ms in v0.4, for Level 2.
 
 **Why 10 ms.** It matches the fastest message period and keeps the loop easy to reason about. The states are slow compared with the step (inertia of the order of 1–3 kg·m², air path of the order of a second), so explicit Euler is adequate. Moving to 1 ms is a configuration change, not a redesign. The controller runs at 10 ms rather than the 20 ms first planned because 10 ms is the TSC1 rate commonly given for engines (verify against J1939-71).
 
@@ -271,7 +288,11 @@ Thin glue per target; no control logic or physics.
 | Portability | `portable/` on Cortex-M4F, symbols, includes | `tools/check_portable.sh` |
 | Undefined behaviour | ASan, UBSan, float-cast-overflow | CI `sanitizers` job |
 | Tests can fail | 18 deliberate mutations, each must fail the suite | `tools/mutation_check.sh` |
-| Golden traces | speed traces from SIL vs Renode within a stated tolerance | v0.2 |
+| MISRA-oriented check | `portable/` against the rules the cppcheck MISRA addon covers; findings fixed or documented as deviations | v0.1.x |
+| Stack usage | maximum stack per function in the Cortex-M4F build (`-fstack-usage`) | v0.1.x |
+| Board vs SIL | `hoist_step` with the board in the loop vs the wall-clock-paced SIL, within tolerances written down before comparing | v0.2 |
+| Acceptance over the bus | any device under test graded by its CAN frames alone, pass/fail per scenario | v0.2.1 |
+| Emulator vs board | the trace in Renode vs the board's, within the stated tolerance | Track R |
 
 Conventions:
 
@@ -319,7 +340,7 @@ The migration itself is recorded in [ROADMAP.md](ROADMAP.md), section "v0.1".
 
 ## 9. Deliberately deferred
 
-- **Generic plant plugin contract.** With one plant, any abstraction would be a guess. Extract it from what the second plant needs (v0.5). The first slice's function-pointer hooks were removed for this reason.
+- **Generic plant plugin contract.** With one plant, any abstraction would be a guess. Extract it from what the second plant needs (v0.6). The first slice's function-pointer hooks were removed for this reason.
 - **Protocol abstraction.** J1939 is the right protocol for the current plant. The 2-stroke uses a different control scheme; separate it then.
 - **Level 2 signal layer** (crank and cam waveforms, analog I/O), including crank angle. Designing it now would be speculation; it arrives with the HIL backend in v0.4.
 - **TSC1 counter and checksum, DM1, transport protocol.** With fault injection on real hardware (v0.3).
@@ -330,8 +351,9 @@ The migration itself is recorded in [ROADMAP.md](ROADMAP.md), section "v0.1".
 
 ## 10. Known risks
 
-1. **Renode and the STM32G4 CAN peripheral are unconfirmed.** Public evidence found for Renode CAN is for other STM32 families (for example the STM32H7 reference platform); nothing confirmed for the G4's FDCAN. Verify before committing v0.2 to that target, and before buying a board. Fallback: emulate a different CAN-capable MCU for firmware-in-the-loop, or compile the controller for the host, and keep the real G4 for v0.3. The `portable/` zone makes this cheap, which is also why D3 matters.
-2. **Parameter validity.** The plant is representative, not calibrated. Mitigation: provenance for every parameter, honest wording, hooks for calibration by someone with bench data.
-3. **Message layouts from public sources.** Mitigation: every layout is in one place ([`docs/bus-interface.md`](docs/bus-interface.md)) with known test vectors, so a correction from someone with the standard is a small change.
-4. **Time synchronisation with an emulator.** Mitigation: the bench never reads a clock (D6); golden-trace comparison in v0.2.
-5. **Scope.** The vision is large for a small team. Mitigation: milestones with explicit exit criteria and a standing list of non-goals.
+1. **Renode has no STM32G4 platform (Track R).** It does have an `STM32_FDCAN` model, used by its STM32L552 platform, which is probably the same IP as the G4's FDCAN; that is not yet verified. Fallback: an STM32H7 with `MCAN`, which Renode supports officially. The board (v0.2) does not depend on any of this, and the `portable/` zone keeps a change of emulated target cheap, which is also why D3 matters.
+2. **USB-CAN latency (v0.2).** The adapter adds its own latency and jitter to every frame, so a trace with the board in the loop cannot match the SIL bit for bit. Mitigation: measure the latency first, then write down the tolerances, then compare, against the SIL paced by the wall clock rather than the free-running tests.
+3. **Parameter validity.** The plant is representative, not calibrated. Mitigation: provenance for every parameter, honest wording, hooks for calibration by someone with bench data.
+4. **Message layouts from public sources.** Mitigation: every layout is in one place ([`docs/bus-interface.md`](docs/bus-interface.md)) with known test vectors, so a correction from someone with the standard is a small change.
+5. **Time synchronisation with an emulator.** Mitigation: the bench never reads a clock (D6); trace comparison against the board in Track R.
+6. **Scope.** The vision is large for a small team. Mitigation: milestones with explicit exit criteria and a standing list of non-goals.

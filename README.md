@@ -1,8 +1,10 @@
 # open-crank
 
-> Open-source heavy-duty diesel engine plant and J1939 test bench, for developing machine controllers from a laptop to an FPGA rig. No engine required.
+> A heavy-duty diesel that answers back: connect your own firmware over J1939 and practise against an engine you could never keep at home.
 
-**Status: pre-alpha, v0.1 in progress.** The v0.1 vertical slice is implemented on the `wip/v0.1-vertical-slice` branch; anything marked *(planned)* does not exist yet. The honest list of what works, what is verified and what is not is in [ROADMAP.md](ROADMAP.md).
+Part of [Open Heavy Machinery](https://open-heavy-machinery.github.io): open tools to practise and develop embedded control for heavy machinery, without access to the machine.
+
+**Status: pre-alpha. v0.1 is done and on `main`.** Anything marked *(planned)* does not exist yet. The honest list of what works, what is verified and what is not is in [ROADMAP.md](ROADMAP.md).
 
 `open-crank` is a simulated heavy-duty diesel engine that behaves enough like the real one to develop, test and break control software against it, on a laptop, in CI, and later on a real microcontroller board or an FPGA rig. It speaks SAE J1939 over CAN, the same way a real engine does.
 
@@ -31,6 +33,8 @@ EMS and PMS are supervisory controllers, so Level 1 is directly useful for them 
 - A **J1939 peer**: the simulated engine publishes and consumes a small, documented set of PGNs. The full bus contract is in [docs/bus-interface.md](docs/bus-interface.md).
 - A **portable reference controller** in plain C, written so the same source can run on the PC, in an emulator and on a real board *(emulator and board: planned)*. CI builds it for a Cortex-M4F on every push.
 - **Scenarios as data** and headless closed-loop tests, so a control regression fails a build instead of a shift.
+- **Bring your own firmware.** Any board, RTOS or language that speaks CAN. The bus contract in [docs/bus-interface.md](docs/bus-interface.md) is all it needs.
+- **Practise critical-firmware techniques** *(planned)*: acceptance tests over the bus, and a reference firmware showing MISRA-oriented checks, stack and timing analysis and requirement traceability. This is practice, not certification: open-crank is not a certified tool (see below).
 
 ## What this is not
 
@@ -49,13 +53,13 @@ Honest non-goals. Revisit these, don't quietly break them.
 | ID | Plant | Type | Role |
 |---|---|---|---|
 | `d936la6` | Liebherr D936L A6-class: 6 cyl. inline, 10.5 L, ~240 kW, hydraulic pump load | 4-stroke CI | **v0.1.** Primary plant |
-| `9g95mec` | MAN B&W 9G95ME-C10.6-class: 9 cyl., ~61.8 MW at 70-80 rpm, propeller load | 2-stroke uniflow, ME electronic control | **v0.5.** Proves the architecture generalises |
+| `9g95mec` | MAN B&W 9G95ME-C10.6-class: 9 cyl., ~61.8 MW at 70-80 rpm, propeller load | 2-stroke uniflow, ME electronic control | **v0.6.** Proves the architecture generalises |
 
 The jump between these two is the point of the project: a 4-stroke inline six driving a hydraulic pump and a 60 MW two-stroke driving a propeller share almost nothing except a crankshaft. Any abstraction that cannot carry both is the wrong abstraction, and we would rather find out with a second plant than pretend the first one is general.
 
 **Architecture rule:** nothing in the plant core may assume four strokes, a camshaft, an even 720° firing order, or a particular load. Load is a pluggable torque source.
 
-> **Heads-up on the 2-stroke:** a real ME engine's control system does not expose J1939 as its control interface. v0.5 will define its own Level 1 interface for that plant instead of forcing J1939 onto it.
+> **Heads-up on the 2-stroke:** a real ME engine's control system does not expose J1939 as its control interface. v0.6 will define its own Level 1 interface for that plant instead of forcing J1939 onto it.
 
 ## Architecture in one picture
 
@@ -91,8 +95,8 @@ open-crank/
 ├── platforms/     zone 3: per-target glue
 │   ├── host/        open-crank-run: headless closed loop
 │   ├── linux-socketcan/  open-crank-sil, open-crank-mc
-│   ├── renode/      (planned)
-│   ├── stm32g4/     (planned)
+│   ├── renode/      (track R)
+│   ├── stm32g4/     (planned, v0.2)
 │   └── fpga/        (reserved)
 ├── scenarios/     operating profiles and fault cases, as CSV
 ├── tests/         unit and closed-loop tests
