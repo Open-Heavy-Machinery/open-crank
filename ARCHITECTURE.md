@@ -12,7 +12,7 @@ This document explains how open-crank is structured and, for each decision, *why
 
 ## 2. System overview
 
-Two kinds of device under test (DUT) can face the plant. v0.1 to v0.3 support Level 1; v0.4 adds Level 2.
+Two kinds of device under test (DUT) can face the plant. Level 1 milestones: v0.1–v0.3, v0.5–v0.7, Track R. Level 2: v0.4.
 
 ```mermaid
 flowchart LR
@@ -84,7 +84,7 @@ The project has three layers:
 Practising critical-firmware techniques is split between the core and the reference:
 
 - What can be checked **over the bus** comes from open-crank, as an acceptance suite for any device under test (v0.2.1).
-- What can only be checked **inside the firmware** (MISRA-oriented checks, stack usage, WCET) is shown by the reference firmware (v0.1.x, v0.2).
+- What can only be checked **inside the firmware** is shown by the reference firmware (v0.1.x, v0.2): MISRA-oriented checks, stack usage, and the worst observed execution time (measured with the DWT cycle counter; not a proven bound).
 
 ## 4. Modules
 
@@ -272,7 +272,7 @@ Thin glue per target; no control logic or physics.
 
 **Why 10 ms.** It matches the fastest message period and keeps the loop easy to reason about. The states are slow compared with the step (inertia of the order of 1–3 kg·m², air path of the order of a second), so explicit Euler is adequate. Moving to 1 ms is a configuration change, not a redesign. The controller runs at 10 ms rather than the 20 ms first planned because 10 ms is the TSC1 rate commonly given for engines (verify against J1939-71).
 
-**What the FPGA is actually for.** The plant's equations (tens of states at about 1 kHz) fit easily on a CPU, so v0.4 does *not* put the plant on the FPGA. The FPGA exists for what a CPU does poorly: crank and cam waveforms with microsecond jitter, deterministic analog and digital I/O, and timestamped CAN. Plant on a CPU or SoC core, timing on the FPGA is the usual HIL split.
+**What the signal generator is actually for.** The plant's equations (tens of states at about 1 kHz) fit easily on a CPU, so v0.4 does *not* put the plant on the signal generator (a second MCU or an FPGA). The signal generator exists for what a PC does poorly: crank and cam waveforms with microsecond jitter, deterministic analog and digital I/O, and timestamped CAN. Plant on a CPU or SoC core, timing on the signal generator: that is the usual HIL split.
 
 ## 6. Testing strategy
 
@@ -314,7 +314,7 @@ Conventions:
 | D8 | Four J1939 PGNs in v0.1 | "Six PGNs" | Add messages when something needs them |
 | D9 | `CHECK` macro instead of `assert` | `assert` | Survives Release builds |
 | D10 | One repository, one org-level profile | Many repos from day one | Split only when a second consumer exists |
-| D11 | FPGA for timing and I/O, not for the plant | Plant on FPGA | The plant is cheap on a CPU; jitter is the hard part |
+| D11 | Signal generator (a second MCU or an FPGA) for timing and I/O, not for the plant | Plant on FPGA | The plant is cheap on a CPU; jitter is the hard part |
 | D12 | Full-load table is brake torque; indicated = brake + friction | Table as indicated torque | Matches datasheets; removes double-counted friction |
 | D13 | Air-path state in the plant | One state | Load acceptance is otherwise unrealistically fast |
 | D14 | Operator inputs and pump command on the bus (bench messages) | Command-line arguments; scenario drives the pump | A board in the loop only sees the bus; the controller must be able to act on its load |

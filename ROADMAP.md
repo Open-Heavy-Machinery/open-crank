@@ -99,12 +99,13 @@ As planned, with the adjustments noted.
 - `platforms/stm32g4`, running `portable/machine_ctrl` unchanged.
 - **The platform/core boundary, documented** for porting to other boards: pass each received frame to `mc_handle_frame`, call `mc_step(now_ms)` on every tick, and send the frames it returns. The API already works this way; it only needs documenting.
 - Ports to bxCAN and other families are welcome as community contributions. They are not a goal of the project.
+- A script that plots CSV traces, needed to compare the board against the SIL.
 
 **Exit criteria**
 
 1. **Latency first, then tolerances, then the comparison.** Measure the latency of the USB-CAN adapter first. With that figure, write down the tolerances *before* comparing: maximum speed droop, recovery time, steady speed. Then `scenarios/hoist_step.csv` with the board in the loop must stay within those tolerances of the reference. The reference is the SIL paced by the wall clock (`open-crank-sil` with `open-crank-mc`), not the free-running tests.
 2. **The guide has been followed from scratch**, on a clean clone. Validation by a third party is recorded when it happens and does not block the release.
-3. **The worst-case execution time (WCET) of `mc_step`**, measured on the board with the DWT cycle counter, and its stack usage are documented.
+3. **The worst observed execution time of `mc_step`** (measured with the DWT cycle counter; not a proven bound) and its stack usage are documented.
 
 **Safety note.** From this milestone on, real silicon is in the loop, never real machinery. The project does not support connecting any of it to operating equipment.
 
@@ -114,11 +115,10 @@ As planned, with the adjustments noted.
 
 **Goal.** Grade **any** device under test by its CAN frames alone, without knowing how it is implemented.
 
-**In scope.** A runner that plays scenarios with the bench over SocketCAN (`vcan` or a USB-CAN adapter) and grades the device under test only by its frames. Each scenario carries its own pass/fail criteria, for example:
+**In scope.** A runner that plays scenarios with the bench over SocketCAN (`vcan` or a USB-CAN adapter) and grades the device under test only by its frames. Each scenario carries its own pass/fail criteria, written only in terms of what is observable on the bus, with reaction times measured from the injected event. For example:
 
-- the override is released within a given time after EEC1 is lost;
-- the pump command is zero on entering a fault;
-- the requested speed never exceeds high idle.
+- within T ms of losing EEC1, TSC1 is sent with override disabled and OC_PUMP_CMD displacement is 0;
+- in every TSC1 frame of the scenario, the requested speed never exceeds the engine's high idle.
 
 The runner produces a pass/fail report.
 
@@ -136,7 +136,8 @@ The runner produces a pass/fail report.
 **In scope**
 
 - **Fault injection**: lost frames, jitter, corrupted frames, bus-off.
-- **DM1** reporting.
+- **Sensor plausibility faults reported by the engine (DM1) and the controller's limp-home reaction.**
+- **DM1**: the simulated engine sends it, and the controller reads it and reacts (core). The controller sending DM1 for its own faults is an optional part of the reference firmware.
 - **Watchdog with a defined state after reset**: override released and pump command at zero until the engine has been confirmed again.
 - **Black box and configuration loaded from EEPROM**, as an optional part of the reference firmware.
 - **Numbered safety requirements**, each traced to its tests.

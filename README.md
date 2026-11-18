@@ -22,7 +22,7 @@ The plant can sit in front of two different devices under test (DUT). This disti
 | It talks to the plant via | CAN: J1939 to the engine (TSC1 in, EEC1 / ET1 / EFL-P1 out) plus two documented bench messages (operator controls in, pump command out) | crank and cam signals, analog and digital sensors, actuator outputs *(planned)* |
 | Typical real-world analogue | crane controller, EMS, PMS | engine ECU |
 | Needs | a CAN bus (`vcan` is enough), or nothing at all for headless runs | microsecond-accurate waveforms, so an FPGA or MCU I/O backend |
-| Milestones | **v0.1 to v0.3** | **v0.4** |
+| Milestones | **v0.1–v0.3, v0.5–v0.7, Track R** | **v0.4** |
 
 EMS and PMS are supervisory controllers, so Level 1 is directly useful for them and is much cheaper to build first.
 
