@@ -2,7 +2,20 @@
 
 All notable changes to this project. The project is pre-alpha; nothing here is a stable API yet.
 
-## Unreleased: v0.1 vertical slice
+## Roadmap revision after v0.1
+
+With v0.1 done, [ROADMAP.md](ROADMAP.md) was reordered. Documentation only; no code changed.
+
+| Change | Why |
+|---|---|
+| The real board comes before the emulator: v0.2 is a reference board on the bus (it was v0.3) | Connecting your own board to a simulated engine is the premise of the project |
+| Renode becomes Track R, a parallel track after v0.2 (it was v0.2) | Renode's support for the STM32G4 is unconfirmed, and the board does not need an emulator |
+| New v0.2.1: an acceptance suite of the project's own, over the bus | To grade anyone's firmware by its CAN frames alone, whatever its board, RTOS or language |
+| Critical-firmware practice is spread over v0.1.x, v0.2 and v0.3 | MISRA-oriented checks and stack usage in CI (v0.1.x); worst observed execution time (measured with the DWT cycle counter; not a proven bound) and stack measured on the board (v0.2); numbered safety requirements traced to tests, and a safe-state specification (v0.3). MISRA tooling leaves the backlog |
+| Two engines on one machine in v0.5, before the marine engine (marine moves to v0.6, PMS to v0.7) | Two instances of the same plant generalise the bench, not the plant; the plant interface is still extracted with the marine engine. The PMS then builds on several generator sets on one bench |
+| New mission statements | They state what the organisation and open-crank are for. Open Heavy Machinery: "Open tools to practise and develop embedded control for heavy machinery, without access to the machine." open-crank: "A heavy-duty diesel that answers back: connect your own firmware over J1939 and practise against an engine you could never keep at home." |
+
+## v0.1: Level 1 vertical slice (2026-11-18)
 
 ### Added
 

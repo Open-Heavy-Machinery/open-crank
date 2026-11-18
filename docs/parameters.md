@@ -46,7 +46,7 @@ Provenance labels:
 | `start_fuel_pct` | 30 % | Estimate | Gives run-up from cranking to idle in about 0.5 s with a small overshoot. |
 | `max_crank_s` | 15 s | Estimate | Typical starter duty limit. |
 | `kp_pct_per_rpm`, `ki_pct_per_rpm_s` | 0.10 %/rpm, 0.30 %/(rpm·s) | Derived | Tuned for ≈5 rad/s closed-loop bandwidth with ζ ≈ 0.9 at 1500 rpm (≈15 Nm per % fuel, J = 1.85 kg·m²). |
-| `droop_pct` | 0 % | Choice | Isochronous by default. Droop exists for generator-set load sharing (v0.6). |
+| `droop_pct` | 0 % | Choice | Isochronous by default. Droop exists for generator-set load sharing (v0.7). |
 | `request_timeout_ms` | 200 ms | Choice | 20 missed TSC1 periods. Verify against the behaviour of the engine you target. |
 | `source_address` | 0x00 | J1939 | Preferred address of Engine #1. |
 
