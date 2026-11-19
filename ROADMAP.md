@@ -206,7 +206,7 @@ The machine is described as an open-tick profile (its v0.5) instead of a hand-bu
 
 **Goal.** Prove the architecture generalises by adding a radically different engine, then extract the plant interface from what both plants actually share.
 
-**In scope.** `9g95mec`: 2-stroke marine engine with a propeller-law load and a Level 1 control interface of its own, ME-style (not J1939, which is not how that engine is controlled). The plant plug-in interface is extracted here, not before.
+**In scope.** `9s50me`: 2-stroke marine engine with a propeller-law load and a Level 1 control interface of its own, ME-style (not J1939, which is not how that engine is controlled). The plant plug-in interface is extracted here, not before.
 
 **Exit criteria**
 
