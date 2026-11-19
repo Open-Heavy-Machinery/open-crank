@@ -2,7 +2,7 @@
 
 > A heavy-duty diesel that answers back: connect your own firmware over J1939 and practise against an engine you could never keep at home.
 
-Part of [Open Heavy Machinery](https://open-heavy-machinery.github.io): open tools to practise and develop embedded control for heavy machinery, without access to the machine.
+Part of [Open Heavy Machinery](https://open-heavy-machinery.github.io) ([open-crank's page](https://open-heavy-machinery.github.io/open-crank/)): open tools to practise and develop embedded control for machines you cannot keep at home, starting with heavy machinery.
 
 **Status: pre-alpha. v0.1 is done and on `main`.** Anything marked *(planned)* does not exist yet. The honest list of what works, what is verified and what is not is in [ROADMAP.md](ROADMAP.md).
 
@@ -21,7 +21,7 @@ The plant can sit in front of two different devices under test (DUT). This disti
 | Your firmware is... | the supervisory controller of the machine (crane, vessel, generator set). It *asks* the engine for speed, *reads* its status and drives the machine's loads | the controller *inside* the engine. It reads sensors and commands fuel |
 | It talks to the plant via | CAN: J1939 to the engine (TSC1 in, EEC1 / ET1 / EFL-P1 out) plus two documented bench messages (operator controls in, pump command out) | crank and cam signals, analog and digital sensors, actuator outputs *(planned)* |
 | Typical real-world analogue | crane controller, EMS, PMS | engine ECU |
-| Needs | a CAN bus (`vcan` is enough), or nothing at all for headless runs | microsecond-accurate waveforms, so an FPGA or MCU I/O backend |
+| Needs | a CAN bus (`vcan` is enough), or nothing at all for headless runs | microsecond-accurate waveforms: open-tick's Tang Nano 20K bridge *(planned)* |
 | Milestones | **v0.1–v0.3, v0.5–v0.7, Track R** | **v0.4** |
 
 EMS and PMS are supervisory controllers, so Level 1 is directly useful for them and is much cheaper to build first.

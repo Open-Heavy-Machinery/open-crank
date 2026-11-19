@@ -166,9 +166,7 @@ Fault injection pulls in protocol work that v0.1 left out on purpose:
 - The simulated engine ECU is switched off; the plant's fuel comes from the captured injector pulses.
 - A plant step of about 1 ms. The plant gains crank angle over a full 720° cycle here, not before.
 - Signals: 60-2 crank wheel, cam, analog sensors (PWM with an RC filter, or an external DAC) and injector capture.
-- A signal generator, with two options:
-  - **a second MCU**, the cheap option: the timers of a G431 give sub-microsecond resolution, and their limit is the number of channels;
-  - **an FPGA**, to scale up.
+- The signal generator is an FPGA, the Tang Nano 20K, through open-tick's bridge. A second MCU was the cheap alternative: a G431's timers give sub-microsecond resolution, but their limit is the number of channels. Level 2 needs many independent timed channels at once (crank, cam, one capture per injector, analog outputs, room for a second engine), which is what an FPGA is for. The Raspberry Pi Pico bridge stays the cheap option for machines with fewer channels, such as open-robots.
 
 The plant stays on a CPU; the signal generator provides timing and I/O.
 
@@ -266,5 +264,6 @@ No commitment to dates.
 
 ## Public text to update
 
-- The organisation site's roadmap follows the table at the top of this file. Change both together.
+- open-crank's page on the organisation site ([open-heavy-machinery.github.io/open-crank](https://open-heavy-machinery.github.io/open-crank/)) follows the table at the top of this file, and the site's home page summarises it. Change them together.
+- The organisation's mission, used in this README, the site and the organisation profile: "Open tools to practise and develop embedded control for machines you cannot keep at home, starting with heavy machinery."
 - An earlier README said the plant "exposes crank and cam position, sensor and actuator interfaces". That describes v0.4; the current README marks Level 2 interfaces as planned. Any copy of the old text elsewhere should be corrected.

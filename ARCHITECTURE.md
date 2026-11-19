@@ -332,7 +332,7 @@ Conventions:
 | D8 | Four J1939 PGNs in v0.1 | "Six PGNs" | Add messages when something needs them |
 | D9 | `CHECK` macro instead of `assert` | `assert` | Survives Release builds |
 | D10 | One repository, one org-level profile | Many repos from day one | Split only when a second consumer exists |
-| D11 | Signal generator (a second MCU or an FPGA) for timing and I/O, not for the plant | Plant on FPGA | The plant is cheap on a CPU; jitter is the hard part |
+| D11 | Signal generator for timing and I/O, not for the plant: an FPGA (Tang Nano 20K, through open-tick) | Plant on FPGA; a second MCU | The plant is cheap on a CPU; jitter and the number of timed channels are the hard part |
 | D12 | Full-load table is brake torque; indicated = brake + friction | Table as indicated torque | Matches datasheets; removes double-counted friction |
 | D13 | Air-path state in the plant | One state | Load acceptance is otherwise unrealistically fast |
 | D14 | Operator inputs and pump command on the bus (bench messages) | Command-line arguments; scenario drives the pump | A board in the loop only sees the bus; the controller must be able to act on its load |
