@@ -20,9 +20,13 @@
 # it does not imply MISRA compliance. Findings are reported by rule number
 # only; the rule texts are copyrighted and are not in this repository.
 #
+# cppcheck analyses with the target's type sizes (--platform=arm32-wchar_t4,
+# a 32-bit Arm like the Cortex-M4F), not the host's.
+#
 # Different cppcheck versions can give different findings. The reference is
-# the version CI installs (apt on ubuntu-latest), recorded in the baseline's
-# first line.
+# the version CI installs (apt on ubuntu-26.04), recorded in the baseline's
+# first line. tools/check_misra_docker.sh runs this script in that
+# environment.
 #
 # Usage: tools/check_misra.sh            compare with the baseline
 #        tools/check_misra.sh --update   regenerate the baseline
@@ -54,7 +58,7 @@ mkdir -p "$ROOT/build"
 cd "$ROOT"
 # cppcheck reports findings on stderr, one per line, with this template.
 cppcheck_status=0
-cppcheck --addon=misra --std=c11 --enable=style --quiet \
+cppcheck --addon=misra --std=c11 --enable=style --platform=arm32-wchar_t4 --quiet \
     -I portable/j1939/include -I portable/machine_ctrl/include \
     --template='{file}:{line}:{id}' \
     portable 2>"$WORK/raw.txt" >"$WORK/stdout.txt" || cppcheck_status=$?

@@ -98,7 +98,8 @@ jobs:
 
   misra:
     name: MISRA-oriented check of portable/ (against the baseline)
-    runs-on: ubuntu-latest
+    # Pinned: the baseline depends on the cppcheck version that apt installs.
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v4
       - name: Install cppcheck
