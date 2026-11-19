@@ -27,6 +27,7 @@
 #include <opencrank/plant.h>
 #include <opencrank/runtime/scenario.h>
 #include <opencrank/runtime/signals.h>
+#include <opentick/player.h>
 
 /** @brief What the bench simulates, and how. */
 typedef struct {
@@ -47,8 +48,7 @@ extern const OcBenchConfig OC_BENCH_D936LA6;
 typedef struct {
     const OcBenchConfig *cfg;
     OcSignals sig;               /**< operator, environment and fault-injection inputs */
-    const OcScenario *scenario;  /**< optional: drives sig over time */
-    size_t scenario_next;
+    OtkPlayer player;            /**< optional scenario: drives sig over time */
 
     PlantState plant;
     EngineEcu ecu;

@@ -13,12 +13,12 @@
 
 #include <signal.h>
 #include <stdio.h>
-#include <unistd.h>
 
 #include <opencrank/machine_ctrl.h>
 
-#include "pacer.h"
-#include "socketcan.h"
+#include <opencrank/can_otk.h>
+#include <opentick/host/pacer.h>
+#include <opentick/host/socketcan.h>
 
 #define MC_PERIOD_MS 10U
 
@@ -34,16 +34,16 @@ int main(int argc, char **argv) {
     signal(SIGINT, handle_sigint);
     signal(SIGTERM, handle_sigint);
 
-    int sock = oc_can_open(ifname);
-    if (sock < 0) {
+    OtkSocketCan sock;
+    if (!otk_socketcan_open(&sock, ifname)) {
         perror("open-crank-mc: cannot open CAN interface");
         return 1;
     }
 
     McCtx mc;
     mc_init(&mc, &MC_DEFAULT_PARAMS);
-    OcPacer pacer;
-    oc_pacer_init(&pacer, MC_PERIOD_MS);
+    OtkPacer pacer;
+    otk_pacer_init(&pacer, otk_ns_from_ms(MC_PERIOD_MS));
 
     printf("open-crank-mc: machine controller 0x%02X on %s (Ctrl+C to stop)\n",
            (unsigned)MC_DEFAULT_PARAMS.source_address, ifname);
@@ -51,15 +51,20 @@ int main(int argc, char **argv) {
     uint32_t now_ms = 0U;
     McState last_state = mc.state;
     while (g_running) {
-        J1939Frame f;
-        while (oc_can_recv(sock, &f) > 0) {
-            mc_handle_frame(&mc, &f, now_ms);
+        OtkCanFrame in;
+        while (otk_socketcan_recv(&sock, &in) > 0) {
+            J1939Frame f;
+            if (oc_frame_from_otk(&in, &f)) {
+                mc_handle_frame(&mc, &f, now_ms);
+            }
         }
 
         J1939Frame out[4];
         const size_t n = mc_step(&mc, now_ms, out, sizeof(out) / sizeof(out[0]));
         for (size_t i = 0; i < n; i++) {
-            (void)oc_can_send(sock, &out[i]);
+            OtkCanFrame o;
+            oc_frame_to_otk(&out[i], &o);
+            (void)otk_socketcan_send(&sock, &o);
         }
 
         if (mc.state != last_state) {
@@ -76,10 +81,10 @@ int main(int argc, char **argv) {
         }
 
         now_ms += MC_PERIOD_MS;
-        oc_pacer_wait(&pacer);
+        otk_pacer_wait(&pacer);
     }
 
     printf("\nopen-crank-mc: stopped (%u late periods)\n", (unsigned)pacer.overruns);
-    close(sock);
+    otk_socketcan_close(&sock);
     return 0;
 }

@@ -103,8 +103,10 @@ mutate "codec: 16-bit values do not saturate" portable/j1939/src/j1939_scaling.h
     "const float raw = (value - offset) / resolution;"
 mutate "codec: 'not available' decoded as a value" portable/j1939/src/j1939_scaling.h \
     "if (raw > J1939_U16_MAX_VALID) {" "if (false) {"
-mutate "scenario: unknown signal names accepted" sim/runtime/src/scenario.c \
-    "return fail(err, err_len, line_no, \"unknown signal '%s'\", f_signal);" "continue;"
+# The parser now lives in open-tick, whose own mutation check covers it. This
+# one breaks open-crank's binding to it instead.
+mutate "scenario: events never reach the bench's signals" sim/runtime/src/bench.c \
+    "oc_signals_set((OcSignals *)ctx, (OcSignalId)signal, value);" "(void)ctx; (void)signal; (void)value;"
 
 echo
 echo "$killed mutations killed, $problems problems"
