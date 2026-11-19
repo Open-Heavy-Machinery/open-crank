@@ -1,0 +1,3 @@
+[submodule "external/open-tick"]
+	path = external/open-tick
+	url = https://github.com/Open-Heavy-Machinery/open-tick.git

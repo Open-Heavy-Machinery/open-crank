@@ -33,6 +33,7 @@ EMS and PMS are supervisory controllers, so Level 1 is directly useful for them 
 - A **J1939 peer**: the simulated engine publishes and consumes a small, documented set of PGNs. The full bus contract is in [docs/bus-interface.md](docs/bus-interface.md).
 - A **portable reference controller** in plain C, written so the same source can run on the PC, in an emulator and on a real board *(emulator and board: planned)*. CI builds it for a Cortex-M4F on every push.
 - **Scenarios as data** and headless closed-loop tests, so a control regression fails a build instead of a shift.
+- **Built on [open-tick](https://github.com/Open-Heavy-Machinery/open-tick)**, the family's machine-independent core (simulated time, scenarios, traces, CAN bridges), pinned as a git submodule. open-crank brings the engine.
 - **Bring your own firmware.** Any board, RTOS or language that speaks CAN. The bus contract in [docs/bus-interface.md](docs/bus-interface.md) is all it needs.
 - **Practise critical-firmware techniques** *(planned)*: acceptance tests over the bus, and a reference firmware showing MISRA-oriented checks, stack and timing analysis and requirement traceability. This is practice, not certification: open-crank is not a certified tool (see below).
 
@@ -70,12 +71,15 @@ flowchart LR
     P["portable/<br/>j1939, machine_ctrl<br/>(goes to firmware)"]
     S["sim/<br/>plant, loads, engine_ecu, runtime<br/>(PC only)"]
     F["platforms/<br/>host, linux-socketcan, renode, stm32g4, fpga"]
+    T["external/open-tick<br/>time, scenarios, trace, CAN bridges"]
     S --> P
     F --> P
     F --> S
+    S --> T
+    F --> T
 ```
 
-`portable/` never includes anything from `sim/` or `platforms/`. That is what lets the same control source run on a laptop, in Renode and on a board.
+`portable/` never includes anything from `sim/`, `platforms/` or open-tick. That is what lets the same control source run on a laptop, in Renode and on a board.
 
 ## Repository layout
 
@@ -83,6 +87,7 @@ flowchart LR
 open-crank/
 ├── README.md  ARCHITECTURE.md  ROADMAP.md  CHANGELOG.md  LICENSE
 ├── docs/          parameters.md (provenance), bus-interface.md (Level 1 contract)
+├── external/      open-tick (git submodule): time, scenarios, trace, CAN bridges
 ├── portable/      zone 1: no OS, no libc I/O, no plant. Goes to firmware
 │   ├── j1939/       message codec and bench messages
 │   └── machine_ctrl/  reference Level 1 controller
@@ -91,7 +96,8 @@ open-crank/
 │   ├── plants/      d936la6/ (plant and its engine-ECU calibration), 9g95mec/ (later)
 │   ├── loads/       hydraulic pump, propeller (later)
 │   ├── engine_ecu/  simulated engine ECU
-│   └── runtime/     bench, scenarios, in-memory loop, trace
+│   ├── can_otk/     J1939 frames to and from open-tick's CAN frames
+│   └── runtime/     bench, signals, in-memory loop, trace columns
 ├── platforms/     zone 3: per-target glue
 │   ├── host/        open-crank-run: headless closed loop
 │   ├── linux-socketcan/  open-crank-sil, open-crank-mc
@@ -100,14 +106,21 @@ open-crank/
 │   └── fpga/        (reserved)
 ├── scenarios/     operating profiles and fault cases, as CSV
 ├── tests/         unit and closed-loop tests
-├── tools/         portability and mutation checks
+├── tools/         portability, mutation, trace-comparison and vcan-demo checks
 ├── cmake/         toolchain file for Cortex-M4F
 └── .github/workflows/
 ```
 
 ## Building
 
-Any host with a C11 compiler and CMake 3.20 or newer:
+Any host with a C11 compiler and CMake 3.20 or newer. open-tick comes in as a git submodule, so clone with it:
+
+```sh
+git clone --recursive https://github.com/Open-Heavy-Machinery/open-crank.git
+cd open-crank
+```
+
+In a clone made without `--recursive`, run `git submodule update --init` once. Then:
 
 ```sh
 cmake -S . -B build
@@ -144,8 +157,10 @@ To test your own controller instead of `open-crank-mc`, follow [docs/bus-interfa
 
 - `tools/check_portable.sh` builds `portable/` for Cortex-M4F and checks that it needs nothing from outside but `memcpy`/`memmove`/`memset`/`memcmp`, and includes nothing outside itself. Needs `arm-none-eabi-gcc`.
 - `tools/mutation_check.sh` breaks each safety-relevant behaviour on purpose and checks that the tests catch it.
+- `tools/compare_traces.sh` runs every scenario with two builds and compares the traces byte for byte. CI runs it on every pull request against its base branch, so a refactor that changes behaviour fails. A pull request that changes behaviour on purpose carries the `behaviour-change` label.
+- `tools/vcan_demo_check.sh` runs the `vcan` demo above as two processes and checks that the controller takes control and holds speed through the hoist load.
 
-CI runs both, plus gcc and clang in Debug and Release with warnings as errors, and a sanitizer build.
+CI runs all four (the `vcan` demo when the runner provides `vcan`), plus gcc and clang in Debug and Release with warnings as errors, and a sanitizer build.
 
 ## Legal and parameters
 

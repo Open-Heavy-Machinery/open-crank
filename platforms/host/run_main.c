@@ -65,24 +65,28 @@ int main(int argc, char **argv) {
     }
 
     FILE *trace = NULL;
+    OtkTrace tr;
     if (trace_path != NULL) {
         trace = fopen(trace_path, "w");
         if (trace == NULL) {
             perror("open-crank-run: cannot open trace file");
             return 1;
         }
-        oc_trace_header(trace);
+        if (!oc_trace_open(&tr, trace)) {
+            fprintf(stderr, "open-crank-run: trace: %s\n", otk_trace_error(&tr));
+            return 1;
+        }
     }
 
     oc_loop_init(&g_loop, &OC_BENCH_D936LA6, &MC_DEFAULT_PARAMS, &g_scenario);
     if (!quiet) {
         printf("open-crank-run: %s, %s, until %.1f s\n", scenario_path, g_loop.bench.cfg->plant->name,
-               (double)g_scenario.end_ms / 1000.0);
+               otk_ns_to_s(g_scenario.end));
     }
     while (!oc_bench_scenario_done(&g_loop.bench)) {
         oc_loop_step(&g_loop);
         if (trace != NULL) {
-            oc_trace_row(trace, &g_loop.bench, &g_loop.mc);
+            oc_trace_row(&tr, &g_loop.bench, &g_loop.mc);
         }
         if (!quiet && g_loop.bench.t_ms % 1000U == 0U) {
             print_status(&g_loop);
@@ -92,7 +96,10 @@ int main(int argc, char **argv) {
         print_status(&g_loop);
     }
 
-    if (trace != NULL && fclose(trace) != 0) {
+    if (trace != NULL && !otk_trace_ok(&tr)) {
+        fprintf(stderr, "open-crank-run: trace: %s\n", otk_trace_error(&tr));
+    }
+    if (trace != NULL && (fclose(trace) != 0 || !otk_trace_ok(&tr))) {
         perror("open-crank-run: writing trace");
         return 1;
     }

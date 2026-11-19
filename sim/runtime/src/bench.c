@@ -31,25 +31,20 @@ void oc_bench_init(OcBench *b, const OcBenchConfig *cfg) {
     hydraulic_pump_init(&b->pump, cfg->pump);
 }
 
+static void apply_signal(void *ctx, OtkSignalId signal, double value) {
+    oc_signals_set((OcSignals *)ctx, (OcSignalId)signal, value);
+}
+
 void oc_bench_set_scenario(OcBench *b, const OcScenario *s) {
-    b->scenario = s;
-    b->scenario_next = 0U;
+    otk_player_init(&b->player, s, apply_signal, &b->sig);
 }
 
 bool oc_bench_scenario_done(const OcBench *b) {
-    return b->scenario != NULL && b->scenario->has_end && b->t_ms >= b->scenario->end_ms;
+    return otk_player_done(&b->player, otk_ns_from_ms(b->t_ms));
 }
 
 static void apply_due_events(OcBench *b) {
-    const OcScenario *s = b->scenario;
-    if (s == NULL) {
-        return;
-    }
-    while (b->scenario_next < s->n && s->events[b->scenario_next].t_ms <= b->t_ms) {
-        const OcEvent *e = &s->events[b->scenario_next];
-        oc_signals_set(&b->sig, e->signal, e->value);
-        b->scenario_next++;
-    }
+    otk_player_advance(&b->player, otk_ns_from_ms(b->t_ms));
 }
 
 double oc_bench_time_s(const OcBench *b) {

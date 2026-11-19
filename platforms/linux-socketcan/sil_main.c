@@ -16,13 +16,13 @@
 #include <signal.h>
 #include <stdio.h>
 #include <string.h>
-#include <unistd.h>
 
 #include <opencrank/runtime/bench.h>
 #include <opencrank/runtime/trace.h>
 
-#include "pacer.h"
-#include "socketcan.h"
+#include <opencrank/can_otk.h>
+#include <opentick/host/pacer.h>
+#include <opentick/host/socketcan.h>
 
 static volatile sig_atomic_t g_running = 1;
 static OcScenario g_scenario;
@@ -67,47 +67,57 @@ int main(int argc, char **argv) {
     signal(SIGINT, handle_sigint);
     signal(SIGTERM, handle_sigint);
 
-    int sock = oc_can_open(ifname);
-    if (sock < 0) {
+    OtkSocketCan sock;
+    if (!otk_socketcan_open(&sock, ifname)) {
         perror("open-crank-sil: cannot open CAN interface. Try: sudo modprobe vcan && "
                "sudo ip link add dev vcan0 type vcan && sudo ip link set up vcan0");
         return 1;
     }
 
     FILE *trace = NULL;
+    OtkTrace tr;
     if (trace_path != NULL) {
         trace = fopen(trace_path, "w");
         if (trace == NULL) {
             perror("open-crank-sil: cannot open trace file");
-            close(sock);
+            otk_socketcan_close(&sock);
             return 1;
         }
-        oc_trace_header(trace);
+        if (!oc_trace_open(&tr, trace)) {
+            fprintf(stderr, "open-crank-sil: trace: %s\n", otk_trace_error(&tr));
+            otk_socketcan_close(&sock);
+            return 1;
+        }
     }
 
     OcBench bench;
     oc_bench_init(&bench, &OC_BENCH_D936LA6);
     oc_bench_set_scenario(&bench, &g_scenario);
-    OcPacer pacer;
-    oc_pacer_init(&pacer, bench.cfg->step_ms);
+    OtkPacer pacer;
+    otk_pacer_init(&pacer, otk_ns_from_ms(bench.cfg->step_ms));
 
     printf("open-crank-sil: [%s] on %s, scenario %s (Ctrl+C to stop)\n", bench.cfg->plant->name, ifname,
            scenario_path);
 
     int end_reported = 0;
     while (g_running) {
-        J1939Frame f;
-        while (oc_can_recv(sock, &f) > 0) {
-            oc_bench_rx(&bench, &f);
+        OtkCanFrame in;
+        while (otk_socketcan_recv(&sock, &in) > 0) {
+            J1939Frame f;
+            if (oc_frame_from_otk(&in, &f)) {
+                oc_bench_rx(&bench, &f);
+            }
         }
 
         J1939Frame tx[8];
         const size_t n = oc_bench_step(&bench, tx, sizeof(tx) / sizeof(tx[0]));
         for (size_t i = 0; i < n; i++) {
-            (void)oc_can_send(sock, &tx[i]);
+            OtkCanFrame out;
+            oc_frame_to_otk(&tx[i], &out);
+            (void)otk_socketcan_send(&sock, &out);
         }
         if (trace != NULL) {
-            oc_trace_row(trace, &bench, NULL);
+            oc_trace_row(&tr, &bench, NULL);
         }
 
         if (bench.t_ms % 500U == 0U) {
@@ -122,13 +132,13 @@ int main(int argc, char **argv) {
                    oc_bench_time_s(&bench));
             end_reported = 1;
         }
-        oc_pacer_wait(&pacer);
+        otk_pacer_wait(&pacer);
     }
 
     printf("open-crank-sil: stopped (%u late steps)\n", (unsigned)pacer.overruns);
     if (trace != NULL) {
         fclose(trace);
     }
-    close(sock);
+    otk_socketcan_close(&sock);
     return 0;
 }

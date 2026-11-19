@@ -6,9 +6,8 @@
 
 #include <opencrank/runtime/signals.h>
 
-#include <string.h>
 
-static const char *const NAMES[OC_SIG_COUNT] = {
+static const char *const NAMES[OC_SIG_END] = {
     [OC_SIG_KEY_ON] = "key_on",
     [OC_SIG_START] = "start",
     [OC_SIG_TARGET_RPM] = "target_rpm",
@@ -19,21 +18,24 @@ static const char *const NAMES[OC_SIG_COUNT] = {
     [OC_SIG_FAULT_ENGINE_TX_LOST] = "fault.engine_tx_lost",
     [OC_SIG_FAULT_ECU_IGNORES_TSC1] = "fault.ecu_ignores_tsc1",
     [OC_SIG_FAULT_OVERRUN_TORQUE_NM] = "fault.overrun_torque_nm",
-    [OC_SIG_END] = "end",
 };
 
+const OtkSignalTable OC_SIGNAL_TABLE = { NAMES, OC_SIG_END };
+
 bool oc_signal_from_name(const char *name, OcSignalId *id) {
-    for (int i = 0; i < (int)OC_SIG_COUNT; i++) {
-        if (strcmp(name, NAMES[i]) == 0) {
-            *id = (OcSignalId)i;
-            return true;
-        }
+    OtkSignalId otk;
+    if (!otk_signal_find(&OC_SIGNAL_TABLE, name, &otk)) {
+        return false;
     }
-    return false;
+    *id = (otk == OTK_SIGNAL_END) ? OC_SIG_END : (OcSignalId)otk;
+    return true;
 }
 
 const char *oc_signal_name(OcSignalId id) {
-    return ((int)id >= 0 && id < OC_SIG_COUNT) ? NAMES[id] : "?";
+    if (id == OC_SIG_END) {
+        return OTK_SIGNAL_END_NAME;
+    }
+    return ((int)id >= 0 && id < OC_SIG_END) ? NAMES[id] : "?";
 }
 
 void oc_signals_set(OcSignals *s, OcSignalId id, double value) {

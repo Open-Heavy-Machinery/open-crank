@@ -26,10 +26,10 @@ static void test_parses_valid_text(void) {
     char err[128] = "";
     CHECK(oc_scenario_parse(text, &scn, err, sizeof(err)));
     CHECK(scn.n == 6U);
-    CHECK(scn.events[1].signal == OC_SIG_START && scn.events[1].t_ms == 500U && scn.events[1].value == 1.0);
-    CHECK(scn.events[3].t_ms == 8250U && scn.events[3].value == 85.5);
+    CHECK(scn.events[1].signal == OC_SIG_START && scn.events[1].t == 500000000U && scn.events[1].value == 1.0);
+    CHECK(scn.events[3].t == 8250000000U && scn.events[3].value == 85.5);
     CHECK(scn.events[4].signal == OC_SIG_FAULT_OVERRUN_TORQUE_NM);
-    CHECK(scn.has_end && scn.end_ms == 20000U);
+    CHECK(scn.has_end && scn.end == 20000000000U);
 }
 
 static void expect_error(const char *text, const char *fragment) {
@@ -43,7 +43,7 @@ static void expect_error(const char *text, const char *fragment) {
 
 static void test_rejects_bad_text(void) {
     expect_error("time_s,signal,value\n0,key_on,1\n1,kye_on,1\n", "line 3: unknown signal 'kye_on'");
-    expect_error("time_s,signal,value\n2,key_on,1\n1,start,1\n", "line 3: time 1.000 s is earlier");
+    expect_error("time_s,signal,value\n2,key_on,1\n1,start,1\n", "line 3: time 1 s is earlier");
     expect_error("0,key_on,1\n", "line 1: expected the header");
     expect_error("time_s,signal,value\n0,key_on,abc\n", "line 2: bad value 'abc'");
     expect_error("time_s,signal,value\n-1,key_on,1\n", "line 2: bad time '-1'");

@@ -10,6 +10,8 @@
 
 #include <stdbool.h>
 
+#include <opentick/signals.h>
+
 /** @brief Every signal a scenario can set. Names are listed in signals.c. */
 typedef enum {
     OC_SIG_KEY_ON = 0,             /**< key_on: key switch, 0/1 */
@@ -40,6 +42,9 @@ typedef struct {
     bool fault_ecu_ignores_tsc1;
     double fault_overrun_torque_nm;
 } OcSignals;
+
+/** @brief The signals above, registered with open-tick (`end` excluded: open-tick reserves it). */
+extern const OtkSignalTable OC_SIGNAL_TABLE;
 
 /** @brief Looks a signal up by its scenario name. */
 bool oc_signal_from_name(const char *name, OcSignalId *id);

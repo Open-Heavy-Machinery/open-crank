@@ -18,6 +18,7 @@
 
 #include <opencrank/machine_ctrl.h>
 #include <opencrank/runtime/bench.h>
+#include <opentick/can.h>
 
 #define OC_LOOP_QUEUE 32U
 
@@ -26,10 +27,8 @@ typedef struct {
     McCtx mc;
     uint32_t mc_period_ms;
 
-    J1939Frame to_mc[OC_LOOP_QUEUE];
-    size_t n_to_mc;
-    J1939Frame to_bench[OC_LOOP_QUEUE];
-    size_t n_to_bench;
+    OtkCanQueue to_mc;
+    OtkCanQueue to_bench;
     uint32_t queue_overflows;
 } OcLoop;
 
