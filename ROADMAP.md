@@ -81,6 +81,8 @@ As planned, with the adjustments noted.
 
 **Why "MISRA-oriented".** The addon covers only part of the rules. Passing it **does not imply MISRA compliance**.
 
+**Approach: baseline first.** The CI job starts by accepting the findings that exist today, which are stored in a baseline ([`tools/misra-baseline.txt`](tools/misra-baseline.txt), counts per rule and file). From then on it fails if a new one appears. As the maintainer fixes findings or documents them as deviations, the baseline goes down. CI protects `portable/` from the first day, and the fixes come after. Exit criterion 2 is met when the baseline contains only findings documented as deviations.
+
 **Exit criteria**
 
 1. The CI job is green.

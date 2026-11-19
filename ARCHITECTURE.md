@@ -306,8 +306,8 @@ Thin glue per target; no control logic or physics.
 | Tests can fail | 18 deliberate mutations, each must fail the suite | `tools/mutation_check.sh` |
 | Behaviour unchanged by refactors | the trace of every scenario, byte for byte, against the pull request's base branch | `tools/compare_traces.sh`, CI `traces` job |
 | SIL on a bus | the README's `vcan` demo as two processes: the controller reaches RUN, holds 1500 rpm within 1 % with and without the hoist load | `tools/vcan_demo_check.sh`, CI `vcan-demo` job |
-| MISRA-oriented check | `portable/` against the rules the cppcheck MISRA addon covers; findings fixed or documented as deviations | v0.1.x |
-| Stack usage | maximum stack per function in the Cortex-M4F build (`-fstack-usage`) | v0.1.x |
+| MISRA-oriented check | `portable/` against the rules the cppcheck MISRA addon covers; fails on a finding beyond the baseline (counts per rule and file), which goes down as findings are fixed or documented as deviations. Does not imply compliance | `tools/check_misra.sh`, `tools/misra-baseline.txt`, CI `misra` job |
+| Stack usage | stack per function in the Cortex-M4F MinSizeRel build (`-fstack-usage`), printed largest first; fails if a function's stack is not `static` | `tools/check_portable.sh`, CI `portable-cortex-m4f` job |
 | Board vs SIL | `hoist_step` with the board in the loop vs the wall-clock-paced SIL, within tolerances written down before comparing | v0.2 |
 | Acceptance over the bus | any device under test graded by its CAN frames alone, pass/fail per scenario | v0.2.1 |
 | Emulator vs board | the trace in Renode vs the board's, within the stated tolerance | Track R |

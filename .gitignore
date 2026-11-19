@@ -58,3 +58,6 @@ build/
 # Editor tooling
 .cache/
 compile_commands.json
+# MISRA-oriented check output (tools/check_misra.sh)
+misra.txt
+misra-report*.txt

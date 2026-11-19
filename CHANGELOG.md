@@ -20,6 +20,8 @@ The machine-independent parts of open-crank moved to [open-tick](https://github.
 - `sim/can_otk`: conversion between `J1939Frame` and open-tick's CAN frames, as a library of its own.
 - `tools/compare_traces.sh` and the CI `traces` job: byte-for-byte trace comparison against each pull request's base branch.
 - `tools/vcan_demo_check.sh` and the CI `vcan-demo` job: the README's `vcan` demo, run and checked automatically.
+- `tools/check_misra.sh` and the CI `misra` job: cppcheck's MISRA addon over `portable/`, compared with a baseline of today's findings (`tools/misra-baseline.txt`, counts per rule and file). It fails on a new finding or a higher count. A MISRA-oriented check: it does not imply compliance.
+- `tools/check_portable.sh` builds MinSizeRel with `-fstack-usage`, prints the stack usage of every function in `portable/`, and fails if any is not `static`.
 
 ### Removed
 
