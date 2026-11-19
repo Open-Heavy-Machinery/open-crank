@@ -122,6 +122,8 @@ As planned, with the adjustments noted.
 
 The runner produces a pass/fail report.
 
+Once proven here, the oracle moves to open-tick (its v0.2), as the runtime did in v0.1.
+
 **Exit criteria**
 
 1. The reference controller passes, on `vcan` and on the reference board.
@@ -142,6 +144,8 @@ The runner produces a pass/fail report.
 - **Black box and configuration loaded from EEPROM**, as an optional part of the reference firmware.
 - **Numbered safety requirements**, each traced to its tests.
 - **A general specification of the safe state.**
+
+Transport-level faults are built in open-tick (its v0.3); domain faults stay here.
 
 Fault injection pulls in protocol work that v0.1 left out on purpose:
 
@@ -187,6 +191,8 @@ The plant stays on a CPU; the signal generator provides timing and I/O.
 - Distinct J1939 source addresses.
 - J1939-81 address claiming, and behaviour on address conflicts.
 - Check whether, on a real crane, both engines share one J1939 segment.
+
+The machine is described as an open-tick profile (its v0.5) instead of a hand-built bench.
 
 **Exit criteria**
 
