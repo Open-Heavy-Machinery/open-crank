@@ -64,11 +64,11 @@ bool j1939_decode_tsc1(const J1939Frame *f, J1939Tsc1 *m) {
         return false;
     }
     switch (f->data[0] & 0x03U) {
-        case (uint8_t)J1939_OVERRIDE_SPEED:
-            m->override_mode = J1939_OVERRIDE_SPEED;
-            break;
         case (uint8_t)J1939_OVERRIDE_DISABLED:
             m->override_mode = J1939_OVERRIDE_DISABLED;
+            break;
+        case (uint8_t)J1939_OVERRIDE_SPEED:
+            m->override_mode = J1939_OVERRIDE_SPEED;
             break;
         case (uint8_t)J1939_OVERRIDE_TORQUE:
             m->override_mode = J1939_OVERRIDE_TORQUE;
@@ -77,7 +77,7 @@ bool j1939_decode_tsc1(const J1939Frame *f, J1939Tsc1 *m) {
             m->override_mode = J1939_OVERRIDE_SPEED_TORQUE_LIMIT;
             break;
         default:
-            m->override_mode = J1939_OVERRIDE_DISABLED; //default safe state    
+            m->override_mode = J1939_OVERRIDE_DISABLED;  
             break;
     }
     m->speed_conditions = (uint8_t)((f->data[0] >> 2) & 0x03U);
