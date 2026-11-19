@@ -48,18 +48,23 @@ flowchart LR
     P["portable/"]
     S["sim/"]
     F["platforms/"]
+    T["external/open-tick<br/>(git submodule)"]
     S --> P
     F --> P
     F --> S
+    S --> T
+    F --> T
 ```
 
 | Zone | Contains | May depend on | Must not contain |
 |---|---|---|---|
-| `portable/` | J1939 codec, bench messages, machine-controller logic | nothing but `<stdint.h>`, `<stdbool.h>`, `<stddef.h>` | `printf`, `malloc`, files, sockets, OS calls, the plant, `double` |
-| `sim/` | plant physics, plants, loads, simulated engine ECU, bench, scenarios, trace | `portable/`, the C standard library | sockets, a specific OS, firmware HALs |
-| `platforms/` | host runner, SocketCAN, (later) Renode glue, STM32G4 HAL, FPGA glue | `portable/` and `sim/` | control logic, physics |
+| `portable/` | J1939 codec, bench messages, machine-controller logic | nothing but `<stdint.h>`, `<stdbool.h>`, `<stddef.h>` | `printf`, `malloc`, files, sockets, OS calls, the plant, `double`, open-tick |
+| `sim/` | plant physics, plants, loads, simulated engine ECU, bench, signals, trace columns, J1939 ↔ open-tick frames | `portable/`, open-tick's core, the C standard library | sockets, a specific OS, firmware HALs |
+| `platforms/` | host runner, SIL programs, (later) Renode glue, STM32G4 HAL, FPGA glue | `portable/`, `sim/`, open-tick (core and host) | control logic, physics |
 
 **The rule: dependencies point one way, and `portable/` depends on nothing else in the repo.**
+
+**open-tick** ([`external/open-tick`](https://github.com/Open-Heavy-Machinery/open-tick), a git submodule) is the family's machine-independent core: simulated time, scenarios, the scenario player, CAN frames and queues, the trace writer, the pacer and the SocketCAN bridge. open-crank brings the engine. `portable/` never uses open-tick, because firmware must not depend on a host library. `tools/check_portable.sh` already fails on any include from outside `portable/`.
 
 **Why.** Without a hard rule, the reference controller drifts into a Linux program: it picks up `printf`, `atof`, sockets and `double` math, and then it cannot be compiled for the STM32 or run in Renode. That is exactly what happened in the first slice, where the "reference firmware" was a Linux process. A folder boundary plus an enforced rule costs almost no code and protects goal 1.
 
@@ -209,13 +214,24 @@ In RUN it asks the engine for the operator's target speed through TSC1 (speed co
 | Driver | Used for | Where | Version |
 |---|---|---|---|
 | free-run | tests, CI, headless runs: as fast as possible, deterministic | `sim/runtime/loop.c`, `platforms/host` | v0.1 |
-| paced | interactive SIL: one step per 10 ms of wall clock (soft real time) | `platforms/linux-socketcan/pacer.c` | v0.1 |
-| virtual | emulator-driven: step when the emulator's time says so | `platforms/renode` | Track R |
-| hard | FPGA rigs: fixed step with a measured jitter budget | `platforms/fpga` | v0.4 |
+| paced | interactive SIL: one step per 10 ms of wall clock (soft real time) | `platforms/linux-socketcan`, with open-tick's pacer | v0.1 |
+| virtual | emulator-driven: step when the emulator's time says so | open-tick's Track R; `platforms/renode` | Track R |
+| hard | FPGA rigs: fixed step with a measured jitter budget | open-tick's bridges; `platforms/fpga` | v0.4 |
 
 **Why the bench owns time instead of reading an abstract clock.** In the first slice the 10 ms step was glued to the wall clock inside `main`, which made CI slow and blocked Renode. The earlier plan was a clock interface (`now`, `wait_until`). That fits free-run and paced, but not an emulator: co-simulating with Renode means "advance by N, then exchange frames" in lockstep, not "wait until T". With a step function that never reads time, every driver is a short loop around the same code.
 
-**In-memory loop** (`loop.c`). The bench and the reference controller in one process, joined by an in-memory bus. Every frame goes through the real encoders and decoders; only the socket is missing. Frames from the bench reach the controller in the same step; frames from the controller reach the bench at the start of the next one.
+**What comes from open-tick.** The scenario parser, the player that applies scenario events, the CAN queues of the in-memory loop, the trace writer, the pacer and the SocketCAN bridge. open-crank keeps what is about this machine:
+
+- the bench;
+- its signals, registered with open-tick as `OC_SIGNAL_TABLE`;
+- the trace columns;
+- the conversion between `J1939Frame` and open-tick's frames.
+
+The bench keeps its millisecond time and passes it to the player in nanoseconds (open-tick's timebase). Moving this code changed no behaviour: CI compares the trace of every scenario, byte for byte, against the base branch of each pull request (D19).
+
+**In-memory loop** (`loop.c`). The bench and the reference controller in one process, joined by an in-memory bus: two of open-tick's CAN queues, holding 32 frames each. Every frame goes through the real encoders and decoders; only the socket is missing. Frames from the bench reach the controller in the same step; frames from the controller reach the bench at the start of the next one.
+
+**J1939 ↔ open-tick frames** (`sim/can_otk`). `J1939Frame` lives in `portable/` and never sees open-tick, so the conversion to `OtkCanFrame` and back happens here. Frames J1939 does not use (11-bit identifiers, CAN FD) are dropped on the way in. It is a library of its own so that `open-crank-mc`, which plays the device under test, can use open-tick's CAN bridge without linking the simulator.
 
 **Scenarios** are time-ordered signal changes in plain CSV:
 
@@ -241,21 +257,21 @@ time_s,signal,value
 | `fault.overrun_torque_nm` | external torque driving the crankshaft |
 | `end` | end of the scenario |
 
-Unknown signals, bad numbers, decreasing times and events after `end` are errors with a line number: a typo must fail loudly, not run a different test.
+The parser is open-tick's; times are rounded to the nearest nanosecond, and `end` is reserved by open-tick. Unknown signals, bad numbers, decreasing times and events after `end` are errors with a line number: a typo must fail loudly, not run a different test.
 
 **Why data, not code.** The hoist profile used to be hard-coded in `main.c`. The same scenario must run in CI tests, in the SIL demo, in Renode and on hardware; if it is code, each of those gets its own copy and they diverge. The files in `scenarios/` are the ones the closed-loop tests load. CSV is trivial to read from C and from Python.
 
-**Trace** (`trace.c`). One CSV row per step: inputs, plant, ECU, pump and, when the controller runs in the same process, its state.
+**Trace** (`trace.c`). One CSV row per step: inputs, plant, ECU, pump and, when the controller runs in the same process, its state. The 26 columns are declared in a table and written through open-tick's trace writer, which reports a value of the wrong kind or a missing column instead of shifting the columns.
 
 ### 4.7 Platforms (`platforms/*`)
 
 Thin glue per target; no control logic or physics.
 
 - `host`: `open-crank-run`, the free-running closed loop. Plain C, builds anywhere.
-- `linux-socketcan`: `open-crank-sil` (bench) and `open-crank-mc` (reference controller), each paced by the wall clock on a non-blocking raw CAN socket with 29-bit frames.
+- `linux-socketcan`: `open-crank-sil` (bench) and `open-crank-mc` (reference controller), each paced by open-tick's pacer on open-tick's SocketCAN bridge. J1939 uses 29-bit classic frames only; `sim/can_otk` drops anything else.
 - `stm32g4` *(planned, v0.2)*: FDCAN driver and board startup, building `portable/` unchanged with the same toolchain file. Bus-off handling and the watchdog follow in v0.3, the engine-ECU firmware in v0.4.
 - `fpga` *(reserved, v0.4)*: time and I/O backend for hard real time.
-- `renode` *(Track R)*: platform description, scripts and a virtual-time driver.
+- `renode` *(Track R)*: the board's platform description and scripts. The virtual-time driver belongs to open-tick's Track R.
 
 ## 5. Timing model
 
@@ -288,6 +304,8 @@ Thin glue per target; no control logic or physics.
 | Portability | `portable/` on Cortex-M4F, symbols, includes | `tools/check_portable.sh` |
 | Undefined behaviour | ASan, UBSan, float-cast-overflow | CI `sanitizers` job |
 | Tests can fail | 18 deliberate mutations, each must fail the suite | `tools/mutation_check.sh` |
+| Behaviour unchanged by refactors | the trace of every scenario, byte for byte, against the pull request's base branch | `tools/compare_traces.sh`, CI `traces` job |
+| SIL on a bus | the README's `vcan` demo as two processes: the controller reaches RUN, holds 1500 rpm within 1 % with and without the hoist load | `tools/vcan_demo_check.sh`, CI `vcan-demo` job |
 | MISRA-oriented check | `portable/` against the rules the cppcheck MISRA addon covers; findings fixed or documented as deviations | v0.1.x |
 | Stack usage | maximum stack per function in the Cortex-M4F build (`-fstack-usage`) | v0.1.x |
 | Board vs SIL | `hoist_step` with the board in the loop vs the wall-clock-paced SIL, within tolerances written down before comparing | v0.2 |
@@ -321,6 +339,8 @@ Conventions:
 | D15 | Controller confirms control through EEC1 SPN 1483 | Trust that TSC1 is honoured | Lost frames and refused overrides are real failures |
 | D16 | Allow `mem*` in `portable/`, forbid everything else | "No undefined symbols at all" | GCC requires those four in freestanding code; soft-double helpers are what matter |
 | D17 | Mutation checks in CI | Manual "break it once" | Keeps proving that tests can fail as code changes |
+| D18 | Machine-independent runtime in open-tick, pinned as a git submodule | Keep it here; CMake `FetchContent`; a sibling checkout | A second application needs the same time, scenarios and bridges (the split D10 waited for). A submodule pins the exact commit, so a commit of open-crank always means the same build |
+| D19 | Traces compared byte for byte against the base branch in CI | Trust that refactors are refactors | Moving code must not move behaviour; a pull request that changes behaviour on purpose says so with the `behaviour-change` label |
 
 ## 8. Migration map from the earlier trees
 
@@ -332,7 +352,9 @@ Conventions:
 | `j1939/` | `portable/j1939/` |
 | `ecu/reference-fw/` | split: logic to `portable/machine_ctrl/`, glue to `platforms/linux-socketcan/mc_main.c` |
 | `backends/sil-vcan/`, `io/vcan/` | `platforms/linux-socketcan/` |
-| `time/` | `sim/runtime/` (bench time) and `platforms/linux-socketcan/pacer.c` |
+| `time/` | `sim/runtime/` (bench time) and open-tick's pacer |
+| `sim/runtime/src/scenario.c` (parser), the queues in `loop.c`, the writer in `trace.c` (v0.1) | open-tick `core/` |
+| `platforms/linux-socketcan/pacer.c`, `socketcan.c` (v0.1) | open-tick `host/` |
 | idle governor inside `d936la6.c` | `sim/engine_ecu/` |
 | hoist profile inside `main.c` | `scenarios/*.csv` |
 
@@ -357,3 +379,4 @@ The migration itself is recorded in [ROADMAP.md](ROADMAP.md), section "v0.1".
 4. **Message layouts from public sources.** Mitigation: every layout is in one place ([`docs/bus-interface.md`](docs/bus-interface.md)) with known test vectors, so a correction from someone with the standard is a small change.
 5. **Time synchronisation with an emulator.** Mitigation: the bench never reads a clock (D6); trace comparison against the board in Track R.
 6. **Scope.** The vision is large for a small team. Mitigation: milestones with explicit exit criteria and a standing list of non-goals.
+7. **A second repository.** A change in open-tick could change open-crank's behaviour. Mitigation: the submodule is pinned, open-crank moves the pin only in a pull request of its own, and the trace comparison (D19) runs on that pull request.

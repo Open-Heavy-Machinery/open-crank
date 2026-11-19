@@ -2,6 +2,28 @@
 
 All notable changes to this project. The project is pre-alpha; nothing here is a stable API yet.
 
+## Unreleased: runs on open-tick
+
+The machine-independent parts of open-crank moved to [open-tick](https://github.com/Open-Heavy-Machinery/open-tick), the family's new core, which open-crank now consumes as a git submodule (`external/open-tick`, pinned at `e23ee71`). **No behaviour changed**: the trace of every scenario is byte-identical to v0.1's, and CI now checks that on every pull request.
+
+### Changed
+
+- Scenarios are parsed by open-tick against `OC_SIGNAL_TABLE`. Event times are nanoseconds (`t`, `end` instead of `t_ms`, `end_ms`). The error for decreasing times reads "time 1 s is earlier" instead of "time 1.000 s".
+- The bench plays scenarios through open-tick's player; the in-memory loop uses open-tick's CAN queues (32 frames each, as before).
+- The trace is written through open-tick's trace writer from a column table: `oc_trace_open(OtkTrace *, FILE *)` and `oc_trace_row(OtkTrace *, ...)` replace `oc_trace_header(FILE *)` and `oc_trace_row(FILE *, ...)`.
+- `open-crank-sil` and `open-crank-mc` use open-tick's pacer and SocketCAN bridge. `open-crank-mc` no longer links the simulator.
+- The mutation "scenario: unknown signal names accepted" moved to open-tick with the parser. It is replaced by "scenario: events never reach the bench's signals"; there are still 18.
+
+### Added
+
+- `sim/can_otk`: conversion between `J1939Frame` and open-tick's CAN frames, as a library of its own.
+- `tools/compare_traces.sh` and the CI `traces` job: byte-for-byte trace comparison against each pull request's base branch.
+- `tools/vcan_demo_check.sh` and the CI `vcan-demo` job: the README's `vcan` demo, run and checked automatically.
+
+### Removed
+
+- `sim/runtime/src/scenario.c`'s parser, `platforms/linux-socketcan/pacer.*` and `socketcan.*`: now in open-tick.
+
 ## Roadmap revision after v0.1
 
 With v0.1 done, [ROADMAP.md](ROADMAP.md) was reordered. Documentation only; no code changed.

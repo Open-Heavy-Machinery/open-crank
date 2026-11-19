@@ -159,6 +159,8 @@ Fault injection pulls in protocol work that v0.1 left out on purpose:
 
 **Goal.** Your firmware *is* the engine ECU: it reads crank and cam signals and sensors, and commands fuel.
 
+**Depends on** [open-tick](https://github.com/Open-Heavy-Machinery/open-tick) v0.4. Its Tang Nano 20K bridge provides the signal-level transports: tooth-wheel patterns for crank and cam, injector capture and analog outputs. This milestone provides the engine side: the crank-angle plant and the reference engine-ECU firmware.
+
 **In scope**
 
 - The simulated engine ECU is switched off; the plant's fuel comes from the captured injector pulses.
@@ -224,6 +226,8 @@ The plant stays on a CPU; the signal generator provides timing and I/O.
 **Goal.** Firmware in the loop inside CI: the board's firmware, run in an emulator, regulates the simulated engine.
 
 **When.** A parallel track. It can be done at any time after v0.2.
+
+**Where.** The virtual-time driver that steps the simulation in lockstep with the emulator is open-tick's (its Track R). This track keeps what is specific to the board: the G4 platform description and the comparison with the board's trace.
 
 **In scope**
 
