@@ -11,6 +11,11 @@
 #    (__aeabi_d*, i.e. `double` emulated in software) fails the check.
 # 3. Every #include in portable/ names one of <stdint.h>, <stdbool.h>,
 #    <stddef.h>, or a header that lives inside portable/.
+# 4. Stack usage: the MinSizeRel build uses -fstack-usage, and the stack usage
+#    of every function is printed, largest first. Every function must be
+#    `static` (a fixed amount of stack): portable code must not use a
+#    variable-size stack. There is no byte limit yet; the stack budget comes
+#    with the board (v0.2).
 #
 # Usage: tools/check_portable.sh   (needs arm-none-eabi-gcc and cmake)
 set -euo pipefail
@@ -24,7 +29,10 @@ status=0
 
 for build_type in Debug MinSizeRel; do
     echo "== Cortex-M4F build ($build_type)"
-    cmake -S "$ROOT/portable" -B "$WORK/$build_type" \
+    # CFLAGS is added to the toolchain file's flags; -DCMAKE_C_FLAGS would replace them.
+    stack_flags=""
+    [[ $build_type == MinSizeRel ]] && stack_flags="-fstack-usage"
+    CFLAGS="$stack_flags" cmake -S "$ROOT/portable" -B "$WORK/$build_type" \
         -DCMAKE_TOOLCHAIN_FILE="$ROOT/cmake/arm-none-eabi.cmake" \
         -DCMAKE_BUILD_TYPE="$build_type" -DOC_WERROR=ON >/dev/null
     cmake --build "$WORK/$build_type" >/dev/null
@@ -47,6 +55,26 @@ for build_type in Debug MinSizeRel; do
     echo "   undefined symbols: $(echo ${undefined:-none}) (allowed: $ALLOWED_UNDEFINED)"
     arm-none-eabi-size "$WORK/$build_type/portable.o" | tail -1 | awk '{print "   size: text " $1 " B, data " $2 " B, bss " $3 " B"}'
 done
+
+echo "== Stack usage (MinSizeRel, -fstack-usage), largest first"
+# Each .su line: <file>:<line>:<column>:<function><TAB><bytes><TAB><qualifier>
+# Only the library's objects: CMake's compiler checks also leave .su files.
+mapfile -t su_files < <(find "$WORK/MinSizeRel/CMakeFiles/opencrank_portable.dir" -name '*.su' | sort)
+if [[ ${#su_files[@]} -eq 0 ]]; then
+    echo "FAIL: the MinSizeRel build produced no .su files"
+    status=1
+else
+    stack_table=$(awk -F'\t' '{ n = split($1, loc, ":"); printf "%s\t%s\t%s\n", loc[n], $2, $3 }' "${su_files[@]}" | sort -t$'\t' -k2,2nr -k1,1)
+    printf 'function\tbytes\tqualifier\n%s\n' "$stack_table" | awk -F'\t' '
+        { f[NR] = $1; b[NR] = $2; q[NR] = $3; if (length($1) > w) w = length($1) }
+        END { for (i = 1; i <= NR; i++) printf "   %-*s  %5s  %s\n", w, f[i], b[i], q[i] }'
+    while IFS=$'\t' read -r fn bytes qualifier; do
+        if [[ "$qualifier" != static ]]; then
+            echo "FAIL: '$fn' uses a '$qualifier' stack ($bytes bytes); portable/ must use a fixed-size stack"
+            status=1
+        fi
+    done <<<"$stack_table"
+fi
 
 echo "== #include check"
 while IFS= read -r -d '' file; do

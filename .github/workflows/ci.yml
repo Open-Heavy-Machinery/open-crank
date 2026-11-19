@@ -93,8 +93,27 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends gcc-arm-none-eabi binutils-arm-none-eabi
-      - name: Build for the MCU, check undefined symbols and includes
+      - name: Build for the MCU, check undefined symbols, stack usage and includes
         run: tools/check_portable.sh
+
+  misra:
+    name: MISRA-oriented check of portable/ (against the baseline)
+    # Pinned: the baseline depends on the cppcheck version that apt installs.
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install cppcheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends cppcheck
+      - name: cppcheck MISRA addon, compared with tools/misra-baseline.txt
+        run: tools/check_misra.sh
+      - name: Upload the report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: misra-report
+          path: build/misra-report.txt
 
   mutation:
     name: mutation sanity (tests can fail)

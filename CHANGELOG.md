@@ -2,7 +2,7 @@
 
 All notable changes to this project. The project is pre-alpha; nothing here is a stable API yet.
 
-## Unreleased: runs on open-tick
+## Unreleased
 
 The machine-independent parts of open-crank moved to [open-tick](https://github.com/Open-Heavy-Machinery/open-tick), the family's new core, which open-crank now consumes as a git submodule (`external/open-tick`, pinned at its first release, `v0.1.0`). **No behaviour changed**: the trace of every scenario is byte-identical to v0.1's, and CI now checks that on every pull request.
 
@@ -20,6 +20,8 @@ The machine-independent parts of open-crank moved to [open-tick](https://github.
 - `sim/can_otk`: conversion between `J1939Frame` and open-tick's CAN frames, as a library of its own.
 - `tools/compare_traces.sh` and the CI `traces` job: byte-for-byte trace comparison against each pull request's base branch.
 - `tools/vcan_demo_check.sh` and the CI `vcan-demo` job: the README's `vcan` demo, run and checked automatically.
+- `tools/check_misra.sh` and the CI `misra` job (on `ubuntu-26.04`): cppcheck's MISRA addon over `portable/`, with the target's type sizes (`--platform=arm32-wchar_t4`), compared with a baseline of today's findings (`tools/misra-baseline.txt`, counts per rule and file). It fails on a new finding or a higher count. A MISRA-oriented check: it does not imply compliance. `tools/check_misra_docker.sh` runs it locally in the CI's environment.
+- `tools/check_portable.sh` builds MinSizeRel with `-fstack-usage`, prints the stack usage of every function in `portable/`, and fails if any is not `static`.
 
 ### Removed
 

@@ -81,6 +81,8 @@ As planned, with the adjustments noted.
 
 **Why "MISRA-oriented".** The addon covers only part of the rules. Passing it **does not imply MISRA compliance**.
 
+**Approach: baseline first.** The CI job starts by accepting the findings that exist today, which are stored in a baseline ([`tools/misra-baseline.txt`](tools/misra-baseline.txt), counts per rule and file). From then on it fails if a new one appears. As the maintainer fixes findings or documents them as deviations, the baseline goes down. CI protects `portable/` from the first day, and the fixes come after. Exit criterion 2 is met when the baseline contains only findings documented as deviations.
+
 **Exit criteria**
 
 1. The CI job is green.
@@ -105,7 +107,7 @@ As planned, with the adjustments noted.
 
 1. **Latency first, then tolerances, then the comparison.** Measure the latency of the USB-CAN adapter first. With that figure, write down the tolerances *before* comparing: maximum speed droop, recovery time, steady speed. Then `scenarios/hoist_step.csv` with the board in the loop must stay within those tolerances of the reference. The reference is the SIL paced by the wall clock (`open-crank-sil` with `open-crank-mc`), not the free-running tests.
 2. **The guide has been followed from scratch**, on a clean clone. Validation by a third party is recorded when it happens and does not block the release.
-3. **The worst observed execution time of `mc_step`** (measured with the DWT cycle counter; not a proven bound) and its stack usage are documented.
+3. **The worst observed execution time of `mc_step`** (measured with the DWT cycle counter; not a proven bound) and its stack usage are documented. The stack budget uses the call graph (`-fcallgraph-info=su`), with the CI's `arm-none-eabi-gcc` as the reference toolchain.
 
 **Safety note.** From this milestone on, real silicon is in the loop, never real machinery. The project does not support connecting any of it to operating equipment.
 
