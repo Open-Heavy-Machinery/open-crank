@@ -4,7 +4,7 @@ All notable changes to this project. The project is pre-alpha; nothing here is a
 
 ## Unreleased: runs on open-tick
 
-The machine-independent parts of open-crank moved to [open-tick](https://github.com/Open-Heavy-Machinery/open-tick), the family's new core, which open-crank now consumes as a git submodule (`external/open-tick`, pinned at `e23ee71`). **No behaviour changed**: the trace of every scenario is byte-identical to v0.1's, and CI now checks that on every pull request.
+The machine-independent parts of open-crank moved to [open-tick](https://github.com/Open-Heavy-Machinery/open-tick), the family's new core, which open-crank now consumes as a git submodule (`external/open-tick`, pinned at its first release, `v0.1.0`). **No behaviour changed**: the trace of every scenario is byte-identical to v0.1's, and CI now checks that on every pull request.
 
 ### Changed
 
@@ -16,6 +16,7 @@ The machine-independent parts of open-crank moved to [open-tick](https://github.
 
 ### Added
 
+- CI runs once per commit: on `push` to `main`, and on `pull_request` for branches. Before, every pull request ran twice.
 - `sim/can_otk`: conversion between `J1939Frame` and open-tick's CAN frames, as a library of its own.
 - `tools/compare_traces.sh` and the CI `traces` job: byte-for-byte trace comparison against each pull request's base branch.
 - `tools/vcan_demo_check.sh` and the CI `vcan-demo` job: the README's `vcan` demo, run and checked automatically.
