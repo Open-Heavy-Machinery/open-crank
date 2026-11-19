@@ -122,6 +122,8 @@ As planned, with the adjustments noted.
 
 The runner produces a pass/fail report.
 
+Once proven here, the oracle moves to open-tick (its v0.2), as the runtime did in v0.1.
+
 **Exit criteria**
 
 1. The reference controller passes, on `vcan` and on the reference board.
@@ -142,6 +144,8 @@ The runner produces a pass/fail report.
 - **Black box and configuration loaded from EEPROM**, as an optional part of the reference firmware.
 - **Numbered safety requirements**, each traced to its tests.
 - **A general specification of the safe state.**
+
+Transport-level faults are built in open-tick (its v0.3); domain faults stay here.
 
 Fault injection pulls in protocol work that v0.1 left out on purpose:
 
@@ -188,6 +192,8 @@ The plant stays on a CPU; the signal generator provides timing and I/O.
 - J1939-81 address claiming, and behaviour on address conflicts.
 - Check whether, on a real crane, both engines share one J1939 segment.
 
+The machine is described as an open-tick profile (its v0.5) instead of a hand-built bench.
+
 **Exit criteria**
 
 1. Both engines run on the same runtime.
@@ -200,7 +206,7 @@ The plant stays on a CPU; the signal generator provides timing and I/O.
 
 **Goal.** Prove the architecture generalises by adding a radically different engine, then extract the plant interface from what both plants actually share.
 
-**In scope.** `9g95mec`: 2-stroke marine engine with a propeller-law load and a Level 1 control interface of its own, ME-style (not J1939, which is not how that engine is controlled). The plant plug-in interface is extracted here, not before.
+**In scope.** `9s50me`: 2-stroke marine engine with a propeller-law load and a Level 1 control interface of its own, ME-style (not J1939, which is not how that engine is controlled). The plant plug-in interface is extracted here, not before.
 
 **Exit criteria**
 

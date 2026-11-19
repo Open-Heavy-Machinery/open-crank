@@ -10,7 +10,7 @@ Part of [Open Heavy Machinery](https://open-heavy-machinery.github.io) ([open-cr
 
 ## Why it exists
 
-The barrier to embedded control work on heavy machinery is not knowledge, it is access. A Liebherr D936L A6 or a MAN B&W 9G95ME-C10.6 is not something an individual or a small team can keep in the garage, and bench time is expensive and scarce. Most people learning energy-management (EMS) and power-management (PMS) development never get past blinking an LED and sending a torque command to a bench-supply motor. `open-crank` is the missing half of the loop: a plant that answers back.
+The barrier to embedded control work on heavy machinery is not knowledge, it is access. A Liebherr D936L A6 or a Mitsui MAN B&W 9S50ME is not something an individual or a small team can keep in the garage, and bench time is expensive and scarce. Most people learning energy-management (EMS) and power-management (PMS) development never get past blinking an LED and sending a torque command to a bench-supply motor. `open-crank` is the missing half of the loop: a plant that answers back.
 
 ## Two ways to use it
 
@@ -54,9 +54,9 @@ Honest non-goals. Revisit these, don't quietly break them.
 | ID | Plant | Type | Role |
 |---|---|---|---|
 | `d936la6` | Liebherr D936L A6-class: 6 cyl. inline, 10.5 L, ~240 kW, hydraulic pump load | 4-stroke CI | **v0.1.** Primary plant |
-| `9g95mec` | MAN B&W 9G95ME-C10.6-class: 9 cyl., ~61.8 MW at 70-80 rpm, propeller load | 2-stroke uniflow, ME electronic control | **v0.6.** Proves the architecture generalises |
+| `9s50me` | Mitsui MAN B&W 9S50ME-class: 9 cyl., 500 mm bore, propeller load; power and rated speed to be sourced | 2-stroke, single-acting, uniflow-scavenged crosshead, ME electronic control | **v0.6.** Proves the architecture generalises |
 
-The jump between these two is the point of the project: a 4-stroke inline six driving a hydraulic pump and a 60 MW two-stroke driving a propeller share almost nothing except a crankshaft. Any abstraction that cannot carry both is the wrong abstraction, and we would rather find out with a second plant than pretend the first one is general.
+The jump between these two is the point of the project: a 4-stroke inline six driving a hydraulic pump and a large two-stroke crosshead engine driving a propeller share almost nothing except a crankshaft. Any abstraction that cannot carry both is the wrong abstraction, and we would rather find out with a second plant than pretend the first one is general.
 
 **Architecture rule:** nothing in the plant core may assume four strokes, a camshaft, an even 720° firing order, or a particular load. Load is a pluggable torque source.
 
@@ -93,7 +93,7 @@ open-crank/
 │   └── machine_ctrl/  reference Level 1 controller
 ├── sim/           zone 2: host-only simulator
 │   ├── core/        plant physics (no I/O, no clock)
-│   ├── plants/      d936la6/ (plant and its engine-ECU calibration), 9g95mec/ (later)
+│   ├── plants/      d936la6/ (plant and its engine-ECU calibration), 9s50me/ (later)
 │   ├── loads/       hydraulic pump, propeller (later)
 │   ├── engine_ecu/  simulated engine ECU
 │   ├── can_otk/     J1939 frames to and from open-tick's CAN frames
@@ -166,7 +166,7 @@ CI runs all four (the `vcan` demo when the runner provides `vcan`), plus gcc and
 
 - **Apache-2.0.** The patent grant matters here; an OEM legal department should be able to read the license and not flinch.
 - **SAE J1939 is a paywalled standard.** This repo does not include the spec text. PGN and SPN layouts here are original work from public sources; verify them against your own copy of J1939-71. The two bench messages (`OC_OPERATOR`, `OC_PUMP_CMD`) are this project's own and are not part of J1939.
-- **Not affiliated with Liebherr or MAN Energy Solutions.** Engine designations are used nominatively to identify the class of engine being modelled.
+- **Not affiliated with Liebherr, MAN Energy Solutions or Mitsui E&S.** Engine designations are used nominatively to identify the class of engine being modelled.
 - **MISRA C** applies to `portable/` only. The simulator is host code and is not held to it. MISRA rule texts are copyrighted and are not included in this repo.
 
 ## Contributing
