@@ -5,7 +5,7 @@ misra-c2012-2.5 portable/j1939/src/j1939_scaling.h 2
 misra-c2012-8.7 portable/j1939/src/j1939.c 8
 misra-c2012-8.7 portable/j1939/src/oc_msgs.c 2
 misra-c2012-8.7 portable/machine_ctrl/src/machine_ctrl.c 6
-misra-c2012-10.8 portable/j1939/src/j1939.c 2
+misra-c2012-10.8 portable/j1939/src/j1939.c 1
 misra-c2012-12.1 portable/j1939/src/j1939_scaling.h 2
 misra-c2012-12.1 portable/machine_ctrl/src/machine_ctrl.c 3
 misra-c2012-15.5 portable/j1939/src/j1939.c 4
