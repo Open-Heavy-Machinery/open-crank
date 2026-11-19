@@ -18,6 +18,8 @@ jobs:
         build_type: [Debug, Release]
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: true
       - name: Configure
         run: >
           cmake -S . -B build
@@ -43,6 +45,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: true
       - name: Build and test as the README says
         run: |
           cmake -S . -B build
@@ -58,6 +62,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: true
       - name: Keep ASan working on kernels with high ASLR entropy
         run: sudo sysctl -w vm.mmap_rnd_bits=28
       - name: Configure
@@ -78,6 +84,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: true
       - name: Install the Arm GNU toolchain
         run: |
           sudo apt-get update
@@ -90,5 +98,63 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: true
       - name: Break each safety-relevant behaviour; the tests must catch it
         run: tools/mutation_check.sh
+
+  traces:
+    name: traces unchanged versus the base branch
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+          path: head
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: base
+      - name: Build the base and the pull request
+        run: |
+          for tree in base head; do
+            cmake -S "$tree" -B "build-$tree" -DCMAKE_BUILD_TYPE=Release
+            cmake --build "build-$tree" -j
+          done
+      - name: Compare the trace of every scenario, byte for byte
+        env:
+          BEHAVIOUR_CHANGE: ${{ contains(github.event.pull_request.labels.*.name, 'behaviour-change') }}
+        run: head/tools/compare_traces.sh build-base build-head head/scenarios
+
+  vcan-demo:
+    name: vcan demo, as the README describes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Set up vcan0
+        id: vcan
+        run: |
+          if ! sudo modprobe vcan 2>/dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends "linux-modules-extra-$(uname -r)" || true
+            sudo modprobe vcan || true
+          fi
+          if sudo ip link add dev vcan0 type vcan && sudo ip link set up vcan0; then
+            echo "available=yes" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=no" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Build
+        run: |
+          cmake -S . -B build
+          cmake --build build -j
+      - name: Controller and engine as two processes on vcan0
+        if: steps.vcan.outputs.available == 'yes'
+        run: tools/vcan_demo_check.sh build vcan0
+      - name: Report that the demo was not run
+        if: steps.vcan.outputs.available != 'yes'
+        run: echo "::warning::vcan is not available on this runner; the vcan demo was NOT run"
