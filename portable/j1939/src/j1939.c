@@ -15,7 +15,7 @@ static uint8_t pf_of(uint32_t pgn) {
 }
 
 uint32_t j1939_make_id(uint8_t priority, uint32_t pgn, uint8_t dest, uint8_t src) {
-    uint32_t id = ((uint32_t)(priority & 0x07U) << 26);
+    uint32_t id = (((uint32_t)priority & 0x07U) << 26);
     if (pf_of(pgn) < PDU2_MIN_PF) {
         id |= ((pgn & 0x3FF00U) << 8) | ((uint32_t)dest << 8);
     } else {
