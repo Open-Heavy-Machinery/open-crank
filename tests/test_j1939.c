@@ -80,7 +80,7 @@ static void test_tsc1_round_trip_and_disabled(void) {
 
     const J1939Tsc1 s = { J1939_OVERRIDE_SPEED_TORQUE_LIMIT, 2, 1, true, 987.375f, true, 50.0f };
     j1939_encode_tsc1(&s, 0x27, 0x00, &f);
-    CHECK((f.data[0] & 0x03U) == 0x03U);   
+    CHECK((f.data[0] & 0x03U) == 0x03U);
     CHECK(j1939_decode_tsc1(&f, &d));
     CHECK(d.override_mode == J1939_OVERRIDE_SPEED_TORQUE_LIMIT);
     CHECK(d.speed_conditions == 2U);

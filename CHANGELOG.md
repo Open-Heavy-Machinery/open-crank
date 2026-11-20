@@ -4,6 +4,10 @@ All notable changes to this project. The project is pre-alpha; nothing here is a
 
 ## Unreleased
 
+Nothing yet.
+
+## v0.1.1: open-tick core, MISRA-oriented checks and stack usage (2026-11-20)
+
 The machine-independent parts of open-crank moved to [open-tick](https://github.com/Open-Heavy-Machinery/open-tick), the family's new core, which open-crank now consumes as a git submodule (`external/open-tick`, pinned at its first release, `v0.1.0`). **No behaviour changed**: the trace of every scenario is byte-identical to v0.1's, and CI now checks that on every pull request.
 
 ### Changed

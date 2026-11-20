@@ -72,6 +72,8 @@ As planned, with the adjustments noted.
 
 ## v0.1.x: MISRA-oriented checks and stack usage in CI
 
+**Status: done** (2026-11-20, released as v0.1.1). Both exit criteria are met: CI is green on `main`, and the 28 findings left in the baseline are covered by four approved deviations.
+
 **Goal.** CI checks `portable/` against part of MISRA C and reports how much stack each of its functions needs.
 
 **In scope**
@@ -83,12 +85,12 @@ As planned, with the adjustments noted.
 
 **Approach: baseline first.** The CI job starts by accepting the findings that exist today, which are stored in a baseline ([`tools/misra-baseline.txt`](tools/misra-baseline.txt), counts per rule and file). From then on it fails if a new one appears. As the maintainer fixes findings or documents them as deviations, the baseline goes down. CI protects `portable/` from the first day, and the fixes come after. Exit criterion 2 is met when the baseline contains only findings documented as deviations.
 
-**Progress.** 21 of the 49 initial findings are fixed in the code. The remaining 28 are covered by four deviations in [`docs/misra_deviations.md`](docs/misra_deviations.md), each naming the baseline pairs it covers. Exit criterion 2 is met once the maintainer has approved all four.
+**Outcome.** 21 of the 49 initial findings were fixed in the code. The remaining 28 are covered by four deviations in [`docs/misra_deviations.md`](docs/misra_deviations.md), each naming the baseline pairs it covers. The stack usage of every function in `portable/` is printed by [`tools/check_portable.sh`](tools/check_portable.sh), which also fails if any function is not `static`.
 
 **Exit criteria**
 
-1. The CI job is green.
-2. Every finding is either fixed or documented as a deviation, with its reason.
+- [x] 1. **The CI job is green.** The `misra` job and the Cortex-M4F stack report pass on `main`.
+- [x] 2. **Every finding is either fixed or documented as a deviation, with its reason.** [`docs/misra_deviations.md`](docs/misra_deviations.md): DEV-001 to DEV-004, approved by the maintainer.
 
 ---
 
