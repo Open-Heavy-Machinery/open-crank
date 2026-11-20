@@ -11,6 +11,9 @@
 #   - FAIL if a (rule, file) pair is new, or if its count went up.
 #   - PASS if every count is the same or lower. Counts that went down are
 #     listed, with a reminder to update the baseline.
+#   - FAIL if a pair in the baseline is not covered by an approved deviation
+#     in docs/misra_deviations.md, with the same count. This is what makes
+#     "every finding is fixed or documented" (ROADMAP.md, v0.1.x) checkable.
 #
 # The baseline starts with the findings that existed when the check was
 # introduced, and only goes down as findings are fixed or documented as
@@ -35,6 +38,7 @@ set -euo pipefail
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 BASELINE="$ROOT/tools/misra-baseline.txt"
+DEVIATIONS="$ROOT/docs/misra_deviations.md"
 REPORT="$ROOT/build/misra-report.txt"
 
 update=0
@@ -83,6 +87,7 @@ if [[ $update -eq 1 ]]; then
         cat "$WORK/current.txt"
     } >"$BASELINE"
     echo "Baseline written: ${BASELINE#"$ROOT"/} ($(wc -l <"$WORK/current.txt") rule/file pairs)"
+    echo "Now make ${DEVIATIONS#"$ROOT"/} agree: its table needs one row per pair, with the same count."
     exit 0
 fi
 
@@ -127,4 +132,45 @@ if grep -q '^DOWN ' "$WORK/diff.txt"; then
     grep '^DOWN ' "$WORK/diff.txt" | sed 's/^/   /'
     echo "   Update the baseline so they cannot come back: tools/check_misra.sh --update"
 fi
+
+# Every baseline pair needs a row "| <rule>, `<file>` | <count> | DEV-nnn |" in the
+# deviations table, with the baseline's count, and DEV-nnn must be approved.
+if [[ ! -f "$DEVIATIONS" ]]; then
+    echo "FAIL: no ${DEVIATIONS#"$ROOT"/}: every baseline finding must be documented there." >&2
+    exit 1
+fi
+awk '
+    FNR == NR {
+        if ($0 ~ /^\| [0-9]+\.[0-9]+, `[^`]+` \| [0-9]+ \| DEV-[0-9]+ \|/) {
+            split($0, c, "|")
+            rule = c[2]; sub(/^ */, "", rule); sub(/,.*/, "", rule)
+            file = c[2]; sub(/^[^`]*`/, "", file); sub(/`.*/, "", file)
+            n = c[3]; gsub(/ /, "", n)
+            d = c[4]; gsub(/ /, "", d)
+            row[rule " " file] = n " " d
+        } else if ($0 ~ /^## DEV-[0-9]+:/) {
+            id = $2; sub(/:$/, "", id)
+        } else if ($0 ~ /^- \*\*Status:\*\* approved by the maintainer/ && id != "") {
+            ok[id] = 1
+        }
+        next
+    }
+    /^#/ { next }
+    {
+        rule = $1; sub(/^misra-c2012-/, "", rule)   # the table says "15.5", the baseline "misra-c2012-15.5"
+        k = rule " " $2
+        if (!(k in row))              printf "UNDOCUMENTED  %s: %d findings, no row in the table\n", k, $3
+        else {
+            split(row[k], r, " ")
+            if (r[1] != $3)           printf "COUNT         %s: baseline %d, table %d\n", k, $3, r[1]
+            if (!(r[2] in ok))        printf "NOT APPROVED  %s: %s has no approved status\n", k, r[2]
+        }
+    }
+' "$DEVIATIONS" "$BASELINE" >"$WORK/coverage.txt"
+if [[ -s "$WORK/coverage.txt" ]]; then
+    echo "FAIL: the baseline and ${DEVIATIONS#"$ROOT"/} disagree:" >&2
+    sed 's/^/   /' "$WORK/coverage.txt" >&2
+    exit 1
+fi
+echo "   every baseline pair is covered by an approved deviation"
 echo "MISRA-oriented check OK: no finding beyond the baseline"

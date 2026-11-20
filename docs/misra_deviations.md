@@ -8,7 +8,7 @@ This file documents every finding that `tools/check_misra.sh` still reports and 
 
 ## How this file and the baseline fit together
 
-`tools/misra-baseline.txt` lists the findings CI accepts, as counts per (rule, file). Every pair in it must be covered by a deviation below, and every deviation names the pairs it covers.
+`tools/misra-baseline.txt` lists the findings CI accepts, as counts per (rule, file). Every pair in it must be covered by a deviation below, and every deviation names the pairs it covers. `tools/check_misra.sh` enforces this in CI: each baseline pair needs a row in the table below with the same count, and its deviation must have the status "approved by the maintainer".
 
 - **To fix a finding:** change the code, run `tools/check_misra_docker.sh --update`, and remove the finding from its deviation's scope here.
 - **To keep a new finding:** add or extend a deviation here first, then update the baseline. A finding that is not covered here must not enter the baseline.
