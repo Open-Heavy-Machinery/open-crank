@@ -156,7 +156,7 @@ To test your own controller instead of `open-crank-mc`, follow [docs/bus-interfa
 ## Checks
 
 - `tools/check_portable.sh` builds `portable/` for Cortex-M4F and checks that it needs nothing from outside but `memcpy`/`memmove`/`memset`/`memcmp`, and includes nothing outside itself. Needs `arm-none-eabi-gcc`.
-- `tools/check_misra.sh` runs cppcheck's MISRA addon over `portable/` and fails on any finding beyond its baseline, `tools/misra-baseline.txt` (MISRA-oriented: it does not imply compliance). `tools/check_misra_docker.sh` runs it, `--update` included, inside `ubuntu:26.04` with the same cppcheck as CI; needs Docker.
+- `tools/check_misra.sh` runs cppcheck's MISRA addon over `portable/` and fails on any finding beyond its baseline, `tools/misra-baseline.txt` (MISRA-oriented: it does not imply compliance). Every finding kept in the baseline is documented as a deviation in [`docs/misra_deviations.md`](docs/misra_deviations.md). `tools/check_misra_docker.sh` runs it, `--update` included, inside `ubuntu:26.04` with the same cppcheck as CI; needs Docker.
 - `tools/mutation_check.sh` breaks each safety-relevant behaviour on purpose and checks that the tests catch it.
 - `tools/compare_traces.sh` runs every scenario with two builds and compares the traces byte for byte. CI runs it on every pull request against its base branch, so a refactor that changes behaviour fails. A pull request that changes behaviour on purpose carries the `behaviour-change` label.
 - `tools/vcan_demo_check.sh` runs the `vcan` demo above as two processes and checks that the controller takes control and holds speed through the hoist load.

@@ -61,7 +61,7 @@ void j1939_encode_tsc1(const J1939Tsc1 *m, uint8_t src, uint8_t dest, J1939Frame
 
 bool j1939_decode_tsc1(const J1939Frame *f, J1939Tsc1 *m) {
     if (!j1939_frame_is(f, J1939_PGN_TSC1)) {
-        return false;
+        return false; /* DEV-003: PGN guard before the output is touched */
     }
     switch (f->data[0] & 0x03U) {
         case (uint8_t)J1939_OVERRIDE_DISABLED:
@@ -77,7 +77,7 @@ bool j1939_decode_tsc1(const J1939Frame *f, J1939Tsc1 *m) {
             m->override_mode = J1939_OVERRIDE_SPEED_TORQUE_LIMIT;
             break;
         default:
-            m->override_mode = J1939_OVERRIDE_DISABLED;  
+            m->override_mode = J1939_OVERRIDE_DISABLED;
             break;
     }
     m->speed_conditions = (uint8_t)((f->data[0] >> 2) & 0x03U);
@@ -106,7 +106,7 @@ void j1939_encode_eec1(const J1939Eec1 *m, uint8_t src, J1939Frame *f) {
 
 bool j1939_decode_eec1(const J1939Frame *f, J1939Eec1 *m) {
     if (!j1939_frame_is(f, J1939_PGN_EEC1)) {
-        return false;
+        return false; /* DEV-003: PGN guard before the output is touched */
     }
     m->torque_mode = (uint8_t)(f->data[0] & 0x0FU);
     m->driver_demand_torque_valid = j1939_from_u8(f->data[1], 1.0f, -125.0f, &m->driver_demand_torque_pct);
@@ -127,7 +127,7 @@ void j1939_encode_et1(const J1939Et1 *m, uint8_t src, J1939Frame *f) {
 
 bool j1939_decode_et1(const J1939Frame *f, J1939Et1 *m) {
     if (!j1939_frame_is(f, J1939_PGN_ET1)) {
-        return false;
+        return false; /* DEV-003: PGN guard before the output is touched */
     }
     m->coolant_temp_valid = j1939_from_u8(f->data[0], 1.0f, -40.0f, &m->coolant_temp_c);
     return true;
@@ -144,7 +144,7 @@ void j1939_encode_eflp1(const J1939Eflp1 *m, uint8_t src, J1939Frame *f) {
 
 bool j1939_decode_eflp1(const J1939Frame *f, J1939Eflp1 *m) {
     if (!j1939_frame_is(f, J1939_PGN_EFLP1)) {
-        return false;
+        return false; /* DEV-003: PGN guard before the output is touched */
     }
     m->oil_pressure_valid = j1939_from_u8(f->data[3], 4.0f, 0.0f, &m->oil_pressure_kpa);
     return true;

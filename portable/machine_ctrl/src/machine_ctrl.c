@@ -22,10 +22,15 @@ const McParams MC_DEFAULT_PARAMS = {
 };
 
 static float clampf(float v, float lo, float hi) {
-    if (!(v >= lo)) {
-        return lo;
+    float r = v;
+    if (!(v >= lo)) { /* NaN maps to lo */
+        r = lo;
+    } else if (v > hi) {
+        r = hi;
+    } else {
+        /* within range */
     }
-    return (v > hi) ? hi : v;
+    return r;
 }
 
 static bool elapsed(uint32_t now_ms, uint32_t since_ms, uint32_t span_ms) {
@@ -48,7 +53,7 @@ void mc_handle_frame(McCtx *c, const J1939Frame *f, uint32_t now_ms) {
     J1939Eec1 eec1;
     OcOperator op;
 
-    if (src == c->p->engine_address && j1939_decode_eec1(f, &eec1)) {
+    if ((src == c->p->engine_address) && j1939_decode_eec1(f, &eec1)) {
         if (eec1.engine_speed_valid) { /* status without a valid speed is no status */
             c->eec1_seen = true;
             c->eec1_ms = now_ms;
@@ -87,19 +92,19 @@ static void enter_run(McCtx *c) {
 static bool override_rejected(McCtx *c, uint32_t now_ms) {
     if (c->controlling_address == c->p->source_address) {
         c->override_mismatch = false;
-        return false;
+        return false; /* DEV-004: in control, nothing to time */
     }
     if (!c->override_mismatch) {
         c->override_mismatch = true;
         c->override_mismatch_since_ms = now_ms;
-        return false;
+        return false; /* DEV-004: mismatch starts, timing begins */
     }
     return elapsed(now_ms, c->override_mismatch_since_ms, c->p->override_confirm_ms);
 }
 
 size_t mc_step(McCtx *c, uint32_t now_ms, J1939Frame *out, size_t cap) {
     const McParams *p = c->p;
-    const float dt_s = c->stepped ? (float)(uint32_t)(now_ms - c->last_step_ms) / 1000.0f : 0.0f;
+    const float dt_s = c->stepped ? ((float)(uint32_t)(now_ms - c->last_step_ms) / 1000.0f) : 0.0f;
     c->stepped = true;
     c->last_step_ms = now_ms;
 
@@ -116,7 +121,7 @@ size_t mc_step(McCtx *c, uint32_t now_ms, J1939Frame *out, size_t cap) {
 
     switch (c->state) {
     case MC_STATE_WAIT_ENGINE:
-        if (status_fresh && c->engine_rpm >= p->running_rpm) {
+        if (status_fresh && (c->engine_rpm >= p->running_rpm)) {
             if (!c->running_seen) {
                 c->running_seen = true;
                 c->running_since_ms = now_ms;
@@ -181,31 +186,43 @@ size_t mc_step(McCtx *c, uint32_t now_ms, J1939Frame *out, size_t cap) {
 }
 
 const char *mc_state_name(McState s) {
+    const char *name = "?";
     switch (s) {
     case MC_STATE_WAIT_ENGINE:
-        return "WAIT_ENGINE";
+        name = "WAIT_ENGINE";
+        break;
     case MC_STATE_RUN:
-        return "RUN";
+        name = "RUN";
+        break;
     case MC_STATE_FAULT:
-        return "FAULT";
+        name = "FAULT";
+        break;
     default:
-        return "?";
+        break;
     }
+    return name;
 }
 
 const char *mc_fault_name(McFault f) {
+    const char *name = "?";
     switch (f) {
     case MC_FAULT_NONE:
-        return "none";
+        name = "none";
+        break;
     case MC_FAULT_ENGINE_STATUS_LOST:
-        return "engine status lost";
+        name = "engine status lost";
+        break;
     case MC_FAULT_OVERSPEED:
-        return "overspeed";
+        name = "overspeed";
+        break;
     case MC_FAULT_STALL:
-        return "stall";
+        name = "stall";
+        break;
     case MC_FAULT_OVERRIDE_REJECTED:
-        return "override rejected";
+        name = "override rejected";
+        break;
     default:
-        return "?";
+        break;
     }
+    return name;
 }

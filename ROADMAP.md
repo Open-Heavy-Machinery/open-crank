@@ -83,6 +83,8 @@ As planned, with the adjustments noted.
 
 **Approach: baseline first.** The CI job starts by accepting the findings that exist today, which are stored in a baseline ([`tools/misra-baseline.txt`](tools/misra-baseline.txt), counts per rule and file). From then on it fails if a new one appears. As the maintainer fixes findings or documents them as deviations, the baseline goes down. CI protects `portable/` from the first day, and the fixes come after. Exit criterion 2 is met when the baseline contains only findings documented as deviations.
 
+**Progress.** 21 of the 49 initial findings are fixed in the code. The remaining 28 are covered by four deviations in [`docs/misra_deviations.md`](docs/misra_deviations.md), each naming the baseline pairs it covers. Exit criterion 2 is met once the maintainer has approved all four.
+
 **Exit criteria**
 
 1. The CI job is green.

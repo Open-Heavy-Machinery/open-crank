@@ -21,7 +21,17 @@ The machine-independent parts of open-crank moved to [open-tick](https://github.
 - `tools/compare_traces.sh` and the CI `traces` job: byte-for-byte trace comparison against each pull request's base branch.
 - `tools/vcan_demo_check.sh` and the CI `vcan-demo` job: the README's `vcan` demo, run and checked automatically.
 - `tools/check_misra.sh` and the CI `misra` job (on `ubuntu-26.04`): cppcheck's MISRA addon over `portable/`, with the target's type sizes (`--platform=arm32-wchar_t4`), compared with a baseline of today's findings (`tools/misra-baseline.txt`, counts per rule and file). It fails on a new finding or a higher count. A MISRA-oriented check: it does not imply compliance. `tools/check_misra_docker.sh` runs it locally in the CI's environment.
+- `docs/misra_deviations.md`: the four deviations (DEV-001 to DEV-004) that cover every finding left in the MISRA baseline, each with its scope, reason and mitigation.
 - `tools/check_portable.sh` builds MinSizeRel with `-fstack-usage`, prints the stack usage of every function in `portable/`, and fails if any is not `static`.
+
+### Fixed
+
+- 21 of the 49 MISRA-oriented findings in `portable/`, fixed in the code with no change in behaviour (six byte-identical traces, 18 mutations still caught):
+  - rule 12.1: explicit precedence (5);
+  - rule 15.5: a single exit in `mc_state_name`, `mc_fault_name`, `j1939_from_u8`, `j1939_from_u16` and both `clampf` (14);
+  - rule 2.5: the unused private macros `J1939_U8_NA` and `J1939_U16_NA` removed (2).
+
+  The baseline went from 49 to 28 findings. The mutation "codec: 'not available' decoded as a value" follows the new form of `j1939_from_u16`.
 
 ### Removed
 
