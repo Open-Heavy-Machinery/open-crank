@@ -137,7 +137,7 @@ ctest --test-dir build --output-on-failure
 ./build/open-crank-run scenarios/overspeed.csv --trace overspeed.csv
 ```
 
-The trace is a CSV with one row per 10 ms step: speed, fuel, torques, ECU state, pump, controller state. The scenarios in `scenarios/` are the same files the closed-loop tests use; see [ARCHITECTURE.md](ARCHITECTURE.md#46-runtime-simruntime) for the signals you can set.
+The trace is a CSV with one row per 10 ms step: speed, fuel, torques, ECU state, pump, controller state. To look at one, or to lay a board's trace over the simulator's, open it in [open-rig](https://github.com/Open-Heavy-Machinery/open-rig) with [`viewer.json`](viewer.json), which says which columns go in which panel. The scenarios in `scenarios/` are the same files the closed-loop tests use; see [ARCHITECTURE.md](ARCHITECTURE.md#46-runtime-simruntime) for the signals you can set.
 
 ## Running on a virtual CAN bus
 
