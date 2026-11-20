@@ -102,7 +102,7 @@ mutate "codec: 16-bit values do not saturate" portable/j1939/src/j1939_scaling.h
     "const float raw = j1939_clampf((value - offset) / resolution, 0.0f, (float)J1939_U16_MAX_VALID);" \
     "const float raw = (value - offset) / resolution;"
 mutate "codec: 'not available' decoded as a value" portable/j1939/src/j1939_scaling.h \
-    "if (raw > J1939_U16_MAX_VALID) {" "if (false) {"
+    "if (raw <= J1939_U16_MAX_VALID) {" "if (true) {"
 # The parser now lives in open-tick, whose own mutation check covers it. This
 # one breaks open-crank's binding to it instead.
 mutate "scenario: events never reach the bench's signals" sim/runtime/src/bench.c \

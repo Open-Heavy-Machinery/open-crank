@@ -14,15 +14,18 @@
 
 #define J1939_U8_MAX_VALID 250U
 #define J1939_U16_MAX_VALID 0xFAFFU
-#define J1939_U8_NA 0xFFU
-#define J1939_U16_NA 0xFFFFU
 
 /* Clamps v to [lo, hi]; NaN maps to lo. */
 static inline float j1939_clampf(float v, float lo, float hi) {
-    if (!(v >= lo)) {
-        return lo;
+    float r = v;
+    if (!(v >= lo)) {          /* NaN maps to lo */
+        r = lo;
+    } else if (v > hi) {
+        r = hi;
+    } else {
+        /* within range */
     }
-    return (v > hi) ? hi : v;
+    return r;
 }
 
 /* Physical value -> raw, with raw = (value - offset) / resolution, rounded and saturated. */
@@ -37,21 +40,29 @@ static inline uint16_t j1939_to_u16(float value, float resolution, float offset)
 }
 
 static inline bool j1939_from_u8(uint8_t raw, float resolution, float offset, float *value) {
-    if (raw > J1939_U8_MAX_VALID) {
+    bool valid = false;
+
+    if (raw <= J1939_U8_MAX_VALID) {
+        *value = ((float)raw * resolution) + offset;
+        valid = true;
+    } else {
         *value = 0.0f;
-        return false;
     }
-    *value = (float)raw * resolution + offset;
-    return true;
+
+    return valid;
 }
 
 static inline bool j1939_from_u16(uint16_t raw, float resolution, float offset, float *value) {
-    if (raw > J1939_U16_MAX_VALID) {
+    bool valid = false;
+
+    if (raw <= J1939_U16_MAX_VALID) {
+        *value = ((float)raw * resolution) + offset;
+        valid = true;
+    } else {
         *value = 0.0f;
-        return false;
     }
-    *value = (float)raw * resolution + offset;
-    return true;
+
+    return valid;
 }
 
 static inline void j1939_put_u16(uint8_t *p, uint16_t v) {

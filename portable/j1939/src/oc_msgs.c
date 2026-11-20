@@ -21,7 +21,7 @@ void oc_encode_operator(const OcOperator *m, uint8_t src, J1939Frame *f) {
 
 bool oc_decode_operator(const J1939Frame *f, OcOperator *m) {
     if (!j1939_frame_is(f, OC_PGN_OPERATOR)) {
-        return false;
+        return false; /* DEV-003: PGN guard before the output is touched */
     }
     m->target_speed_valid = j1939_from_u16(j1939_get_u16(&f->data[0]), 0.125f, 0.0f, &m->target_speed_rpm);
     m->hoist_demand_valid = j1939_from_u8(f->data[2], 0.4f, 0.0f, &m->hoist_demand_pct);
@@ -38,7 +38,7 @@ void oc_encode_pump_cmd(const OcPumpCmd *m, uint8_t src, J1939Frame *f) {
 
 bool oc_decode_pump_cmd(const J1939Frame *f, OcPumpCmd *m) {
     if (!j1939_frame_is(f, OC_PGN_PUMP_CMD)) {
-        return false;
+        return false; /* DEV-003: PGN guard before the output is touched */
     }
     m->displacement_valid = j1939_from_u8(f->data[0], 0.4f, 0.0f, &m->displacement_pct);
     return true;
