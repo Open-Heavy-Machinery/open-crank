@@ -8,6 +8,7 @@ All notable changes to this project. The project is pre-alpha; nothing here is a
 
 - STM32G4 demo of the machine controller on a real board (v0.2 step 1, tested once on the board, 2026-11-21): `platforms/stm32g4/`.
 - `tools/check_misra.sh` also fails when a baseline pair has no row in the table of `docs/misra_deviations.md`, when the row's count differs from the baseline's, or when its deviation is not approved. Exit criterion 2 of v0.1.x is now checked by CI, not only by review.
+- `docs/bus-interface.md` states the bus: classical CAN, 29-bit, 250 kbit/s (J1939-11), J1939-21 framing. The STM32G4 demo samples at 87.5 % and says to reset the board between runs.
 
 ## v0.1.1: open-tick core, MISRA-oriented checks and stack usage (2026-11-20)
 

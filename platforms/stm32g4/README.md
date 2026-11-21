@@ -26,15 +26,16 @@ Set these in the `.ioc` and let CubeIDE generate the code; do not edit `MX_FDCAN
 | Frame format | Classic mode (`FDCAN_FRAME_CLASSIC`) |
 | Mode | Normal |
 | Auto retransmission | Enabled |
-| Nominal prescaler | 34 |
-| Nominal sync jump width | 1 |
-| Nominal time seg 1 | 15 |
-| Nominal time seg 2 | 4 |
-| Bit rate | 250 kbit/s (170 MHz / 34 / (1 + 15 + 4)) |
+| Nominal prescaler | 17 |
+| Nominal sync jump width | 5 |
+| Nominal time seg 1 | 34 |
+| Nominal time seg 2 | 5 |
+| Bit rate | 250 kbit/s (170 MHz / 17 / (1 + 34 + 5)) |
+| Sample point | 87.5 % ((1 + 34) / 40) |
 | Identifiers | extended (29-bit) |
 | TX | FIFO (`FDCAN_TX_FIFO_OPERATION`) |
 
-**Clock.** HSI (16 MHz) into the PLL with M = 4, N = 85, R = 2: 170 MHz system clock; AHB, APB1 and APB2 at 170 MHz; FDCAN kernel clock 170 MHz. Regulator in Scale 1 boost mode, flash latency 4.
+**Clock.** HSI (16 MHz) into the PLL with M = 4, N = 85, R = 2: 170 MHz system clock; AHB, APB1 and APB2 at 170 MHz; FDCAN kernel clock 170 MHz. Regulator in Scale 1 boost mode, flash latency 4. The board's 24 MHz HSE crystal is not used: enabling it needs a hardware change on the Nucleo (see ST's UM2397). The HSI is less accurate than a crystal; that is enough for this two-node bench, not for a vehicle network.
 
 **Pins**
 
@@ -67,6 +68,10 @@ candump can0
 
 `-s5` is 250 kbit/s. (`-s6` is 500 kbit/s, which is not the J1939 rate used here.)
 
+Reset the board before each run. When `open-crank-sil` stops, the controller loses EEC1 and latches `MC_FAULT_ENGINE_STATUS_LOST`; it leaves the fault only on a fault reset, which `hoist_step.csv` does not send. Without a reset, the next run shows `speed set by 0x00` and the pump at 0 %: the controller is holding its safe state.
+
+The Nucleo's ST-LINK also shows up as `/dev/ttyACM*`, and the numbers can swap after a USB reconnect. Give `slcand` the adapter's path under `/dev/serial/by-id/` instead of `/dev/ttyACM0`.
+
 ## What you should see
 
 - In `candump`, frames with identifier `0x0C000027` (TSC1 from the controller) every 10 ms.
@@ -76,6 +81,8 @@ candump can0
 ## Status
 
 Tested on the board: yes, 2026-11-21, one run of `hoist_step` against `open-crank-sil` on `can0`: `speed set by 0x27` from 2.0 s, rpm steady at 1500, pump at 85 % during the step.
+
+Bit timing changed to a sample point of 87.5 % (2026-11-21) and `hoist_step` re-run on the board with it: every run started after a reset gave the same result; a run started without a reset showed the latched fault described in "Running the demo".
 
 This is not yet the comparison against the SIL paced by the wall clock that v0.2's exit criteria ask for.
 
