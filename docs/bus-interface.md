@@ -13,7 +13,7 @@ Classical CAN (CAN 2.0B, not CAN FD), 29-bit identifiers, 8-byte data field, J19
 With a slcan USB-CAN adapter:
 
 ```sh
-sudo slcand -o -c -s5 /dev/ttyACM0 can0 && sudo ip link set can0 up
+sudo slcand -o -c -s5 /dev/serial/by-id/<your-adapter> can0 && sudo ip link set can0 up
 ```
 
 ## Nodes and addresses

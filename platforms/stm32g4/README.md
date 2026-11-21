@@ -60,7 +60,7 @@ Set these in the `.ioc` and let CubeIDE generate the code; do not edit `MX_FDCAN
 ## Running the demo
 
 ```sh
-sudo slcand -o -c -s5 /dev/ttyACM0 can0
+sudo slcand -o -c -s5 /dev/serial/by-id/<your-adapter> can0
 sudo ip link set can0 up
 ./build/open-crank-sil can0 scenarios/hoist_step.csv
 candump can0
@@ -70,7 +70,7 @@ candump can0
 
 Reset the board before each run. When `open-crank-sil` stops, the controller loses EEC1 and latches `MC_FAULT_ENGINE_STATUS_LOST`; it leaves the fault only on a fault reset, which `hoist_step.csv` does not send. Without a reset, the next run shows `speed set by 0x00` and the pump at 0 %: the controller is holding its safe state.
 
-The Nucleo's ST-LINK also shows up as `/dev/ttyACM*`, and the numbers can swap after a USB reconnect. Give `slcand` the adapter's path under `/dev/serial/by-id/` instead of `/dev/ttyACM0`.
+The Nucleo's ST-LINK also shows up as `/dev/ttyACM*`, and the numbers can swap after a USB reconnect, so the commands use the adapter's path under `/dev/serial/by-id/`; `ls -l /dev/serial/by-id/` shows which one it is.
 
 ## What you should see
 
@@ -80,9 +80,7 @@ The Nucleo's ST-LINK also shows up as `/dev/ttyACM*`, and the numbers can swap a
 
 ## Status
 
-Tested on the board: yes, 2026-11-21, one run of `hoist_step` against `open-crank-sil` on `can0`: `speed set by 0x27` from 2.0 s, rpm steady at 1500, pump at 85 % during the step.
-
-Bit timing changed to a sample point of 87.5 % (2026-11-21) and `hoist_step` re-run on the board with it: every run started after a reset gave the same result; a run started without a reset showed the latched fault described in "Running the demo".
+Tested on the board: yes, 2026-11-21, several runs of `hoist_step` against `open-crank-sil` on `can0` with the settings above (sample point 87.5 %, SJW 5), each started after a reset: `speed set by 0x27` from 1.5 s, rpm steady at 1500, pump at 85 % during the step. A run started without a reset showed the latched fault described in "Running the demo".
 
 This is not yet the comparison against the SIL paced by the wall clock that v0.2's exit criteria ask for.
 
