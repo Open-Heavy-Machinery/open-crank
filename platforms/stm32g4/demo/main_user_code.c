@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: Apache-2.0 */
 /* Demo to paste into an STM32CubeIDE project (v0.2 step 1). It does not compile on its own and it is not portable code. */
 
 /* USER CODE Includes */

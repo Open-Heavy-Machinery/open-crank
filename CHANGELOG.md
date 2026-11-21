@@ -6,7 +6,7 @@ All notable changes to this project. The project is pre-alpha; nothing here is a
 
 ### Added
 
-- STM32G4 demo of the machine controller on a real board (v0.2 step 1, untested on hardware): `platforms/stm32g4/`.
+- STM32G4 demo of the machine controller on a real board (v0.2 step 1, tested once on the board, 2026-11-21): `platforms/stm32g4/`.
 - `tools/check_misra.sh` also fails when a baseline pair has no row in the table of `docs/misra_deviations.md`, when the row's count differs from the baseline's, or when its deviation is not approved. Exit criterion 2 of v0.1.x is now checked by CI, not only by review.
 
 ## v0.1.1: open-tick core, MISRA-oriented checks and stack usage (2026-11-20)
