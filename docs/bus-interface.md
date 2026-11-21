@@ -6,6 +6,16 @@ Everything travels as 29-bit CAN frames with J1939 framing, so the same controll
 
 > **Verify against your copy of SAE J1939-71.** The J1939 layouts below are original work from public sources. The repository ships no spec text.
 
+## Bus
+
+Classical CAN (CAN 2.0B, not CAN FD), 29-bit identifiers, 8-byte data field, J1939-21 framing. On a real bus, 250 kbit/s, the rate of the J1939-11 physical layer. On `vcan` the bit rate does not apply.
+
+With a slcan USB-CAN adapter:
+
+```sh
+sudo slcand -o -c -s5 /dev/serial/by-id/<your-adapter> can0 && sudo ip link set can0 up
+```
+
 ## Nodes and addresses
 
 | Node | Source address | Sends | Notes |
