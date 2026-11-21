@@ -102,7 +102,7 @@ open-crank/
 │   ├── host/        open-crank-run: headless closed loop
 │   ├── linux-socketcan/  open-crank-sil, open-crank-mc
 │   ├── renode/      (track R)
-│   ├── stm32g4/     (planned, v0.2)
+│   ├── stm32g4/     v0.2 demo, in progress: see platforms/stm32g4/README.md
 │   └── fpga/        (reserved)
 ├── scenarios/     operating profiles and fault cases, as CSV
 ├── tests/         unit and closed-loop tests
