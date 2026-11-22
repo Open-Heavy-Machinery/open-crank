@@ -8,12 +8,33 @@ It is a demo to paste into an STM32CubeIDE project, not a build of its own: [`de
 
 ## Hardware
 
-- STM32G431KB board.
-- A CAN transceiver.
-- A USB-CAN adapter (CANable).
-- 120 Ω termination at both ends of the bus.
+**Bill of materials** (the maintainer's bench)
 
-There is no bill of materials yet; it comes in a later step of v0.2.
+| Qty | Part | Notes |
+|---|---|---|
+| 1 | NUCLEO-G431KB | STM32G431KB; powered and programmed through its micro-USB (ST-LINK) |
+| 1 | MCP2562FD CAN transceiver, DIP-8 | on a breadboard; VDD from the Nucleo's 5V, VIO from its 3V3 |
+| 1 | USB-CAN adapter compatible with CANable 2.0 (slcan firmware), USB-C | its on-board 120 Ω termination enabled with its jumper |
+| 1 | 120 Ω resistor, ±5 % | between CANH and CANL at the transceiver: the other end of the bus |
+| 1 | breadboard and jumper wires | |
+| 1 | micro-USB cable | for the Nucleo |
+| 1 | USB-C cable | for the adapter (USB-C to USB-C or to USB-A, as the PC needs) |
+| 2 | 100 nF ceramic capacitors | **recommended, not fitted on the maintainer's bench**: decoupling at the transceiver's VDD and VIO pins, as its datasheet recommends |
+
+**Wiring**
+
+| MCP2562FD pin | Connects to |
+|---|---|
+| 1 TXD | PA12 (FDCAN1_TX) |
+| 2 VSS | GND |
+| 3 VDD | 5V of the Nucleo |
+| 4 RXD | PA11 (FDCAN1_RX) |
+| 5 VIO | 3V3 of the Nucleo |
+| 6 CANL | CANL of the adapter |
+| 7 CANH | CANH of the adapter |
+| 8 STBY | GND (normal mode) |
+
+The 120 Ω resistor goes between pins 6 and 7; with the adapter's termination on, the bus has one terminator at each end (about 60 Ω between CANH and CANL with everything unpowered). VIO at 3.3 V keeps TXD and RXD at the STM32's logic level while the bus side runs from 5 V. Pin numbers are those of Microchip's MCP2562FD datasheet; check them against your copy.
 
 ## STM32CubeIDE project
 
