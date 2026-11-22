@@ -17,6 +17,7 @@ All notable changes to this project. The project is pre-alpha; nothing here is a
 - Stack budget by call graph in CI (`tools/stack_budget.py`, limit 1024 bytes): worst-case stack of `mc_step` 68 bytes and of `mc_handle_frame` 96 bytes on the Cortex-M4F MinSizeRel build with the CI's GCC 14.2.
 - Bill of materials and wiring of the STM32G4 reference bench in `platforms/stm32g4/README.md`.
 - `docs/porting.md`: what a platform does to run the controller, the rules it follows, and how to check a port.
+- `platforms/stm32g4/BRINGUP.md`: bring-up guide for the STM32G4 reference bench, from a clean clone to `hoist_step` on the board (v0.2 exit criterion 2), followed from scratch by the maintainer on 2026-11-22 with four fixes.
 
 ## v0.1.1: open-tick core, MISRA-oriented checks and stack usage (2026-11-20)
 

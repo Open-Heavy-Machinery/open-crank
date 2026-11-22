@@ -2,7 +2,7 @@
 
 ## What this is
 
-The first step of [v0.2](../../ROADMAP.md#v02-reference-board-on-the-bus): an STM32G431KB running the reference machine controller (`portable/machine_ctrl`), as a Level 1 device under test, against `open-crank-sil` over a real CAN bus.
+The first step of [v0.2](../../ROADMAP.md#v02-reference-board-on-the-bus): an STM32G431KB running the reference machine controller (`portable/machine_ctrl`), as a Level 1 device under test, against `open-crank-sil` over a real CAN bus. To set it up from nothing, follow [BRINGUP.md](BRINGUP.md).
 
 It is a demo to paste into an STM32CubeIDE project, not a build of its own: [`demo/main_user_code.c`](demo/main_user_code.c) holds only the `USER CODE` zones of the project's `main.c`. [`echo/main_user_code.c`](echo/main_user_code.c) is the same kind of file for the round-trip measurement below.
 
@@ -42,6 +42,8 @@ Set these in the `.ioc` and let CubeIDE generate the code; do not edit `MX_FDCAN
 
 **FDCAN1**
 
+Only the *Nominal* fields count in Classic mode; leave the *Data* fields as CubeMX sets them. The sync jump width goes in *Nominal Sync Jump Width*.
+
 | Setting | Value |
 |---|---|
 | Frame format | Classic mode (`FDCAN_FRAME_CLASSIC`) |
@@ -60,23 +62,23 @@ Set these in the `.ioc` and let CubeIDE generate the code; do not edit `MX_FDCAN
 
 **Pins**
 
-| Pin | Signal |
-|---|---|
-| PA11 | FDCAN1_RX |
-| PA12 | FDCAN1_TX |
-| PA2 | USART2_TX |
-| PA3 | USART2_RX |
-| PB8 | GPIO output, `LED_USER` |
+| Pin | Signal | Used by the demo |
+|---|---|---|
+| PA11 | FDCAN1_RX | yes |
+| PA12 | FDCAN1_TX | yes |
+| PA2 | USART2_TX | no: board default, can stay or go |
+| PA3 | USART2_RX | no: board default, can stay or go |
+| PB8 | GPIO output, `LED_USER` | no: board default, can stay or go |
 
 ## Bringing in the code without copying files
 
 1. **Link `portable/`** into the project as a linked folder: *New > Folder > Advanced > Link to alternate location*, pointing at this repository's `portable/`.
-2. **Add include paths** (*Properties > C/C++ Build > Settings > MCU GCC Compiler > Include paths*), as **absolute paths**:
+2. **Add `portable` as a source location** (*Project > Properties > C/C++ General > Paths and Symbols > Source Location > Add Folder…*, then select `portable`). A generated project compiles only `Core` and `Drivers`; without this step the link fails with undefined references to `mc_init` and the other controller functions.
+3. **Add include paths** (*Project > Properties > C/C++ Build > Settings > MCU GCC Compiler > Include paths*), as **absolute paths**:
    - `<path to open-crank>/portable/j1939/include`
    - `<path to open-crank>/portable/machine_ctrl/include`
 
-   A build variable such as `${...}` does not resolve in the maintainer's installation; see the notes.
-3. **Paste [`demo/main_user_code.c`](demo/main_user_code.c)** into the matching `USER CODE` zones of `Core/Src/main.c`: `Includes`, `PV`, `0`, `2` and `WHILE`. The `WHILE` zone opens the `while (1)` loop; its closing brace is the generated one after `USER CODE BEGIN 3`.
+4. **Paste [`demo/main_user_code.c`](demo/main_user_code.c)** into the matching `USER CODE` zones of `Core/Src/main.c`: `Includes`, `PV`, `0`, `2` and `WHILE`. The `WHILE` zone opens the `while (1)` loop; its closing brace is the generated one after `USER CODE BEGIN 3`.
 
 ## Running the demo
 
@@ -95,7 +97,7 @@ The Nucleo's ST-LINK also shows up as `/dev/ttyACM*`, and the numbers can swap a
 
 ## What you should see
 
-- In `candump`, frames with identifier `0x0C000027` (TSC1 from the controller) every 10 ms.
+- In `candump`, frames with identifier `0x0C000027` (TSC1 from the controller) every 10 ms: first data byte `F0` (override disabled) until the controller takes control, then `F1`.
 - In `open-crank-sil`, `speed set by 0x27`.
 - The engine speed following the operator's requests.
 
