@@ -107,16 +107,16 @@ Worst observed: 2287 cycles (13.5 µs), about 0.13 % of the 10 ms period. Anothe
 
 ## Stack usage of the controller
 
-`tools/check_portable.sh` builds `portable/` for the Cortex-M4F (MinSizeRel) with `-fcallgraph-info=su`, and `tools/stack_budget.py` adds up the stack along the worst call path from each public function of the controller. CI fails on recursion, on an indirect call, or on a path above 1024 bytes. With `arm-none-eabi-gcc (15:10.3-2021.07-4) 10.3.1 20210621 (release)`:
+`tools/check_portable.sh` builds `portable/` for the Cortex-M4F (MinSizeRel) with `-fcallgraph-info=su`, and `tools/stack_budget.py` adds up the stack along the worst call path from each public function of the controller. CI fails on recursion, on an indirect call, or on a path above 1024 bytes. As printed by the CI job `portable/ on Cortex-M4F`, with the CI's `arm-none-eabi-gcc` (`15:14.2.rel1-1`):
 
 | Function | Worst-case stack |
 |---|---|
 | `mc_init` | 16 bytes |
 | `mc_handle_frame` | 96 bytes |
-| `mc_step` | 76 bytes |
+| `mc_step` | 68 bytes |
 | `mc_clear_fault` | 0 bytes |
 
-`memcpy`, `memmove`, `memset` and `memcmp` are not counted. This is the controller's stack only: the demo's own code, the HAL and the interrupt handlers come on top, and the demo's build (CubeIDE, `-O0`) is not the build measured here.
+`memcpy`, `memmove`, `memset` and `memcmp` are not counted. This is the controller's stack only: the demo's own code, the HAL and the interrupt handlers come on top, and the demo's build (CubeIDE, `-O0`) is not the build measured here. Other GCC versions give other figures (GCC 10.3.1: `mc_step` 76 bytes).
 
 ## Status
 

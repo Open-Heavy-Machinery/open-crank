@@ -14,7 +14,7 @@ All notable changes to this project. The project is pre-alpha; nothing here is a
 - `docs/board-vs-sil.md` and `tools/compare_runs.py`: the tolerances for `hoist_step` with the board in the loop against the paced SIL, written before any comparison (v0.2 exit 1), and the script that checks them.
 - Results of `hoist_step` with the board in the loop against the paced SIL (2026-11-22, three runs, all within the tolerances of `docs/board-vs-sil.md`).
 - Worst observed execution time of `mc_step` on the STM32G431 with the DWT cycle counter, over the six scenarios: 2287 cycles (13.5 µs at 170 MHz, `-O0`); the demo keeps it in `mc_step_cycles_max`.
-- Stack budget by call graph in CI (`tools/stack_budget.py`, limit 1024 bytes): worst-case stack of `mc_step` 76 bytes and of `mc_handle_frame` 96 bytes on the Cortex-M4F MinSizeRel build.
+- Stack budget by call graph in CI (`tools/stack_budget.py`, limit 1024 bytes): worst-case stack of `mc_step` 68 bytes and of `mc_handle_frame` 96 bytes on the Cortex-M4F MinSizeRel build with the CI's GCC 14.2.
 
 ## v0.1.1: open-tick core, MISRA-oriented checks and stack usage (2026-11-20)
 
