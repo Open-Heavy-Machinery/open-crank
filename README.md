@@ -35,7 +35,7 @@ EMS and PMS are supervisory controllers, so Level 1 is directly useful for them 
 - **Scenarios as data** and headless closed-loop tests, so a control regression fails a build instead of a shift.
 - **Built on [open-tick](https://github.com/Open-Heavy-Machinery/open-tick)**, the family's machine-independent core (simulated time, scenarios, traces, CAN bridges), pinned as a git submodule. open-crank brings the engine.
 - **Bring your own firmware.** Any board, RTOS or language that speaks CAN. The bus contract in [docs/bus-interface.md](docs/bus-interface.md) is all it needs.
-- **Practise critical-firmware techniques** *(planned)*: acceptance tests over the bus, and a reference firmware showing MISRA-oriented checks, stack and timing analysis and requirement traceability. This is practice, not certification: open-crank is not a certified tool (see below).
+- **Practise critical-firmware techniques**: MISRA-oriented checks, stack usage by call graph and the worst observed execution time on the board, in CI and in the docs since v0.1.x and v0.2; acceptance tests over the bus and requirement traceability *(planned)*. This is practice, not certification: open-crank is not a certified tool (see below).
 
 ## What this is not
 

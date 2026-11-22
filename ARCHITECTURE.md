@@ -60,7 +60,7 @@ flowchart LR
 |---|---|---|---|
 | `portable/` | J1939 codec, bench messages, machine-controller logic | nothing but `<stdint.h>`, `<stdbool.h>`, `<stddef.h>` | `printf`, `malloc`, files, sockets, OS calls, the plant, `double`, open-tick |
 | `sim/` | plant physics, plants, loads, simulated engine ECU, bench, signals, trace columns, J1939 ↔ open-tick frames | `portable/`, open-tick's core, the C standard library | sockets, a specific OS, firmware HALs |
-| `platforms/` | host runner, SIL programs, (later) Renode glue, STM32G4 HAL, FPGA glue | `portable/`, `sim/`, open-tick (core and host) | control logic, physics |
+| `platforms/` | host runner, SIL programs, the STM32G4 reference board's `USER CODE` zones; (later) Renode glue, FPGA glue | `portable/`, `sim/`, open-tick (core and host) | control logic, physics |
 
 **The rule: dependencies point one way, and `portable/` depends on nothing else in the repo.**
 
