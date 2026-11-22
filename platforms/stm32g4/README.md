@@ -105,6 +105,19 @@ Measured on 2026-11-22 at 170 MHz with optimisation `-O0` (CubeIDE's Debug defau
 
 Worst observed: 2287 cycles (13.5 µs), about 0.13 % of the 10 ms period. Another optimisation level gives other figures.
 
+## Stack usage of the controller
+
+`tools/check_portable.sh` builds `portable/` for the Cortex-M4F (MinSizeRel) with `-fcallgraph-info=su`, and `tools/stack_budget.py` adds up the stack along the worst call path from each public function of the controller. CI fails on recursion, on an indirect call, or on a path above 1024 bytes. With `arm-none-eabi-gcc (15:10.3-2021.07-4) 10.3.1 20210621 (release)`:
+
+| Function | Worst-case stack |
+|---|---|
+| `mc_init` | 16 bytes |
+| `mc_handle_frame` | 96 bytes |
+| `mc_step` | 76 bytes |
+| `mc_clear_fault` | 0 bytes |
+
+`memcpy`, `memmove`, `memset` and `memcmp` are not counted. This is the controller's stack only: the demo's own code, the HAL and the interrupt handlers come on top, and the demo's build (CubeIDE, `-O0`) is not the build measured here.
+
 ## Status
 
 Tested on the board: yes, 2026-11-21, several runs of `hoist_step` against `open-crank-sil` on `can0` with the settings above (sample point 87.5 %, SJW 5), each started after a reset: `speed set by 0x27` from 1.5 s, rpm steady at 1500, pump at 85 % during the step. A run started without a reset showed the latched fault described in "Running the demo".

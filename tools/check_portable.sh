@@ -14,8 +14,10 @@
 # 4. Stack usage: the MinSizeRel build uses -fstack-usage, and the stack usage
 #    of every function is printed, largest first. Every function must be
 #    `static` (a fixed amount of stack): portable code must not use a
-#    variable-size stack. There is no byte limit yet; the stack budget comes
-#    with the board (v0.2).
+#    variable-size stack. The call graph (-fcallgraph-info=su) gives the
+#    worst-case stack of each public controller function;
+#    tools/stack_budget.py fails on recursion, indirect calls or a path above
+#    its limit (1024 bytes).
 #
 # Usage: tools/check_portable.sh   (needs arm-none-eabi-gcc and cmake)
 set -euo pipefail
@@ -31,7 +33,7 @@ for build_type in Debug MinSizeRel; do
     echo "== Cortex-M4F build ($build_type)"
     # CFLAGS is added to the toolchain file's flags; -DCMAKE_C_FLAGS would replace them.
     stack_flags=""
-    [[ $build_type == MinSizeRel ]] && stack_flags="-fstack-usage"
+    [[ $build_type == MinSizeRel ]] && stack_flags="-fstack-usage -fcallgraph-info=su"
     CFLAGS="$stack_flags" cmake -S "$ROOT/portable" -B "$WORK/$build_type" \
         -DCMAKE_TOOLCHAIN_FILE="$ROOT/cmake/arm-none-eabi.cmake" \
         -DCMAKE_BUILD_TYPE="$build_type" -DOC_WERROR=ON >/dev/null
@@ -74,6 +76,15 @@ else
             status=1
         fi
     done <<<"$stack_table"
+fi
+
+echo "== Stack budget (MinSizeRel, call graph)"
+mapfile -t ci_files < <(find "$WORK/MinSizeRel/CMakeFiles/opencrank_portable.dir" -name '*.ci' | sort)
+if [[ ${#ci_files[@]} -eq 0 ]]; then
+    echo "FAIL: the MinSizeRel build produced no .ci files"
+    status=1
+elif ! "$ROOT/tools/stack_budget.py" "${ci_files[@]}" | sed 's/^/   /'; then
+    status=1
 fi
 
 echo "== #include check"
