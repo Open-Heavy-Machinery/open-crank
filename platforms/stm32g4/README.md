@@ -2,7 +2,7 @@
 
 ## What this is
 
-The first step of [v0.2](../../ROADMAP.md#v02-reference-board-on-the-bus): an STM32G431KB running the reference machine controller (`portable/machine_ctrl`), as a Level 1 device under test, against `open-crank-sil` over a real CAN bus.
+The first step of [v0.2](../../ROADMAP.md#v02-reference-board-on-the-bus): an STM32G431KB running the reference machine controller (`portable/machine_ctrl`), as a Level 1 device under test, against `open-crank-sil` over a real CAN bus. To set it up from nothing, follow [BRINGUP.md](BRINGUP.md).
 
 It is a demo to paste into an STM32CubeIDE project, not a build of its own: [`demo/main_user_code.c`](demo/main_user_code.c) holds only the `USER CODE` zones of the project's `main.c`. [`echo/main_user_code.c`](echo/main_user_code.c) is the same kind of file for the round-trip measurement below.
 
