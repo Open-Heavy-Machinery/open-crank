@@ -18,7 +18,7 @@ Only columns that are observable on the bus are used: `t_s`, `rpm`, `controlling
 
 ## Tolerances
 
-Times are in seconds from the start of the scenario; "board − reference" is the difference between the same metric in the two traces. The band is 1500 ± 10 rpm.
+Times are in seconds from the start of the scenario; "board − reference" is the difference between the same metric in the two traces. The band is 1500 ± 10 rpm. Before a difference is compared with its limit, times are rounded to whole milliseconds and rpm to 6 decimals.
 
 | Metric | Definition | Limit |
 |---|---|---|
@@ -51,4 +51,25 @@ The engine speed loop is closed by the simulated engine ECU. The controller send
 
 ## Results
 
-None yet *(planned)*.
+### 2026-11-22
+
+NUCLEO-G431KB running the demo with the settings of the [STM32G4 README](../platforms/stm32g4/README.md), CANable over slcan at 250 kbit/s. Reference: one run of `open-crank-mc vcan0` with `open-crank-sil vcan0`. Board: three runs on `can0`, each started after a board reset. `tools/compare_runs.py ref.csv board_1.csv board_2.csv board_3.csv`: **all three PASS**.
+
+| Metric | Reference | Board 1 | Board 2 | Board 3 |
+|---|---|---|---|---|
+| `takeover_s` | 1.500 | 1.500 | 1.500 | 1.500 |
+| `reach_band_s` | 2.890 | 2.890 | 2.890 | 2.900 |
+| `settle_start_s` | 3.590 | 3.590 | 3.590 | 3.600 |
+| `pump_on_s` | 8.030 | 8.030 | 8.030 | 8.030 |
+| `droop_t_s` | 8.470 | 8.470 | 8.470 | 8.470 |
+| `settle_load_s` | 9.500 | 9.500 | 9.500 | 9.500 |
+| `pump_off_s` | 18.030 | 18.030 | 18.030 | 18.040 |
+| `over_t_s` | 18.310 | 18.310 | 18.310 | 18.320 |
+| `settle_unload_s` | 19.130 | 19.130 | 19.130 | 19.140 |
+| `droop_min_rpm` | 1328.72 | 1328.72 | 1328.72 | 1328.72 |
+| `over_max_rpm` | 1722.44 | 1722.44 | 1722.44 | 1722.44 |
+| `mean_5_8`, `mean_12_18`, `mean_21_25` | 1500.00 | 1500.00 | 1500.00 | 1500.00 |
+| `maxdev_5_8` / `_12_18` / `_21_25` | — | 0.02 / 0.00 / 0.00 | 0.02 / 0.00 / 0.00 | 0.02 / 0.00 / 0.00 |
+| `control_held` | yes | yes | yes | yes |
+
+Boards 1 and 2 match the reference row by row up to 25 s. Board 3 is one 10 ms step later on five events and matches it in every amplitude, which is the unsynchronised clocks the ±30 ms allows for. The `late steps` line of `open-crank-sil` was not written down for these four runs, so step 3 of the procedure was not followed for them. The traces are not in this repository.

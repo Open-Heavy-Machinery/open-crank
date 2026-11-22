@@ -12,6 +12,8 @@ All notable changes to this project. The project is pre-alpha; nothing here is a
 - `tools/can_rtt.py`: round-trip time of a CAN echo (request `0x18FF2EFC`, echo `0x18FF2F27`), to measure the USB-CAN adapter's latency for v0.2; standard-library python3 only.
 - `platforms/stm32g4/echo/`: echo firmware's `USER CODE` zones for `tools/can_rtt.py`, and the first round-trip figure on the board (2026-11-22: p50 1.660 ms, p99 1.949 ms, max 4.170 ms, 0 of 5000 lost).
 - `docs/board-vs-sil.md` and `tools/compare_runs.py`: the tolerances for `hoist_step` with the board in the loop against the paced SIL, written before any comparison (v0.2 exit 1), and the script that checks them.
+- Results of `hoist_step` with the board in the loop against the paced SIL (2026-11-22, three runs, all within the tolerances of `docs/board-vs-sil.md`).
+- Worst observed execution time of `mc_step` on the STM32G431 with the DWT cycle counter, over the six scenarios: 2287 cycles (13.5 µs at 170 MHz, `-O0`); the demo keeps it in `mc_step_cycles_max`.
 
 ## v0.1.1: open-tick core, MISRA-oriented checks and stack usage (2026-11-20)
 

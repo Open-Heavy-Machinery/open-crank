@@ -88,11 +88,28 @@ tools/can_rtt.py can0 --csv rtt_can0.csv
 
 Measured on 2026-11-22: NUCLEO-G431KB with the settings above, CANable over slcan at 250 kbit/s, one run of 5000 requests at 100 Hz, with a `candump` running at the same time. 5000 echoed, 0 lost; on the board `echo_count` 5000 and `echo_dropped` 0. Round trip: min 1.285 ms, p50 1.660 ms, p99 1.949 ms, max 4.170 ms. It is the round trip seen by a program on the PC, both directions, not halved. Roughly 1.1 ms of it is the two frames on the wire at 250 kbit/s (an estimate from the frame length, not a measurement).
 
+## Execution time of `mc_step`
+
+The demo times every `mc_step` call with the DWT cycle counter and keeps the largest in `mc_step_cycles_max`; read it in a CubeIDE debug session (for example in Live Expressions). It is the worst observed execution time, not a proven bound.
+
+Measured on 2026-11-22 at 170 MHz with optimisation `-O0` (CubeIDE's Debug default), one run per scenario, each after a board reset:
+
+| Scenario | Cycles | µs |
+|---|---|---|
+| `cold_start` | 2224 | 13.1 |
+| `engine_status_loss` | 2248 | 13.2 |
+| `hoist_step` | 2230 | 13.1 |
+| `override_ignored` | 2287 | 13.5 |
+| `overspeed` | 2224 | 13.1 |
+| `speed_command_loss` | 2286 | 13.4 |
+
+Worst observed: 2287 cycles (13.5 µs), about 0.13 % of the 10 ms period. Another optimisation level gives other figures.
+
 ## Status
 
 Tested on the board: yes, 2026-11-21, several runs of `hoist_step` against `open-crank-sil` on `can0` with the settings above (sample point 87.5 %, SJW 5), each started after a reset: `speed set by 0x27` from 1.5 s, rpm steady at 1500, pump at 85 % during the step. A run started without a reset showed the latched fault described in "Running the demo".
 
-This is not yet the comparison against the SIL paced by the wall clock that v0.2's exit criteria ask for.
+The comparison against the SIL paced by the wall clock passed on 2026-11-22 (three board runs); see [docs/board-vs-sil.md](../../docs/board-vs-sil.md#results).
 
 ## Notes
 
