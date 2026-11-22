@@ -4,7 +4,9 @@ All notable changes to this project. The project is pre-alpha; nothing here is a
 
 ## Unreleased
 
-Nothing yet.
+### Changed
+
+- `README.md` and `ARCHITECTURE.md` no longer list as planned what v0.1.x and v0.2 delivered.
 
 ## v0.2: Reference board on the bus (2026-11-22)
 
