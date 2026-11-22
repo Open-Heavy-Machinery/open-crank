@@ -1,8 +1,8 @@
-# STM32G4 demo (v0.2, step 1)
+# STM32G4 reference board (v0.2)
 
 ## What this is
 
-The first step of [v0.2](../../ROADMAP.md#v02-reference-board-on-the-bus): an STM32G431KB running the reference machine controller (`portable/machine_ctrl`), as a Level 1 device under test, against `open-crank-sil` over a real CAN bus. To set it up from nothing, follow [BRINGUP.md](BRINGUP.md).
+The reference board of [v0.2](../../ROADMAP.md#v02-reference-board-on-the-bus): an STM32G431KB running the reference machine controller (`portable/machine_ctrl`), as a Level 1 device under test, against `open-crank-sil` over a real CAN bus. To set it up from nothing, follow [BRINGUP.md](BRINGUP.md).
 
 It is a demo to paste into an STM32CubeIDE project, not a build of its own: [`demo/main_user_code.c`](demo/main_user_code.c) holds only the `USER CODE` zones of the project's `main.c`. [`echo/main_user_code.c`](echo/main_user_code.c) is the same kind of file for the round-trip measurement below.
 
@@ -78,6 +78,7 @@ Only the *Nominal* fields count in Classic mode; leave the *Data* fields as Cube
    - `<path to open-crank>/portable/j1939/include`
    - `<path to open-crank>/portable/machine_ctrl/include`
 
+   A build variable such as `${...}` does not resolve in the maintainer's installation; see the notes.
 4. **Paste [`demo/main_user_code.c`](demo/main_user_code.c)** into the matching `USER CODE` zones of `Core/Src/main.c`: `Includes`, `PV`, `0`, `2` and `WHILE`. The `WHILE` zone opens the `while (1)` loop; its closing brace is the generated one after `USER CODE BEGIN 3`.
 
 ## Running the demo

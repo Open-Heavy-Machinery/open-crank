@@ -7,8 +7,8 @@ Scope is deliberately narrow. Each milestone is small enough to finish and usefu
 | Version | Theme | DUT level |
 |---|---|---|
 | **v0.1** (done) | Level 1 vertical slice, in CI | 1 |
-| **v0.1.x** | MISRA-oriented checks and stack usage in CI | 1 |
-| **v0.2** | Reference board on the bus | 1 |
+| **v0.1.x** (done) | MISRA-oriented checks and stack usage in CI | 1 |
+| **v0.2** (done) | Reference board on the bus | 1 |
 | **v0.2.1** | Acceptance suite over the bus | 1 |
 | **v0.3** | Robustness on the board | 1 |
 | **v0.4** | Level 2: your firmware as the engine ECU | 2 |
@@ -105,13 +105,15 @@ As planned, with the adjustments noted.
 - `platforms/stm32g4`, running `portable/machine_ctrl` unchanged.
 - **The platform/core boundary, documented** for porting to other boards: pass each received frame to `mc_handle_frame`, call `mc_step(now_ms)` on every tick, and send the frames it returns. The API already works this way; it only needs documenting.
 - Ports to bxCAN and other families are welcome as community contributions. They are not a goal of the project.
-- A script that plots CSV traces, needed to compare the board against the SIL.
+- Plotting CSV traces to compare the board against the SIL: [open-rig](https://github.com/Open-Heavy-Machinery/open-rig) draws them with [`viewer.json`](viewer.json), and [`tools/compare_runs.py`](tools/compare_runs.py) checks the tolerances.
 
 **Exit criteria**
 
 1. **Latency first, then tolerances, then the comparison.** Measure the latency of the USB-CAN adapter first. With that figure, write down the tolerances *before* comparing: maximum speed droop, recovery time, steady speed. Then `scenarios/hoist_step.csv` with the board in the loop must stay within those tolerances of the reference. The reference is the SIL paced by the wall clock (`open-crank-sil` with `open-crank-mc`), not the free-running tests.
 2. **The guide has been followed from scratch**, on a clean clone. Validation by a third party is recorded when it happens and does not block the release.
 3. **The worst observed execution time of `mc_step`** (measured with the DWT cycle counter; not a proven bound) and its stack usage are documented. The stack budget uses the call graph (`-fcallgraph-info=su`), with the CI's `arm-none-eabi-gcc` as the reference toolchain.
+
+**Met on 2026-11-22.** 1: [docs/board-vs-sil.md](docs/board-vs-sil.md#results), three board runs within the tolerances. 2: [platforms/stm32g4/BRINGUP.md](platforms/stm32g4/BRINGUP.md#followed-from-scratch), followed from scratch by the maintainer. 3: [execution time](platforms/stm32g4/README.md#execution-time-of-mc_step) and [stack usage](platforms/stm32g4/README.md#stack-usage-of-the-controller) in the STM32G4 README.
 
 **Safety note.** From this milestone on, real silicon is in the loop, never real machinery. The project does not support connecting any of it to operating equipment.
 

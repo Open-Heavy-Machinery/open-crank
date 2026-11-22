@@ -4,7 +4,7 @@
 
 Part of [Open Heavy Machinery](https://open-heavy-machinery.github.io) ([open-crank's page](https://open-heavy-machinery.github.io/open-crank/)): open tools to practise and develop embedded control for machines you cannot keep at home, starting with heavy machinery.
 
-**Status: pre-alpha. v0.1 is done and on `main`.** Anything marked *(planned)* does not exist yet. The honest list of what works, what is verified and what is not is in [ROADMAP.md](ROADMAP.md).
+**Status: pre-alpha. v0.2 is done and on `main`: the reference controller runs on an STM32G431 board over a real CAN bus.** Anything marked *(planned)* does not exist yet. The honest list of what works, what is verified and what is not is in [ROADMAP.md](ROADMAP.md).
 
 `open-crank` is a simulated heavy-duty diesel engine that behaves enough like the real one to develop, test and break control software against it, on a laptop, in CI, and later on a real microcontroller board or an FPGA rig. It speaks SAE J1939 over CAN, the same way a real engine does.
 
@@ -102,7 +102,7 @@ open-crank/
 │   ├── host/        open-crank-run: headless closed loop
 │   ├── linux-socketcan/  open-crank-sil, open-crank-mc
 │   ├── renode/      (track R)
-│   ├── stm32g4/     v0.2 demo, in progress: see platforms/stm32g4/README.md
+│   ├── stm32g4/     v0.2 reference board: see platforms/stm32g4/README.md
 │   └── fpga/        (reserved)
 ├── scenarios/     operating profiles and fault cases, as CSV
 ├── tests/         unit and closed-loop tests
