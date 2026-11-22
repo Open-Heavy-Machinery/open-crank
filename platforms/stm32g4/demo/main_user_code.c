@@ -9,6 +9,7 @@
 #define MC_PERIOD_MS 10U   /* TSC1 and pump command every 10 ms */
 static McCtx mc;
 static uint32_t tx_dropped;
+static volatile uint32_t mc_step_cycles_max;   /* worst observed mc_step, in CPU cycles */
 
 /* USER CODE 0 */
 static void can_poll_rx(uint32_t now_ms)
@@ -74,6 +75,11 @@ static void can_poll_rx(uint32_t now_ms)
     Error_Handler();
   }
 
+  /* DWT cycle counter: worst observed execution time, not a proven bound. */
+  CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+  DWT->CYCCNT = 0U;
+  DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
+
   mc_init(&mc, &MC_DEFAULT_PARAMS);
   uint32_t next = HAL_GetTick() + MC_PERIOD_MS;
 
@@ -91,7 +97,10 @@ static void can_poll_rx(uint32_t now_ms)
       next += MC_PERIOD_MS;
 
       J1939Frame out[4];
+      const uint32_t c0 = DWT->CYCCNT;
       const size_t n = mc_step(&mc, now, out, sizeof(out) / sizeof(out[0]));
+      const uint32_t dc = DWT->CYCCNT - c0;   /* wrap-safe */
+      if (dc > mc_step_cycles_max) { mc_step_cycles_max = dc; }
       for (size_t k = 0U; k < n; k++)
       {
         can_send(&out[k]);
