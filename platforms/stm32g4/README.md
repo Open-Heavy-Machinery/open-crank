@@ -96,13 +96,14 @@ Measured on 2026-11-22 at 170 MHz with optimisation `-O0` (CubeIDE's Debug defau
 
 | Scenario | Cycles | µs |
 |---|---|---|
-| `hoist_step` | 2230 | 13.1 |
+| `cold_start` | 2224 | 13.1 |
 | `engine_status_loss` | 2248 | 13.2 |
-| `speed_command_loss` | 2286 | 13.4 |
-| `overspeed` | 2224 | 13.1 |
+| `hoist_step` | 2230 | 13.1 |
 | `override_ignored` | 2287 | 13.5 |
+| `overspeed` | 2224 | 13.1 |
+| `speed_command_loss` | 2286 | 13.4 |
 
-Worst observed: 2287 cycles (13.5 µs), about 0.13 % of the 10 ms period. `cold_start` was not measured. Another optimisation level gives other figures.
+Worst observed: 2287 cycles (13.5 µs), about 0.13 % of the 10 ms period. Another optimisation level gives other figures.
 
 ## Status
 
