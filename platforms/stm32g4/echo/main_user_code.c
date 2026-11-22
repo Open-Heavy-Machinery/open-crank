@@ -2,12 +2,12 @@
 /* Echo for the USB-CAN round-trip measurement (v0.2), to paste into a separate STM32CubeIDE project. It does not compile on its own and it is not portable code. */
 
 /* USER CODE PV */
-static volatile uint32_t echo_count;    /* ecos enviados */
-static volatile uint32_t echo_dropped;  /* peticiones sin eco (cola TX llena) */
+static volatile uint32_t echo_count;    /* echoes sent */
+static volatile uint32_t echo_dropped;  /* requests not echoed (TX queue full) */
 
 /* USER CODE 0 */
-#define ECHO_ID_REQUEST 0x18FF2EFCU   /* PGN 0xFF2E, prioridad 6, desde 0xFC */
-#define ECHO_ID_REPLY   0x18FF2F27U   /* PGN 0xFF2F, desde 0x27 */
+#define ECHO_ID_REQUEST 0x18FF2EFCU   /* PGN 0xFF2E, priority 6, from 0xFC */
+#define ECHO_ID_REPLY   0x18FF2F27U   /* PGN 0xFF2F, from 0x27 */
 
 void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
 {
