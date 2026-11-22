@@ -10,6 +10,7 @@ All notable changes to this project. The project is pre-alpha; nothing here is a
 - `tools/check_misra.sh` also fails when a baseline pair has no row in the table of `docs/misra_deviations.md`, when the row's count differs from the baseline's, or when its deviation is not approved. Exit criterion 2 of v0.1.x is now checked by CI, not only by review.
 - `docs/bus-interface.md` states the bus: classical CAN, 29-bit, 250 kbit/s (J1939-11), J1939-21 framing. The STM32G4 demo samples at 87.5 % and says to reset the board between runs.
 - `tools/can_rtt.py`: round-trip time of a CAN echo (request `0x18FF2EFC`, echo `0x18FF2F27`), to measure the USB-CAN adapter's latency for v0.2; standard-library python3 only.
+- `platforms/stm32g4/echo/`: echo firmware's `USER CODE` zones for `tools/can_rtt.py`, and the first round-trip figure on the board (2026-11-22: p50 1.660 ms, p99 1.949 ms, max 4.170 ms, 0 of 5000 lost).
 
 ## v0.1.1: open-tick core, MISRA-oriented checks and stack usage (2026-11-20)
 

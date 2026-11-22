@@ -4,7 +4,7 @@
 
 The first step of [v0.2](../../ROADMAP.md#v02-reference-board-on-the-bus): an STM32G431KB running the reference machine controller (`portable/machine_ctrl`), as a Level 1 device under test, against `open-crank-sil` over a real CAN bus.
 
-It is a demo to paste into an STM32CubeIDE project, not a build of its own: [`demo/main_user_code.c`](demo/main_user_code.c) holds only the `USER CODE` zones of the project's `main.c`.
+It is a demo to paste into an STM32CubeIDE project, not a build of its own: [`demo/main_user_code.c`](demo/main_user_code.c) holds only the `USER CODE` zones of the project's `main.c`. [`echo/main_user_code.c`](echo/main_user_code.c) is the same kind of file for the round-trip measurement below.
 
 ## Hardware
 
@@ -77,6 +77,16 @@ The Nucleo's ST-LINK also shows up as `/dev/ttyACM*`, and the numbers can swap a
 - In `candump`, frames with identifier `0x0C000027` (TSC1 from the controller) every 10 ms.
 - In `open-crank-sil`, `speed set by 0x27`.
 - The engine speed following the operator's requests.
+
+## Measuring the USB-CAN round trip
+
+[`echo/main_user_code.c`](echo/main_user_code.c) is for a second, separate CubeIDE project: the board answers each request `0x18FF2EFC` with `0x18FF2F27` and the same 8 bytes, from the FDCAN RX FIFO 0 interrupt, and does nothing else. Make it from a copy of the demo project without the demo code and without `portable/`, and enable **FDCAN1 interrupt 0** in the `.ioc` (FDCAN1 → NVIC Settings). With `open-crank-sil` stopped, on the PC:
+
+```sh
+tools/can_rtt.py can0 --csv rtt_can0.csv
+```
+
+Measured on 2026-11-22: NUCLEO-G431KB with the settings above, CANable over slcan at 250 kbit/s, one run of 5000 requests at 100 Hz, with a `candump` running at the same time. 5000 echoed, 0 lost; on the board `echo_count` 5000 and `echo_dropped` 0. Round trip: min 1.285 ms, p50 1.660 ms, p99 1.949 ms, max 4.170 ms. It is the round trip seen by a program on the PC, both directions, not halved. Roughly 1.1 ms of it is the two frames on the wire at 250 kbit/s (an estimate from the frame length, not a measurement).
 
 ## Status
 
