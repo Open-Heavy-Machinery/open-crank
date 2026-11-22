@@ -74,7 +74,7 @@ Only the *Nominal* fields count in Classic mode; leave the *Data* fields as Cube
 
 1. **Link `portable/`** into the project as a linked folder: *New > Folder > Advanced > Link to alternate location*, pointing at this repository's `portable/`.
 2. **Add `portable` as a source location** (*Project > Properties > C/C++ General > Paths and Symbols > Source Location > Add Folder…*, then select `portable`). A generated project compiles only `Core` and `Drivers`; without this step the link fails with undefined references to `mc_init` and the other controller functions.
-3. **Add include paths** (*Prjoect > Properties > C/C++ Build > Settings > MCU GCC Compiler > Include paths*), as **absolute paths**:
+3. **Add include paths** (*Project > Properties > C/C++ Build > Settings > MCU GCC Compiler > Include paths*), as **absolute paths**:
    - `<path to open-crank>/portable/j1939/include`
    - `<path to open-crank>/portable/machine_ctrl/include`
 
