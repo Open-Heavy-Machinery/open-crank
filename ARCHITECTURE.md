@@ -269,7 +269,7 @@ Thin glue per target; no control logic or physics.
 
 - `host`: `open-crank-run`, the free-running closed loop. Plain C, builds anywhere.
 - `linux-socketcan`: `open-crank-sil` (bench) and `open-crank-mc` (reference controller), each paced by open-tick's pacer on open-tick's SocketCAN bridge. J1939 uses 29-bit classic frames only; `sim/can_otk` drops anything else.
-- `stm32g4` *(planned, v0.2)*: FDCAN driver and board startup, building `portable/` unchanged with the same toolchain file. Bus-off handling and the watchdog follow in v0.3, the engine-ECU firmware in v0.4.
+- `stm32g4` (v0.2): the reference board, as `USER CODE` zones to paste into an STM32CubeIDE project that links `portable/` unchanged and builds it with CubeIDE's own toolchain. CI builds `portable/` for the Cortex-M4F separately, with `cmake/arm-none-eabi.cmake`. See [platforms/stm32g4/README.md](platforms/stm32g4/README.md). Bus-off handling and the watchdog follow in v0.3, the engine-ECU firmware in v0.4.
 - `fpga` *(reserved, v0.4)*: time and I/O backend for hard real time.
 - `renode` *(Track R)*: the board's platform description and scripts. The virtual-time driver belongs to open-tick's Track R.
 

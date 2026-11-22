@@ -4,6 +4,19 @@ All notable changes to this project. The project is pre-alpha; nothing here is a
 
 ## Unreleased
 
+Nothing yet.
+
+## v0.2: Reference board on the bus (2026-11-22)
+
+The reference controller, unchanged, runs on an STM32G431 (NUCLEO-G431KB) and controls the simulated engine over a real CAN bus at 250 kbit/s. All three exit criteria of v0.2 are met: `hoist_step` with the board in the loop stays within tolerances written before the comparison (three runs, after measuring the USB-CAN round trip); the bring-up guide was followed from scratch on a clean clone; and the worst observed execution time of `mc_step` (DWT) and its worst-case stack (call graph, in CI) are documented. Nothing in `portable/`, `sim/` or `scenarios/` changed since v0.1.1.
+
+### Known limitations
+
+- The board runs on its internal HSI oscillator, not a crystal: enough for a two-node bench, not for a vehicle network.
+- The demo does not recover from bus-off.
+- The `late steps` line of `open-crank-sil` was not recorded for the comparison runs.
+- The STM32 firmware is built in STM32CubeIDE; no CI job builds it.
+
 ### Added
 
 - STM32G4 demo of the machine controller on a real board (v0.2 step 1, tested on the board, 2026-11-21): `platforms/stm32g4/`.
