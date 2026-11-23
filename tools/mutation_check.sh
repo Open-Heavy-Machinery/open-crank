@@ -98,6 +98,8 @@ mutate "controller: override kept outside RUN" $MC \
 mutate "controller: speed request not slew-limited" $MC \
     "c->requested_rpm += clampf(c->target_rpm - c->requested_rpm, -max_delta, max_delta);" \
     "c->requested_rpm = c->target_rpm; (void)max_delta;"
+mutate "controller: operator target not clamped to the governed range" $MC \
+    "? clampf(c->op.target_speed_rpm, p->request_min_rpm, p->request_max_rpm)" "? c->op.target_speed_rpm"
 mutate "codec: 16-bit values do not saturate" portable/j1939/src/j1939_scaling.h \
     "const float raw = j1939_clampf((value - offset) / resolution, 0.0f, (float)J1939_U16_MAX_VALID);" \
     "const float raw = (value - offset) / resolution;"

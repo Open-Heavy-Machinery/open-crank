@@ -4,11 +4,11 @@
 # Deliberately broken controllers must fail the acceptance suite (exit
 # criterion 2 of v0.2.1; docs/acceptance.md). Each mutation below breaks one
 # behaviour of the reference controller, in a scratch copy of the tree, as
-# tools/mutation_check.sh does; the mutant is then graded on the six
+# tools/mutation_check.sh does; the mutant is then graded on the seven
 # scenarios with open-crank-accept-loop (the in-memory loop: deterministic,
 # fast, no vcan) and must fail the criteria listed with it.
 #
-# Every mutant runs all six scenarios, without stopping at the first failure:
+# Every mutant runs all seven scenarios, without stopping at the first failure:
 # the full list says which criteria have teeth.
 #
 #   killed      every expected criterion failed (other failures are listed too)
@@ -152,6 +152,9 @@ mutate "controller: pump stays commanded outside RUN" $MC \
 mutate "controller: override kept outside RUN" $MC \
     ".override_mode = run ? J1939_OVERRIDE_SPEED : J1939_OVERRIDE_DISABLED," ".override_mode = J1939_OVERRIDE_SPEED," \
     "S1 E2 O1 V1 L1"
+mutate "controller: operator target not clamped to the governed range" $MC \
+    "? clampf(c->op.target_speed_rpm, p->request_min_rpm, p->request_max_rpm)" "? c->op.target_speed_rpm" \
+    "G1"
 mutate "controller: speed request not slew-limited" $MC \
     "c->requested_rpm += clampf(c->target_rpm - c->requested_rpm, -max_delta, max_delta);" \
     "c->requested_rpm = c->target_rpm; (void)max_delta;" \
