@@ -10,7 +10,7 @@ set(OC_TESTS
     test_bench
     test_scenario
     test_closed_loop
-    test_oracle
+    test_accept
 )
 foreach(test_name ${OC_TESTS})
     add_executable(${test_name} ${test_name}.c)
@@ -18,7 +18,7 @@ foreach(test_name ${OC_TESTS})
     add_test(NAME ${test_name} COMMAND ${test_name})
 endforeach()
 
-target_link_libraries(test_oracle PRIVATE opencrank_accept)
+target_link_libraries(test_accept PRIVATE opencrank_accept)
 
 set(OC_SCENARIO_DIR ${PROJECT_SOURCE_DIR}/scenarios)
 target_compile_definitions(test_closed_loop PRIVATE OC_SCENARIO_DIR="${OC_SCENARIO_DIR}")

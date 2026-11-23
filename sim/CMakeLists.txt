@@ -29,12 +29,7 @@ target_include_directories(opencrank_sim PUBLIC
 )
 target_link_libraries(opencrank_sim PUBLIC opencrank_portable opencrank_can_otk opentick::core m)
 
-# Acceptance oracle. Only opentick::core and its own include dir: an open-crank #include in it must not compile.
-add_library(opencrank_oracle STATIC oracle/src/oracle.c)
-target_include_directories(opencrank_oracle PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/oracle/include)
-target_link_libraries(opencrank_oracle PUBLIC opentick::core)
-
 # open-crank's observables for the oracle: what the device under test sends.
 add_library(opencrank_accept STATIC accept/src/accept.c)
 target_include_directories(opencrank_accept PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/accept/include)
-target_link_libraries(opencrank_accept PUBLIC opencrank_oracle opencrank_can_otk opencrank_portable)
+target_link_libraries(opencrank_accept PUBLIC opentick::core opencrank_can_otk opencrank_portable)

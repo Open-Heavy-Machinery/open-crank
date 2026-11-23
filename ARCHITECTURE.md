@@ -64,7 +64,7 @@ flowchart LR
 
 **The rule: dependencies point one way, and `portable/` depends on nothing else in the repo.**
 
-**open-tick** ([`external/open-tick`](https://github.com/Open-Heavy-Machinery/open-tick), a git submodule) is the family's machine-independent core: simulated time, scenarios, the scenario player, CAN frames and queues, the trace writer, the pacer and the SocketCAN bridge. open-crank brings the engine. `portable/` never uses open-tick, because firmware must not depend on a host library. `tools/check_portable.sh` already fails on any include from outside `portable/`.
+**open-tick** ([`external/open-tick`](https://github.com/Open-Heavy-Machinery/open-tick), a git submodule) is the family's machine-independent core: simulated time, scenarios, the scenario player, CAN frames and queues, the trace writer, the pacer, the SocketCAN bridge and the acceptance oracle. open-crank brings the engine. `portable/` never uses open-tick, because firmware must not depend on a host library. `tools/check_portable.sh` already fails on any include from outside `portable/`.
 
 **Why.** Without a hard rule, the reference controller drifts into a Linux program: it picks up `printf`, `atof`, sockets and `double` math, and then it cannot be compiled for the STM32 or run in Renode. That is exactly what happened in the first slice, where the "reference firmware" was a Linux process. A folder boundary plus an enforced rule costs almost no code and protects goal 1.
 
@@ -272,6 +272,16 @@ Thin glue per target; no control logic or physics.
 - `stm32g4` (v0.2): the reference board, as `USER CODE` zones to paste into an STM32CubeIDE project that links `portable/` unchanged and builds it with CubeIDE's own toolchain. CI builds `portable/` for the Cortex-M4F separately, with `cmake/arm-none-eabi.cmake`. See [platforms/stm32g4/README.md](platforms/stm32g4/README.md). Bus-off handling and the watchdog follow in v0.3, the engine-ECU firmware in v0.4.
 - `fpga` *(reserved, v0.4)*: time and I/O backend for hard real time.
 - `renode` *(Track R)*: the board's platform description and scripts. The virtual-time driver belongs to open-tick's Track R.
+
+### 4.8 Acceptance (`sim/accept`, oracle in open-tick)
+
+The acceptance suite grades a device under test by the frames it sends ([docs/acceptance.md](docs/acceptance.md)). open-crank brings what is about J1939 and this machine:
+
+- the observables (`sim/accept`): TSC1 and OC_PUMP_CMD decoded into `tsc1_speed_control`, `tsc1_speed_rpm`, `pump_cmd_pct` and `tsc1_override`, and the filter that counts only the DUT's frames (its source address, and a TSC1 addressed to the engine);
+- the criteria for each scenario (`scenarios/<name>.accept.csv`);
+- the two runners: `open-crank-accept-loop` (`platforms/host`, in memory) and `open-crank-accept` (`platforms/linux-socketcan`, on SocketCAN).
+
+The oracle and the criteria format are open-tick's (`opentick/oracle.h`, since v0.2.0): see its [docs/criteria-format.md](https://github.com/Open-Heavy-Machinery/open-tick/blob/v0.2.0/docs/criteria-format.md) and [ARCHITECTURE.md §3.9](https://github.com/Open-Heavy-Machinery/open-tick/blob/v0.2.0/ARCHITECTURE.md#39-oracle-oracleh).
 
 ## 5. Timing model
 

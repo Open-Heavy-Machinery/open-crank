@@ -25,8 +25,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include <opencrank/oracle.h>
 #include <opentick/can.h>
+#include <opentick/oracle.h>
 
 /** @brief Address of the device under test unless told otherwise: the reference controller's. */
 #define OC_ACCEPT_DUT_DEFAULT 0x27U
@@ -43,7 +43,7 @@ typedef enum {
 } OcAcceptObservable;
 
 /** @brief The observables above, in that order. */
-extern const OcOracleObservable OC_ACCEPT_OBSERVABLES[OC_ACCEPT_OBSERVABLE_COUNT];
+extern const OtkOracleObservable OC_ACCEPT_OBSERVABLES[OC_ACCEPT_OBSERVABLE_COUNT];
 
 /** @brief Decoder state: whose frames count. */
 typedef struct {
@@ -51,9 +51,9 @@ typedef struct {
 } OcAccept;
 
 /** @brief Sets up @p a for the device under test at @p dut and fills @p table to use it. */
-void oc_accept_init(OcAccept *a, uint8_t dut, OcOracleTable *table);
+void oc_accept_init(OcAccept *a, uint8_t dut, OtkOracleTable *table);
 
-/** @brief The oracle's decoder (OcOracleDecodeFn); @p ctx is an OcAccept. */
-size_t oc_accept_decode(void *ctx, const OtkCanFrame *f, OcOracleUpdate *out, size_t cap);
+/** @brief The oracle's decoder (OtkOracleDecodeFn); @p ctx is an OcAccept. */
+size_t oc_accept_decode(void *ctx, const OtkCanFrame *f, OtkOracleUpdate *out, size_t cap);
 
 #endif /* OPEN_CRANK_ACCEPT_H */
