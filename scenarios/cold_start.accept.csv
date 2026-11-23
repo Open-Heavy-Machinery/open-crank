@@ -1,0 +1,7 @@
+# Acceptance criteria for scenarios/cold_start.csv. Format: docs/acceptance.md.
+id,from,until,tolerance_ms,condition,text
+S1,begin,start=1-10ms,0,tsc1_speed_control == 0,no speed request before the starter is pressed
+S2,start=1+2000ms,end,0,tsc1_speed_control == 1,speed control taken within 2 s of start and kept
+G1,begin,end,0,tsc1_speed_control == 1 -> tsc1_speed_rpm <= 2100,requested speed never above high idle (2100 rpm)
+G2,begin,end,20,pump_cmd_pct > 0 -> tsc1_speed_control == 1,pump commanded only while in speed control
+C1,5.0,end,0,tsc1_speed_rpm >= 1499 && tsc1_speed_rpm <= 1501,requested speed at the operator's 1500 rpm

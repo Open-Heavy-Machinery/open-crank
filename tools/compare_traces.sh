@@ -36,6 +36,7 @@ summary "|---|---|"
 different=0
 compared=0
 for scenario in "$SCENARIOS"/*.csv; do
+    [[ $scenario == *.accept.csv ]] && continue # acceptance criteria, not a scenario
     name=$(basename "$scenario" .csv)
     "$HEAD" "$scenario" --quiet --trace "$WORK/$name.head.csv" >/dev/null
     if ! "$BASE" "$scenario" --quiet --trace "$WORK/$name.base.csv" >/dev/null 2>&1; then
