@@ -28,3 +28,8 @@ target_include_directories(opencrank_sim PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/runtime/include
 )
 target_link_libraries(opencrank_sim PUBLIC opencrank_portable opencrank_can_otk opentick::core m)
+
+# Acceptance oracle. Only opentick::core and its own include dir: an open-crank #include in it must not compile.
+add_library(opencrank_oracle STATIC oracle/src/oracle.c)
+target_include_directories(opencrank_oracle PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/oracle/include)
+target_link_libraries(opencrank_oracle PUBLIC opentick::core)
