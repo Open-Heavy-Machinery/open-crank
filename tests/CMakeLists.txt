@@ -10,6 +10,7 @@ set(OC_TESTS
     test_bench
     test_scenario
     test_closed_loop
+    test_oracle
 )
 foreach(test_name ${OC_TESTS})
     add_executable(${test_name} ${test_name}.c)
@@ -17,11 +18,14 @@ foreach(test_name ${OC_TESTS})
     add_test(NAME ${test_name} COMMAND ${test_name})
 endforeach()
 
+target_link_libraries(test_oracle PRIVATE opencrank_accept)
+
 set(OC_SCENARIO_DIR ${PROJECT_SOURCE_DIR}/scenarios)
 target_compile_definitions(test_closed_loop PRIVATE OC_SCENARIO_DIR="${OC_SCENARIO_DIR}")
 
 # Every shipped scenario must parse, so a broken demo file fails the build.
 file(GLOB OC_SCENARIO_FILES CONFIGURE_DEPENDS ${OC_SCENARIO_DIR}/*.csv)
+list(FILTER OC_SCENARIO_FILES EXCLUDE REGEX "\\.accept\\.csv$") # acceptance criteria, not scenarios
 if(NOT OC_SCENARIO_FILES)
     message(FATAL_ERROR "no scenario files found in ${OC_SCENARIO_DIR}")
 endif()

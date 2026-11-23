@@ -4,6 +4,10 @@ All notable changes to this project. The project is pre-alpha; nothing here is a
 
 ## Unreleased
 
+### Added
+
+- Acceptance suite over the bus (v0.2.1, first part), described in `docs/acceptance.md`: `open-crank-accept` plays a scenario with the simulated machine on SocketCAN and grades the device under test only by the frames it sends; a generic oracle (`sim/oracle/`, only the C standard library and open-tick's core) reads criteria written as data; criteria for the six scenarios (`scenarios/*.accept.csv`); and `tools/accept_vcan.sh`, which runs the suite against the reference controller on `vcan`, in CI's `vcan-demo` job when the runner provides `vcan`.
+
 ### Changed
 
 - `README.md` and `ARCHITECTURE.md` no longer list as planned what v0.1.x and v0.2 delivered.

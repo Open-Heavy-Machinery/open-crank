@@ -101,6 +101,8 @@ The reference controller does the following, and the closed-loop tests check it.
 - Check that it is actually in control: EEC1 byte 5 must show its address within 500 ms.
 - On loss of EEC1 (200 ms), overspeed (2300 rpm), stall (below 400 rpm) or a rejected override: release the override (TSC1 mode `00`), command zero displacement, and stay in FAULT until the operator presses fault reset.
 
+This section describes the reference controller. What any controller must do to pass the acceptance suite, judged only by the frames it sends, is in [acceptance.md](acceptance.md).
+
 ## Trying your controller
 
 ```sh
