@@ -9,7 +9,7 @@ Scope is deliberately narrow. Each milestone is small enough to finish and usefu
 | **v0.1** (done) | Level 1 vertical slice, in CI | 1 |
 | **v0.1.x** (done) | MISRA-oriented checks and stack usage in CI | 1 |
 | **v0.2** (done) | Reference board on the bus | 1 |
-| **v0.2.1** | Acceptance suite over the bus | 1 |
+| **v0.2.1** (done) | Acceptance suite over the bus | 1 |
 | **v0.3** | Robustness on the board | 1 |
 | **v0.4** | Level 2: your firmware as the engine ECU | 2 |
 | **v0.5** | Two engines on one machine | 1 |
@@ -136,6 +136,8 @@ Once proven here, the oracle moves to open-tick (its v0.2), as the runtime did i
 
 1. The reference controller passes, on `vcan` and on the reference board.
 2. A deliberately broken controller fails.
+
+**Met on 2026-11-23.** 1: [docs/acceptance.md](docs/acceptance.md#results), the reference controller passes all seven scenarios on `vcan` (in CI) and on the reference board. 2: [docs/acceptance.md](docs/acceptance.md#deliberately-broken-controllers), six mutated controllers fail by the expected criteria in CI; one accepted survivor, with its reason.
 
 ---
 

@@ -2,7 +2,16 @@
 
 All notable changes to this project. The project is pre-alpha; nothing here is a stable API yet.
 
-## Unreleased
+## v0.2.1: Acceptance suite over the bus (2026-11-23)
+
+### Known limitations
+
+- The board was run once per scenario, by hand, with a manual reset before each run.
+- Times are measured on `vcan` and on a two-node bench, not on a vehicle network with other traffic.
+- The suite grades the reaction, not the kind of fault: the controller's own DM1 is planned for v0.3.
+- V1's 1 s window depends on how fast the plant passes 2300 rpm; it has to be revisited if the plant changes.
+- The oracle still lives in open-crank (`sim/oracle/`); it moves to open-tick in its v0.2.
+- From v0.2, unchanged: the board runs on its HSI oscillator; the demo does not recover from bus-off; no CI job builds the STM32 firmware; `open-crank-sil` does not write its late steps into the trace (`open-crank-accept` reports them and does not trust a late run).
 
 ### Added
 

@@ -69,7 +69,7 @@ Four criteria are common to the seven scenarios:
 | Id | Window | Condition | Why |
 |---|---|---|---|
 | S1 | from the start of the run to 10 ms before the starter is pressed | no override | the DUT must not request an override before the operator starts the engine |
-| S2 | from 2 s after the starter is pressed to `end`, or to 10 ms before the scenario's fault | speed control | 2 s covers cranking and the reference's 500 ms wait for a running engine (EEC1 above 600 rpm), with margin. Not in `override_ignored`, where the engine never honours the request |
+| S2 | from 2 s after the starter is pressed to `end`, or to 10 ms before the scenario's fault (in `target_above_high_idle`, before the request above high idle) | speed control | 2 s covers cranking and the reference's 500 ms wait for a running engine (EEC1 above 600 rpm), with margin. Not in `override_ignored`, where the engine never honours the request |
 | G1 | the whole run | speed control implies a requested speed of at most 2100 rpm | the engine's high idle; above it the request means nothing |
 | G2 | the whole run, 20 ms tolerance | pump above 0 implies speed control | the pump loads the engine only while the DUT holds its speed; 20 ms because TSC1 and OC_PUMP_CMD are two frames that need not change in the same step |
 
@@ -161,6 +161,29 @@ open-crank-accept-loop <scenario.csv> [--criteria <file>]
 ```
 
 `ctest` runs it on the seven scenarios, as the tests `accept_cold_start`, `accept_engine_status_loss`, `accept_hoist_step`, `accept_override_ignored`, `accept_overspeed`, `accept_speed_command_loss` and `accept_target_above_high_idle`.
+
+## Results
+
+Run on 2026-11-23 against the reference controller, one run per scenario, each from a fresh start:
+
+- on `vcan`, with `open-crank-mc` as the device under test (`tools/accept_vcan.sh`, in CI's `vcan-demo` job);
+- on the reference board: a NUCLEO-G431KB running the v0.2 demo unchanged (`portable/` is the same since v0.1.1), through the CANable adapter at 250 kbit/s (see [platforms/stm32g4/README.md](../platforms/stm32g4/README.md)), reset by hand before each scenario.
+
+All seven scenarios pass on both, with 0 late steps. The board's reports and traces are attached to the GitHub release of v0.2.1.
+
+| Scenario | Criteria | `vcan` | Board | Reaction times on the board |
+|---|---|---|---|---|
+| `cold_start` | 5 | PASS | PASS | S2 990 ms |
+| `engine_status_loss` | 6 | PASS | PASS | S2 990 ms, E1 20 ms, E2 210 ms |
+| `hoist_step` | 7 | PASS | PASS | S2 1000 ms, H2 20 ms, H3 30 ms |
+| `override_ignored` | 4 | PASS | PASS | O1 1500 ms |
+| `overspeed` | 5 | PASS | PASS | S2 990 ms, V1 640 ms |
+| `speed_command_loss` | 7 | PASS | PASS | S2 990 ms, L1 710 ms, L2 530 ms |
+| `target_above_high_idle` | 4 | PASS | PASS | S2 990 ms |
+
+The reaction times measured on `vcan` (S2 990 ms, H2 20 ms, E2 210 ms, V1 640 ms, L1 710 ms, L2 530 ms) are the same on the board, except S2 in `hoist_step`, one 10 ms step later: the round trip through the adapter (about 1.7 ms) is small against the 10 ms step. The tightest margin is E2's, 210 ms against 300 ms.
+
+What this does not show: one run per scenario on the board, on a two-node bench, not on a vehicle network with other traffic.
 
 ## Deliberately broken controllers
 
