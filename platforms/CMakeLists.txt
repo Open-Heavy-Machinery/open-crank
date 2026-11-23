@@ -4,6 +4,10 @@
 add_executable(open-crank-run host/run_main.c)
 target_link_libraries(open-crank-run PRIVATE opencrank_sim)
 
+# The acceptance suite on the in-memory loop, with the reference controller. Builds anywhere.
+add_executable(open-crank-accept-loop host/accept_loop_main.c)
+target_link_libraries(open-crank-accept-loop PRIVATE opencrank_sim opencrank_accept)
+
 # Linux SocketCAN: the SIL executables, paced by the wall clock.
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     add_executable(open-crank-sil linux-socketcan/sil_main.c)
@@ -18,4 +22,4 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     # Executables land next to each other in the top of the build tree.
     set_target_properties(open-crank-sil open-crank-mc open-crank-accept PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 endif()
-set_target_properties(open-crank-run PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
+set_target_properties(open-crank-run open-crank-accept-loop PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})

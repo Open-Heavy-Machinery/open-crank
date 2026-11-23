@@ -68,7 +68,7 @@ Four criteria are common to the six scenarios:
 
 | Id | Window | Condition | Why |
 |---|---|---|---|
-| S1 | from the start of the run to 10 ms before the starter is pressed | no override | the DUT must not ask for a speed before the operator starts the engine |
+| S1 | from the start of the run to 10 ms before the starter is pressed | no override | the DUT must not request an override before the operator starts the engine |
 | S2 | from 2 s after the starter is pressed to `end`, or to 10 ms before the scenario's fault | speed control | 2 s covers cranking and the reference's 500 ms wait for a running engine (EEC1 above 600 rpm), with margin. Not in `override_ignored`, where the engine never honours the request |
 | G1 | the whole run | speed control implies a requested speed of at most 2100 rpm | the engine's high idle; above it the request means nothing *(planned: no scenario asks for more than high idle yet, so no shipped scenario can make G1 fail)* |
 | G2 | the whole run, 20 ms tolerance | pump above 0 implies speed control | the pump loads the engine only while the DUT holds its speed; 20 ms because TSC1 and OC_PUMP_CMD are two frames that need not change in the same step |
@@ -147,7 +147,41 @@ If no frame from the DUT arrived, the runner says so before that line. If S1 or 
 
 A late step is a step that started after its wall-clock deadline: the simulated machine then ran slower than real time, so the DUT saw different timing from the one the criteria assume. Such a run is not trusted, even if every criterion passed.
 
+### In memory, with the reference controller
+
+```
+open-crank-accept-loop <scenario.csv> [--criteria <file>]
+```
+
+`open-crank-accept-loop` grades only the reference controller (`MC_DEFAULT_PARAMS`, `0x27`), or a mutant built from it, with the same oracle and criteria as `open-crank-accept`, but in the closed loop of `sim/runtime/loop.c`: no bus, no wall clock, as fast as the CPU allows (a fraction of a second per scenario). `--criteria` defaults to the same file as for `open-crank-accept`. It prints the same report and ends with `open-crank-accept-loop: PASS (N of N criteria)` or `open-crank-accept-loop: FAIL (K of N criteria failed)`; it exits with 0 if the run passes, 1 if it fails, and 2 on a usage, format or I/O error. It builds on any host, Linux or not.
+
+```sh
+./build/open-crank-accept-loop scenarios/engine_status_loss.csv
+```
+
+`ctest` runs it on the six scenarios, as the tests `accept_cold_start`, `accept_engine_status_loss`, `accept_hoist_step`, `accept_override_ignored`, `accept_overspeed` and `accept_speed_command_loss`.
+
+## Deliberately broken controllers
+
+Exit criterion 2 of v0.2.1 is that a deliberately broken controller fails. A suite that always passes says nothing: an oracle that sees no frame at all would pass the reference too. So each mutation of the reference controller that `tools/mutation_check.sh` applies is also built and graded by the suite, and it must fail the criteria that belong to it.
+
+`tools/accept_mutants.sh` copies the tree to a scratch directory, grades the unmutated reference on the six scenarios with `open-crank-accept-loop` (and stops if it already fails), then applies each mutation, rebuilds, and grades the mutant on **all six** scenarios, without stopping at the first failure: the full list shows which criteria have teeth. It prints one line per mutation (`killed`, `accepted`, or a problem: `SURVIVED`, `WRONG`, `UNEXPECTED`, `ERROR`, `STALE`, `NO BUILD`) and exits with 0 only if there is no problem. CI runs it in the `mutation` job.
+
+It runs in memory, not on `vcan`, on purpose: the loop is deterministic, so no timing jitter can kill a mutant for the wrong reason; it takes a few seconds instead of about 13 minutes; and it does not depend on the CI runner providing `vcan`. The path over the bus is covered by the reference's runs on `vcan` and on a board.
+
+All mutations are in `portable/machine_ctrl/src/machine_ctrl.c`:
+
+| Mutation | Must fail |
+|---|---|
+| controller: engine status timeout ignored | E2 |
+| controller: overspeed ignored | V1 |
+| controller: never checks that the engine honours the override | O1, L1 |
+| controller: pump stays commanded outside RUN | G2, E2 |
+| controller: override kept outside RUN | S1, E2, O1, V1, L1 |
+| controller: speed request not slew-limited | nothing: accepted survivor |
+
+**Accepted survivor: speed request not slew-limited.** The reference ramps its requested speed at 500 rpm/s (`MC_DEFAULT_PARAMS`), but nothing in the bus contract asks for a ramp, and the engine's governor accepts a step in its setpoint. A controller that jumps straight to the target is not unsafe, so the suite does not fail it.
+
 ## Planned
 
 - *(planned)* **G1 with teeth.** No shipped scenario asks for more than high idle yet, so G1 cannot fail with any of them; a scenario that asks for it is planned.
-- *(planned)* **Deliberately broken controllers in CI.** Exit criterion 2 of v0.2.1: a set of mutated controllers that the suite must fail, run in CI.
