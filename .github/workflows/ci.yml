@@ -177,6 +177,9 @@ jobs:
       - name: Controller and engine as two processes on vcan0
         if: steps.vcan.outputs.available == 'yes'
         run: tools/vcan_demo_check.sh build vcan0
+      - name: Acceptance suite on vcan0
+        if: steps.vcan.outputs.available == 'yes'
+        run: tools/accept_vcan.sh build vcan0
       - name: Report that the demo was not run
         if: steps.vcan.outputs.available != 'yes'
-        run: echo "::warning::vcan is not available on this runner; the vcan demo was NOT run"
+        run: echo "::warning::vcan is not available on this runner; the vcan demo and the acceptance suite were NOT run"
