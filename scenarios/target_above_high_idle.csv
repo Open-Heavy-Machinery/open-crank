@@ -1,0 +1,8 @@
+# The operator asks for more than the engine's high idle (2100 rpm).
+time_s,signal,value
+0.0,key_on,1
+0.0,target_rpm,1500
+0.5,start,1
+3.0,start,0
+8.0,target_rpm,2500
+14.0,end,0
