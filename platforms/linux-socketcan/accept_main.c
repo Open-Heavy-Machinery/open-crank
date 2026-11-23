@@ -25,13 +25,13 @@
 #include <string.h>
 
 #include <opencrank/accept.h>
-#include <opencrank/oracle.h>
 #include <opencrank/runtime/bench.h>
 #include <opencrank/runtime/trace.h>
 
 #include <opencrank/can_otk.h>
 #include <opentick/host/pacer.h>
 #include <opentick/host/socketcan.h>
+#include <opentick/oracle.h>
 
 #define EXIT_PASS 0
 #define EXIT_FAIL 1
@@ -40,7 +40,7 @@
 
 static volatile sig_atomic_t g_running = 1;
 static OcScenario g_scenario;
-static OcOracle g_oracle;
+static OtkOracle g_oracle;
 
 static void handle_sigint(int sig) {
     (void)sig;
@@ -123,10 +123,10 @@ int main(int argc, char **argv) {
     oc_bench_set_scenario(&bench, &g_scenario);
 
     OcAccept accept;
-    OcOracleTable table;
+    OtkOracleTable table;
     oc_accept_init(&accept, dut, &table);
-    if (!oc_oracle_load(&g_oracle, criteria_path, &table, &g_scenario, &OC_SIGNAL_TABLE, bench.cfg->step_ms, err,
-                        sizeof(err))) {
+    if (!otk_oracle_load(&g_oracle, criteria_path, &table, &g_scenario, &OC_SIGNAL_TABLE,
+                         otk_ns_from_ms(bench.cfg->step_ms), err, sizeof(err))) {
         fprintf(stderr, "open-crank-accept: %s: %s\n", criteria_path, err);
         return EXIT_ERROR;
     }
@@ -168,7 +168,7 @@ int main(int argc, char **argv) {
     while (g_running) {
         OtkCanFrame in;
         while (otk_socketcan_recv(&sock, &in) > 0) {
-            oc_oracle_frame(&g_oracle, &in, bench.t_ms);
+            otk_oracle_frame(&g_oracle, &in, otk_ns_from_ms(bench.t_ms));
             J1939Frame f;
             if (oc_frame_from_otk(&in, &f)) {
                 if (j1939_id_source(f.id) == dut) {
@@ -177,7 +177,7 @@ int main(int argc, char **argv) {
                 oc_bench_rx(&bench, &f);
             }
         }
-        oc_oracle_step(&g_oracle, bench.t_ms);
+        otk_oracle_step(&g_oracle, otk_ns_from_ms(bench.t_ms));
         if (oc_bench_scenario_done(&bench)) {
             break;
         }
@@ -205,16 +205,16 @@ int main(int argc, char **argv) {
         return EXIT_ERROR;
     }
 
-    const bool pass = oc_oracle_report(&g_oracle, stdout);
-    const size_t total = oc_oracle_count(&g_oracle);
-    const size_t failed = oc_oracle_failures(&g_oracle);
+    const bool pass = otk_oracle_report(&g_oracle, stdout);
+    const size_t total = otk_oracle_count(&g_oracle);
+    const size_t failed = otk_oracle_failures(&g_oracle);
     const unsigned late = (unsigned)pacer.overruns;
 
     if (dut_frames == 0U) {
         printf("open-crank-accept: no frames from 0x%02X were seen; is the device under test on the bus?\n",
                (unsigned)dut);
     }
-    if (oc_oracle_failed(&g_oracle, "S2") || oc_oracle_failed(&g_oracle, "S1")) {
+    if (otk_oracle_failed(&g_oracle, "S2") || otk_oracle_failed(&g_oracle, "S1")) {
         printf("If the device under test is a board, reset it before each run.\n");
     }
     if (late > 0U) {

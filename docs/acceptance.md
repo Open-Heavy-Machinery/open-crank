@@ -31,6 +31,8 @@ A term on a gap is false: `tsc1_speed_rpm >= 1499` does not hold while the DUT i
 
 ## Criteria files
 
+The format is open-tick's ([docs/criteria-format.md](https://github.com/Open-Heavy-Machinery/open-tick/blob/v0.2.0/docs/criteria-format.md), since `v0.2.0`); this section summarises it with open-crank's 10 ms step.
+
 Each scenario's criteria live next to it: `scenarios/<name>.accept.csv` for `scenarios/<name>.csv`.
 
 ```

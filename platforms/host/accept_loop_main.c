@@ -22,15 +22,15 @@
 #include <string.h>
 
 #include <opencrank/accept.h>
-#include <opencrank/oracle.h>
 #include <opencrank/runtime/loop.h>
+#include <opentick/oracle.h>
 
 #define EXIT_PASS 0
 #define EXIT_FAIL 1
 #define EXIT_ERROR 2
 
 static OcScenario g_scenario;
-static OcOracle g_oracle;
+static OtkOracle g_oracle;
 static OcLoop g_loop;
 
 static void usage(void) {
@@ -83,10 +83,10 @@ int main(int argc, char **argv) {
     oc_loop_init(&g_loop, &OC_BENCH_D936LA6, &MC_DEFAULT_PARAMS, &g_scenario);
 
     OcAccept accept;
-    OcOracleTable table;
+    OtkOracleTable table;
     oc_accept_init(&accept, MC_DEFAULT_PARAMS.source_address, &table);
-    if (!oc_oracle_load(&g_oracle, criteria_path, &table, &g_scenario, &OC_SIGNAL_TABLE, g_loop.bench.cfg->step_ms,
-                        err, sizeof(err))) {
+    if (!otk_oracle_load(&g_oracle, criteria_path, &table, &g_scenario, &OC_SIGNAL_TABLE,
+                         otk_ns_from_ms(g_loop.bench.cfg->step_ms), err, sizeof(err))) {
         fprintf(stderr, "open-crank-accept-loop: %s: %s\n", criteria_path, err);
         return EXIT_ERROR;
     }
@@ -96,21 +96,21 @@ int main(int argc, char **argv) {
 
     for (;;) {
         for (size_t i = 0; i < otk_can_queue_count(&g_loop.to_bench); i++) {
-            oc_oracle_frame(&g_oracle, otk_can_queue_at(&g_loop.to_bench, i), g_loop.bench.t_ms);
+            otk_oracle_frame(&g_oracle, otk_can_queue_at(&g_loop.to_bench, i), otk_ns_from_ms(g_loop.bench.t_ms));
         }
-        oc_oracle_step(&g_oracle, g_loop.bench.t_ms);
+        otk_oracle_step(&g_oracle, otk_ns_from_ms(g_loop.bench.t_ms));
         if (oc_bench_scenario_done(&g_loop.bench)) {
             break;
         }
         oc_loop_step(&g_loop);
     }
 
-    const bool pass = oc_oracle_report(&g_oracle, stdout);
-    const size_t total = oc_oracle_count(&g_oracle);
+    const bool pass = otk_oracle_report(&g_oracle, stdout);
+    const size_t total = otk_oracle_count(&g_oracle);
     if (pass) {
         printf("open-crank-accept-loop: PASS (%zu of %zu criteria)\n", total, total);
         return EXIT_PASS;
     }
-    printf("open-crank-accept-loop: FAIL (%zu of %zu criteria failed)\n", oc_oracle_failures(&g_oracle), total);
+    printf("open-crank-accept-loop: FAIL (%zu of %zu criteria failed)\n", otk_oracle_failures(&g_oracle), total);
     return EXIT_FAIL;
 }

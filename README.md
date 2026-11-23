@@ -87,7 +87,7 @@ flowchart LR
 open-crank/
 ├── README.md  ARCHITECTURE.md  ROADMAP.md  CHANGELOG.md  LICENSE
 ├── docs/          parameters.md (provenance), bus-interface.md (Level 1 contract), acceptance.md (what any controller must do)
-├── external/      open-tick (git submodule): time, scenarios, trace, CAN bridges
+├── external/      open-tick (git submodule): time, scenarios, trace, CAN bridges, acceptance oracle
 ├── portable/      zone 1: no OS, no libc I/O, no plant. Goes to firmware
 │   ├── j1939/       message codec and bench messages
 │   └── machine_ctrl/  reference Level 1 controller
@@ -97,7 +97,6 @@ open-crank/
 │   ├── loads/       hydraulic pump, propeller (later)
 │   ├── engine_ecu/  simulated engine ECU
 │   ├── can_otk/     J1939 frames to and from open-tick's CAN frames
-│   ├── oracle/      acceptance oracle: criteria and observables, nothing J1939
 │   ├── accept/      open-crank's observables for the oracle (TSC1, OC_PUMP_CMD)
 │   └── runtime/     bench, signals, in-memory loop, trace columns
 ├── platforms/     zone 3: per-target glue

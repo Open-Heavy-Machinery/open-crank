@@ -2,6 +2,12 @@
 
 All notable changes to this project. The project is pre-alpha; nothing here is a stable API yet.
 
+## Unreleased
+
+### Changed
+
+- The acceptance oracle now lives in open-tick `v0.2.0` (`opentick/oracle.h`, `otk_oracle_*`, time in `OtkNs`); `sim/oracle/` is deleted and `sim/accept` builds on `opentick::core`. `test_oracle` is now `test_accept` and keeps only open-crank's observables; the oracle itself is tested in open-tick. The verdicts and reports of the seven scenarios (`open-crank-accept-loop`) are identical byte for byte, and so is the output of `tools/accept_mutants.sh`.
+
 ## v0.2.1: Acceptance suite over the bus (2026-11-23)
 
 ### Known limitations
