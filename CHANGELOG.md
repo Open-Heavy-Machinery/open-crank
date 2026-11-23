@@ -7,6 +7,7 @@ All notable changes to this project. The project is pre-alpha; nothing here is a
 ### Added
 
 - Acceptance suite over the bus (v0.2.1, first part), described in `docs/acceptance.md`: `open-crank-accept` plays a scenario with the simulated machine on SocketCAN and grades the device under test only by the frames it sends; a generic oracle (`sim/oracle/`, only the C standard library and open-tick's core) reads criteria written as data; criteria for the six scenarios (`scenarios/*.accept.csv`); and `tools/accept_vcan.sh`, which runs the suite against the reference controller on `vcan`, in CI's `vcan-demo` job when the runner provides `vcan`.
+- Deliberately broken controllers must fail the acceptance suite (v0.2.1, second part): `open-crank-accept-loop` grades the reference controller, or a mutant built from it, on the in-memory loop with the same oracle and criteria; `ctest` runs it on the six scenarios (`accept_*`, 17 tests in all); and `tools/accept_mutants.sh`, in CI's `mutation` job, grades each of the six controller mutations of `tools/mutation_check.sh` on all six scenarios and checks that it fails its criteria. One accepted survivor: a speed request that is not slew-limited, because the bus contract does not ask for a ramp.
 
 ### Changed
 
