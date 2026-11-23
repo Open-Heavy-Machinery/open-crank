@@ -16,6 +16,7 @@
  * | `tsc1_speed_control` | 1 if TSC1 asks for speed control (mode 01) with a valid speed, else 0 | 0  |
  * | `tsc1_speed_rpm`     | that requested speed while `tsc1_speed_control` is 1, else a gap | gap     |
  * | `pump_cmd_pct`       | OC_PUMP_CMD displacement; 0 if "not available"                    | 0       |
+ * | `tsc1_override`      | 1 if TSC1 has an override mode other than 00 (speed, torque, limit), 0 if 00 | 0 |
  */
 
 #ifndef OPEN_CRANK_ACCEPT_H
@@ -37,6 +38,7 @@ typedef enum {
     OC_ACCEPT_TSC1_SPEED_CONTROL = 0,
     OC_ACCEPT_TSC1_SPEED_RPM,
     OC_ACCEPT_PUMP_CMD_PCT,
+    OC_ACCEPT_TSC1_OVERRIDE,
     OC_ACCEPT_OBSERVABLE_COUNT
 } OcAcceptObservable;
 

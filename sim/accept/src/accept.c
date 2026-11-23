@@ -14,6 +14,7 @@ const OcOracleObservable OC_ACCEPT_OBSERVABLES[OC_ACCEPT_OBSERVABLE_COUNT] = {
     [OC_ACCEPT_TSC1_SPEED_CONTROL] = { "tsc1_speed_control", OC_ACCEPT_STALE_MS, { false, 0.0 } },
     [OC_ACCEPT_TSC1_SPEED_RPM] = { "tsc1_speed_rpm", OC_ACCEPT_STALE_MS, { true, 0.0 } },
     [OC_ACCEPT_PUMP_CMD_PCT] = { "pump_cmd_pct", OC_ACCEPT_STALE_MS, { false, 0.0 } },
+    [OC_ACCEPT_TSC1_OVERRIDE] = { "tsc1_override", OC_ACCEPT_STALE_MS, { false, 0.0 } },
 };
 
 void oc_accept_init(OcAccept *a, uint8_t dut, OcOracleTable *table) {
@@ -34,14 +35,16 @@ size_t oc_accept_decode(void *ctx, const OtkCanFrame *f, OcOracleUpdate *out, si
     J1939Tsc1 tsc1;
     OcPumpCmd pump;
     if (j1939_decode_tsc1(&jf, &tsc1)) {
-        if (j1939_id_dest(jf.id) != J1939_ADDR_ENGINE_1 || cap < 2U) {
+        if (j1939_id_dest(jf.id) != J1939_ADDR_ENGINE_1 || cap < 3U) {
             return 0U;
         }
         const bool speed = tsc1.override_mode == J1939_OVERRIDE_SPEED && tsc1.requested_speed_valid;
         out[0] = (OcOracleUpdate){ OC_ACCEPT_TSC1_SPEED_CONTROL, { false, speed ? 1.0 : 0.0 } };
         out[1] = (OcOracleUpdate){ OC_ACCEPT_TSC1_SPEED_RPM,
                                    { !speed, speed ? (double)tsc1.requested_speed_rpm : 0.0 } };
-        return 2U;
+        const bool overriding = tsc1.override_mode != J1939_OVERRIDE_DISABLED;
+        out[2] = (OcOracleUpdate){ OC_ACCEPT_TSC1_OVERRIDE, { false, overriding ? 1.0 : 0.0 } };
+        return 3U;
     }
     if (oc_decode_pump_cmd(&jf, &pump)) {
         if (cap < 1U) {

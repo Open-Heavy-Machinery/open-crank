@@ -10,21 +10,22 @@ It grades what the DUT asks of the engine (TSC1) and of the hoist pump (OC_PUMP_
 
 It does not grade:
 
-- **The kind of fault or the internal state.** A controller that releases the override because it lost EEC1 and one that releases it for any other reason look the same on the bus. The suite sees `tsc1_speed_control == 0`, not `FAULT: engine status lost`.
+- **The kind of fault or the internal state.** A controller that releases the override because it lost EEC1 and one that releases it for any other reason look the same on the bus. The suite sees `tsc1_override == 0`, not `FAULT: engine status lost`.
 - **The timing of a real network.** Times are measured on `vcan` or with the board on a two-node bench, not on a vehicle network with other traffic.
 - **The ramp.** The reference controller slews its requested speed; the slew is not a requirement, and a DUT that jumps straight to the target passes.
 
 ## Observables
 
-The oracle reads three observables from the DUT's frames. Only frames whose source address is the DUT's count (`--dut`, `0x27` by default); a TSC1 counts only if it is addressed to the engine (`0x00`). Engine frames are never looked at.
+The oracle reads four observables from the DUT's frames. Only frames whose source address is the DUT's count (`--dut`, `0x27` by default); a TSC1 counts only if it is addressed to the engine (`0x00`). Engine frames are never looked at.
 
 | Observable | Value | Holds for | Default |
 |---|---|---|---|
 | `tsc1_speed_control` | 1 if the TSC1 asks for speed control (override mode `01`) with a valid requested speed; 0 otherwise | 200 ms | 0 |
 | `tsc1_speed_rpm` | the requested speed of that TSC1 while `tsc1_speed_control` is 1; a gap otherwise | 200 ms | gap |
 | `pump_cmd_pct` | the OC_PUMP_CMD displacement; 0 if "not available" | 200 ms | 0 |
+| `tsc1_override` | 1 if the TSC1 has an override mode other than `00` (speed, torque or limit); 0 if it is `00` | 200 ms | 0 |
 
-**Silence counts as releasing.** An observable falls back to its default when no frame has updated it for more than 200 ms, because that is what the simulated machine does: the engine drops a TSC1 older than 200 ms and returns to its own idle governor, and the pump takes a command older than 200 ms as zero (and "not available" as zero). "Released" therefore means TSC1 without speed control **or** no TSC1 for more than 200 ms, and the pump at 0 **or** no OC_PUMP_CMD for more than 200 ms.
+**Silence counts as releasing.** An observable falls back to its default when no frame has updated it for more than 200 ms, because that is what the simulated machine does: the engine drops a TSC1 older than 200 ms and returns to its own idle governor, and the pump takes a command older than 200 ms as zero (and "not available" as zero). "Released" therefore means: TSC1 with override mode `00`, or no TSC1 for more than 200 ms; and the pump at 0, or no OC_PUMP_CMD for more than 200 ms. A TSC1 that keeps any other override mode is not a release, even without a valid requested speed: the simulated engine then falls back to low idle, but the bus contract does not say what a real engine does with a speed-control request that carries no speed, and a release in mode `00` is unambiguous.
 
 A term on a gap is false: `tsc1_speed_rpm >= 1499` does not hold while the DUT is not asking for a speed.
 
@@ -57,8 +58,8 @@ H2,hoist_demand_pct=85+100ms,hoist_demand_pct=0-10ms,0,pump_cmd_pct >= 84.6 && p
 **Report.** One line per criterion: `PASS` or `FAIL`, the id, the text and the window in seconds. A failure adds the first instant of the violation and the values of the condition's observables then. When `from` is an event plus an offset, the line also gives the **reaction time**: how long after the event the condition had been holding without interruption up to `from`.
 
 ```
-PASS  S2  speed control taken within 2 s of start and kept  [2.50 s .. 12.00 s]  reaction: 990 ms after start=1
-FAIL  E2  override released and pump at 0 within 300 ms of losing EEC1, and kept  [8.30 s .. 14.00 s]  reaction: not holding at 8.30 s  first violation at 8.30 s: tsc1_speed_control = 1, pump_cmd_pct = 50
+PASS  S2  speed control taken within 2 s of start and kept  [2.50 s .. 25.00 s]  reaction: 990 ms after start=1
+FAIL  E2  override released and pump at 0 within 300 ms of losing EEC1, and kept  [8.30 s .. 14.00 s]  reaction: not holding at 8.30 s  first violation at 8.30 s: tsc1_override = 1, pump_cmd_pct = 50
 ```
 
 ## The criteria
@@ -67,7 +68,7 @@ Four criteria are common to the six scenarios:
 
 | Id | Window | Condition | Why |
 |---|---|---|---|
-| S1 | from the start of the run to 10 ms before the starter is pressed | no speed control | the DUT must not ask for a speed before the operator starts the engine |
+| S1 | from the start of the run to 10 ms before the starter is pressed | no override | the DUT must not ask for a speed before the operator starts the engine |
 | S2 | from 2 s after the starter is pressed to `end`, or to 10 ms before the scenario's fault | speed control | 2 s covers cranking and the reference's 500 ms wait for a running engine (EEC1 above 600 rpm), with margin. Not in `override_ignored`, where the engine never honours the request |
 | G1 | the whole run | speed control implies a requested speed of at most 2100 rpm | the engine's high idle; above it the request means nothing *(planned: no scenario asks for more than high idle yet, so no shipped scenario can make G1 fail)* |
 | G2 | the whole run, 20 ms tolerance | pump above 0 implies speed control | the pump loads the engine only while the DUT holds its speed; 20 ms because TSC1 and OC_PUMP_CMD are two frames that need not change in the same step |
@@ -81,10 +82,10 @@ And per scenario:
 | | H2 | 100 ms after the lever goes to 85 % | pump at 85 ± 0.4 % until the lever is released | 100 ms = OC_OPERATOR every 20 ms + one 10 ms step + margin; 0.4 % is one bit of OC_PUMP_CMD |
 | | H3 | 100 ms after the lever is released | pump at 0 | as H2 |
 | `engine_status_loss` | E1 | 100 ms after the lever goes to 50 % | pump at 50 ± 0.4 % until EEC1 is lost | as H2 |
-| | E2 | 300 ms after EEC1 is lost | no speed control and pump at 0, kept | 300 ms = the 200 ms EEC1 timeout + margin |
-| `override_ignored` | O1 | 2.5 s after the starter is pressed | no speed control and pump at 0, kept | 2.5 s covers S2's 2 s plus the reference's 500 ms wait for EEC1 to show its address |
-| `overspeed` | V1 | 1 s after the overrunning load starts | no speed control and pump at 0, kept | the DUT can only react once the engine is past 2300 rpm; 1 s depends on how long the plant takes to get there under 400 Nm of overrun |
-| `speed_command_loss` | L1 | 1 s after the DUT's frames stop reaching the engine, until 10 ms before the fault reset | no speed control and pump at 0 | 1 s covers the engine's 200 ms TSC1 timeout and the reference's 500 ms wait for EEC1 to show its address, with margin. Until the reset, it also checks that the DUT does not take control again by itself |
+| | E2 | 300 ms after EEC1 is lost | no override and pump at 0, kept | 300 ms = the 200 ms EEC1 timeout + margin |
+| `override_ignored` | O1 | 2.5 s after the starter is pressed | no override and pump at 0, kept | 2.5 s covers S2's 2 s plus the reference's 500 ms wait for EEC1 to show its address |
+| `overspeed` | V1 | 1 s after the overrunning load starts | no override and pump at 0, kept | the reference releases at its overspeed limit of 2300 rpm (the engine itself trips at 2400 rpm); 1 s depends on how long the plant takes to get there under 400 Nm of overrun |
+| `speed_command_loss` | L1 | 1 s after the DUT's frames stop reaching the engine, until 10 ms before the fault reset | no override and pump at 0 | 1 s covers the engine's 200 ms TSC1 timeout and the reference's 500 ms wait for EEC1 to show its address, with margin. Until the reset, it also checks that the DUT does not take control again by itself |
 | | L2 | 1 s after the fault reset | speed control, kept | the engine is already running: 1 s covers the reference's 500 ms wait for a running engine, with margin |
 | | L3 | 18.0 s | requested speed 1500 ± 1 rpm | back at the operator's target once the slew has finished |
 
