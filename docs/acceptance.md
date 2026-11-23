@@ -181,7 +181,7 @@ All seven scenarios pass on both, with 0 late steps. The board's reports and tra
 | `speed_command_loss` | 7 | PASS | PASS | S2 990 ms, L1 710 ms, L2 530 ms |
 | `target_above_high_idle` | 4 | PASS | PASS | S2 990 ms |
 
-The reaction times measured on `vcan` (S2 990 ms, H2 20 ms, E2 210 ms, V1 640 ms, L1 710 ms, L2 530 ms) are the same on the board, except S2 in `hoist_step`, one 10 ms step later: the round trip through the adapter (about 1.7 ms) is small against the 10 ms step. The tightest margin is E2's, 210 ms against 300 ms.
+Every reaction time on the board is the same as on `vcan`, except in `hoist_step`, where S2 and H3 come one 10 ms step later (1000 ms against 990 ms, 30 ms against 20 ms): the round trip through the adapter (about 1.7 ms) is small against the 10 ms step, so a reaction lands in the same step or in the next one. The tightest margin is E2's, 210 ms against 300 ms.
 
 What this does not show: one run per scenario on the board, on a two-node bench, not on a vehicle network with other traffic.
 

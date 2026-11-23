@@ -86,7 +86,7 @@ flowchart LR
 ```text
 open-crank/
 ├── README.md  ARCHITECTURE.md  ROADMAP.md  CHANGELOG.md  LICENSE
-├── docs/          parameters.md (provenance), bus-interface.md (Level 1 contract)
+├── docs/          parameters.md (provenance), bus-interface.md (Level 1 contract), acceptance.md (what any controller must do)
 ├── external/      open-tick (git submodule): time, scenarios, trace, CAN bridges
 ├── portable/      zone 1: no OS, no libc I/O, no plant. Goes to firmware
 │   ├── j1939/       message codec and bench messages
@@ -97,10 +97,12 @@ open-crank/
 │   ├── loads/       hydraulic pump, propeller (later)
 │   ├── engine_ecu/  simulated engine ECU
 │   ├── can_otk/     J1939 frames to and from open-tick's CAN frames
+│   ├── oracle/      acceptance oracle: criteria and observables, nothing J1939
+│   ├── accept/      open-crank's observables for the oracle (TSC1, OC_PUMP_CMD)
 │   └── runtime/     bench, signals, in-memory loop, trace columns
 ├── platforms/     zone 3: per-target glue
-│   ├── host/        open-crank-run: headless closed loop
-│   ├── linux-socketcan/  open-crank-sil, open-crank-mc
+│   ├── host/        open-crank-run, open-crank-accept-loop: headless closed loop
+│   ├── linux-socketcan/  open-crank-sil, open-crank-mc, open-crank-accept
 │   ├── renode/      (track R)
 │   ├── stm32g4/     v0.2 reference board: see platforms/stm32g4/README.md
 │   └── fpga/        (reserved)
