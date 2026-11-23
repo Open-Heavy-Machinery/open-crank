@@ -33,3 +33,12 @@ add_test(NAME test_scenario_files COMMAND test_scenario ${OC_SCENARIO_FILES})
 
 # Smoke test of the headless runner, as a user would call it.
 add_test(NAME run_hoist_step COMMAND open-crank-run ${OC_SCENARIO_DIR}/hoist_step.csv --quiet)
+
+# The reference controller passes the acceptance suite in the in-memory loop:
+# one test per scenarios/<name>.accept.csv, named accept_<name>.
+file(GLOB OC_ACCEPT_FILES CONFIGURE_DEPENDS ${OC_SCENARIO_DIR}/*.accept.csv)
+foreach(criteria ${OC_ACCEPT_FILES})
+    get_filename_component(criteria_name ${criteria} NAME)
+    string(REGEX REPLACE "\\.accept\\.csv$" "" scenario_name ${criteria_name})
+    add_test(NAME accept_${scenario_name} COMMAND open-crank-accept-loop ${OC_SCENARIO_DIR}/${scenario_name}.csv)
+endforeach()
