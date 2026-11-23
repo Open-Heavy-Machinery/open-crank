@@ -4,7 +4,7 @@
 
 Part of [Open Heavy Machinery](https://open-heavy-machinery.github.io) ([open-crank's page](https://open-heavy-machinery.github.io/open-crank/)): open tools to practise and develop embedded control for machines you cannot keep at home, starting with heavy machinery.
 
-**Status: pre-alpha. v0.2 is done and on `main`: the reference controller runs on an STM32G431 board over a real CAN bus.** Anything marked *(planned)* does not exist yet. The honest list of what works, what is verified and what is not is in [ROADMAP.md](ROADMAP.md).
+**Status: pre-alpha. v0.2.1 is done and on `main`: an acceptance suite grades any controller by the CAN frames it sends, and the reference controller passes it on `vcan` and on an STM32G431 board.** Anything marked *(planned)* does not exist yet. The honest list of what works, what is verified and what is not is in [ROADMAP.md](ROADMAP.md).
 
 `open-crank` is a simulated heavy-duty diesel engine that behaves enough like the real one to develop, test and break control software against it, on a laptop, in CI, on a real microcontroller board, and later on an FPGA rig. It speaks SAE J1939 over CAN, the same way a real engine does.
 
@@ -35,7 +35,7 @@ EMS and PMS are supervisory controllers, so Level 1 is directly useful for them 
 - **Scenarios as data** and headless closed-loop tests, so a control regression fails a build instead of a shift.
 - **Built on [open-tick](https://github.com/Open-Heavy-Machinery/open-tick)**, the family's machine-independent core (simulated time, scenarios, traces, CAN bridges), pinned as a git submodule. open-crank brings the engine.
 - **Bring your own firmware.** Any board, RTOS or language that speaks CAN. The bus contract in [docs/bus-interface.md](docs/bus-interface.md) is all it needs.
-- **Practise critical-firmware techniques**: MISRA-oriented checks, stack usage by call graph and the worst observed execution time on the board, in CI and in the docs since v0.1.x and v0.2; acceptance tests over the bus and requirement traceability *(planned)*. This is practice, not certification: open-crank is not a certified tool (see below).
+- **Practise critical-firmware techniques**: MISRA-oriented checks, stack usage by call graph and the worst observed execution time on the board, in CI and in the docs since v0.1.x and v0.2; acceptance tests over the bus since v0.2.1 ([docs/acceptance.md](docs/acceptance.md)); requirement traceability *(planned)*. This is practice, not certification: open-crank is not a certified tool (see below).
 
 ## What this is not
 
@@ -106,7 +106,7 @@ open-crank/
 │   └── fpga/        (reserved)
 ├── scenarios/     operating profiles and fault cases, as CSV
 ├── tests/         unit and closed-loop tests
-├── tools/         portability, mutation, trace-comparison and vcan-demo checks
+├── tools/         portability, mutation, trace-comparison, vcan-demo and acceptance checks
 ├── cmake/         toolchain file for Cortex-M4F
 └── .github/workflows/
 ```
@@ -160,8 +160,10 @@ To test your own controller instead of `open-crank-mc`, follow [docs/bus-interfa
 - `tools/mutation_check.sh` breaks each safety-relevant behaviour on purpose and checks that the tests catch it.
 - `tools/compare_traces.sh` runs every scenario with two builds and compares the traces byte for byte. CI runs it on every pull request against its base branch, so a refactor that changes behaviour fails. A pull request that changes behaviour on purpose carries the `behaviour-change` label.
 - `tools/vcan_demo_check.sh` runs the `vcan` demo above as two processes and checks that the controller takes control and holds speed through the hoist load.
+- `tools/accept_vcan.sh` runs the acceptance suite ([docs/acceptance.md](docs/acceptance.md)) against the reference controller on `vcan`, with a fresh controller for each scenario.
+- `tools/accept_mutants.sh` builds each deliberately broken controller and checks that the acceptance suite fails it by the expected criteria, in memory (no `vcan` needed).
 
-CI runs all five (the `vcan` demo when the runner provides `vcan`), plus gcc and clang in Debug and Release with warnings as errors, and a sanitizer build.
+CI runs all seven (the `vcan` demo and the acceptance suite on `vcan` when the runner provides `vcan`), plus gcc and clang in Debug and Release with warnings as errors, and a sanitizer build.
 
 ## Legal and parameters
 
