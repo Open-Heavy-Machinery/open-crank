@@ -17,11 +17,15 @@
 #      and every reaction time against the reference bench
 #      (tools/board/bench_reference.csv)
 #
-# Usage: tools/board/bench.sh [--iface can0] [--out DIR] [--rtt-count N] [--no-rtt] [SCENARIO...]
+# Usage: tools/board/bench.sh [--iface can0] [--out DIR] [--rtt-count N] [--no-rtt] [--include-serials] [SCENARIO...]
 #   --iface       SocketCAN interface of the USB-CAN adapter (default can0)
 #   --out         run directory (default bench-<date>-<time>/ at the top of the repository)
 #   --rtt-count   round-trip requests (default 1000, at 100 per second)
 #   --no-rtt      skip the round trip
+#   --include-serials
+#                 record the serial numbers of the ST-LINK and the USB-CAN adapter
+#                 in meta.txt and report.md. By default they are written as <serial>,
+#                 so a report can be shared as it is.
 #   SCENARIO      names under scenarios/ (default: every scenario with an .accept.csv)
 #
 # Exit 0 bench OK, 1 the bench does not match the reference, 2 usage or setup.
@@ -32,6 +36,7 @@ iface=can0
 out=""
 rtt_count=1000
 rtt=1
+serials=0
 scenarios=()
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -39,7 +44,8 @@ while [[ $# -gt 0 ]]; do
         --out)       out=$2; shift 2 ;;
         --rtt-count) rtt_count=$2; shift 2 ;;
         --no-rtt)    rtt=0; shift ;;
-        -h|--help)   sed -n '4,29p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        --include-serials) serials=1; shift ;;
+        -h|--help)   sed -n '4,31p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         -*)          echo "bench.sh: unknown option '$1'" >&2; exit 2 ;;
         *)           scenarios+=("$1"); shift ;;
     esac
@@ -82,7 +88,9 @@ mkdir -p "$out"
 demo_elf=$OC_FW_BUILD/oc-stm32g4-demo.elf
 commit=$(git -C "$OC_ROOT" rev-parse --short HEAD 2>/dev/null || echo unknown)
 git -C "$OC_ROOT" diff --quiet HEAD -- 2>/dev/null || commit="$commit (with local changes)"
-by_id() { for p in /dev/serial/by-id/*"$1"*; do [[ -e $p ]] && basename "$p"; done | head -1; }
+# A /dev/serial/by-id name ends in _<serial>-ifNN; mask the serial unless --include-serials.
+mask() { if [[ $serials == 1 ]]; then cat; else sed -E 's/_[^_]+(-if[0-9]+)$/_<serial>\1/'; fi; }
+by_id() { for p in /dev/serial/by-id/*"$1"*; do [[ -e $p ]] && basename "$p"; done | head -1 | mask; }
 {
     echo "date=$(date '+%Y-%m-%d %H:%M:%S %z')"
     echo "commit=$commit"
@@ -90,7 +98,7 @@ by_id() { for p in /dev/serial/by-id/*"$1"*; do [[ -e $p ]] && basename "$p"; do
     echo "toolchain=$(arm-none-eabi-gcc --version | head -1)"
     echo "openocd=$(openocd --version 2>&1 | head -1)"
     echo "stlink=$(by_id STLINK || echo '?')"
-    echo "adapter=$(for p in /dev/serial/by-id/*; do [[ -e $p && $p != *STLINK* ]] && basename "$p"; done | head -1)"
+    echo "adapter=$(for p in /dev/serial/by-id/*; do [[ -e $p && $p != *STLINK* ]] && basename "$p"; done | head -1 | mask)"
     echo "iface=$iface"
 } > "$out/meta.txt"
 echo "commit $commit; results in $out"
