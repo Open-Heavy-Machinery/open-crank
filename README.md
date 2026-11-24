@@ -4,7 +4,7 @@
 
 Part of [Open Heavy Machinery](https://open-heavy-machinery.github.io) ([open-crank's page](https://open-heavy-machinery.github.io/open-crank/)): open tools to practise and develop embedded control for machines you cannot keep at home, starting with heavy machinery.
 
-**Status: pre-alpha. v0.2.1 is done and on `main`: an acceptance suite grades any controller by the CAN frames it sends, and the reference controller passes it on `vcan` and on an STM32G431 board.** Anything marked *(planned)* does not exist yet. The honest list of what works, what is verified and what is not is in [ROADMAP.md](ROADMAP.md).
+**Status: pre-alpha. v0.2.2 is done and on `main`: an acceptance suite grades any controller by the CAN frames it sends. The reference controller passes it on `vcan` and on an STM32G431 board, which is built, programmed and tested from the PC with one command ([Run the demo on a real board](#run-the-demo-on-a-real-board)).** Anything marked *(planned)* does not exist yet. The honest list of what works, what is verified and what is not is in [ROADMAP.md](ROADMAP.md).
 
 `open-crank` is a simulated heavy-duty diesel engine that behaves enough like the real one to develop, test and break control software against it, on a laptop, in CI, on a real microcontroller board, and later on an FPGA rig. It speaks SAE J1939 over CAN, the same way a real engine does.
 
@@ -178,6 +178,7 @@ tools/board/bench.sh      # about 2.5 minutes
 
 - `tools/check_portable.sh` builds `portable/` for Cortex-M4F and checks that it needs nothing from outside but `memcpy`/`memmove`/`memset`/`memcmp`, and includes nothing outside itself. Needs `arm-none-eabi-gcc` (the pinned version: `tools/board/arm_toolchain.sh`).
 - `tools/board/setup.sh`, `tools/board/flash.sh` and `tools/board/reset.sh` get a Linux PC ready, build and program the reference board's firmware, and reset the board, all through the Nucleo's ST-LINK (see [platforms/stm32g4/README.md](platforms/stm32g4/README.md#build-and-program-without-cubeide)).
+- `tools/board/bench.sh` is the standard bench check on a real board (see [Run the demo on a real board](#run-the-demo-on-a-real-board)).
 - `tools/check_misra.sh` runs cppcheck's MISRA addon over `portable/` and fails on any finding beyond its baseline, `tools/misra-baseline.txt` (MISRA-oriented: it does not imply compliance). Every finding kept in the baseline is documented as a deviation in [`docs/misra_deviations.md`](docs/misra_deviations.md). `tools/check_misra_docker.sh` runs it, `--update` included, inside `ubuntu:26.04` with the same cppcheck as CI; needs Docker.
 - `tools/mutation_check.sh` breaks each safety-relevant behaviour on purpose and checks that the tests catch it.
 - `tools/compare_traces.sh` runs every scenario with two builds and compares the traces byte for byte. CI runs it on every pull request against its base branch, so a refactor that changes behaviour fails. A pull request that changes behaviour on purpose carries the `behaviour-change` label.
@@ -185,7 +186,7 @@ tools/board/bench.sh      # about 2.5 minutes
 - `tools/accept_vcan.sh` runs the acceptance suite ([docs/acceptance.md](docs/acceptance.md)) against the reference controller on `vcan`, with a fresh controller for each scenario.
 - `tools/accept_mutants.sh` builds each deliberately broken controller and checks that the acceptance suite fails it by the expected criteria, in memory (no `vcan` needed).
 
-CI runs all seven (the `vcan` demo and the acceptance suite on `vcan` when the runner provides `vcan`), plus gcc and clang in Debug and Release with warnings as errors, and a sanitizer build.
+CI runs every check above except the `tools/board/` scripts, which need a board (the `vcan` demo and the acceptance suite on `vcan` run when the runner provides `vcan`). It also builds the STM32G4 firmware with the pinned toolchain (job `firmware`), gcc and clang in Debug and Release with warnings as errors, and a sanitizer build.
 
 ## Legal and parameters
 
