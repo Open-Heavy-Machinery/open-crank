@@ -8,6 +8,8 @@ Part of [Open Heavy Machinery](https://open-heavy-machinery.github.io) ([open-cr
 
 `open-crank` is a simulated heavy-duty diesel engine that behaves enough like the real one to develop, test and break control software against it, on a laptop, in CI, on a real microcontroller board, and later on an FPGA rig. It speaks SAE J1939 over CAN, the same way a real engine does.
 
+**Have a NUCLEO-G431KB and a USB-CAN adapter?** [Run the demo on a real board](#run-the-demo-on-a-real-board): two commands program the board, run every scenario against it and tell you whether your bench matches the reference.
+
 ## Why it exists
 
 The barrier to embedded control work on heavy machinery is not knowledge, it is access. A Liebherr D936L A6 or a Mitsui MAN B&W 9S50ME is not something an individual or a small team can keep in the garage, and bench time is expensive and scarce. Most people learning energy-management (EMS) and power-management (PMS) development never get past blinking an LED and sending a torque command to a bench-supply motor. `open-crank` is the missing half of the loop: a plant that answers back.
@@ -153,6 +155,24 @@ candump vcan0                                             # terminal 3: watch th
 ```
 
 To test your own controller instead of `open-crank-mc`, follow [docs/bus-interface.md](docs/bus-interface.md).
+
+## Run the demo on a real board
+
+The reference controller on an STM32G431 board, against the simulated engine, over a real CAN bus. No STM32CubeIDE and no button to press. You need a NUCLEO-G431KB, an MCP2562FD transceiver and a CANable 2.0-compatible USB-CAN adapter, wired as in [platforms/stm32g4/README.md](platforms/stm32g4/README.md#hardware), and a Debian or Ubuntu PC.
+
+```sh
+tools/board/setup.sh      # checks the PC and installs what is missing (it asks first)
+sudo slcand -o -c -s5 /dev/serial/by-id/<your-adapter> can0 && sudo ip link set can0 up
+tools/board/bench.sh      # about 2.5 minutes
+```
+
+`bench.sh` is the standard bench check:
+
+1. It builds the firmware from this commit and measures the bus round trip with an echo firmware. This checks the wiring, the termination, the adapter and the bit rate.
+2. It programs the reference controller and plays all seven scenarios. It resets the board before each one and prints each pass/fail report as it goes. Run `candump can0` in another terminal to watch the frames.
+3. It ends with `report.md`: your setup, the round trip, every verdict and every reaction time next to the reference bench's.
+
+**BENCH OK** means your bench behaves like the reference one, and is ready for your own firmware. The traces it leaves can be opened in [open-rig](https://github.com/Open-Heavy-Machinery/open-rig). Details are in [platforms/stm32g4/README.md](platforms/stm32g4/README.md#the-bench-check).
 
 ## Checks
 

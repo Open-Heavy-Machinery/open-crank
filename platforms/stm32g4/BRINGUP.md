@@ -1,5 +1,7 @@
 # Bring-up from scratch: the STM32G4 reference bench
 
+> **Two ways in.** This guide builds the demo with STM32CubeIDE, step by step. Start here if you are new to STM32, or if your own application depends on CubeIDE. Test automation does not use this path. Since v0.2.2 the firmware also builds with CMake, and [`tools/board/bench.sh`](../../tools/board/bench.sh) programs and tests the board without CubeIDE (see [README.md](README.md#build-and-program-without-cubeide)). The hardware and wiring are the same for both.
+
 This guide goes from nothing to the reference controller on a NUCLEO-G431KB, controlling the simulated engine over a real CAN bus. It starts from a clean clone and links to the [STM32G4 README](README.md) for the tables (bill of materials, wiring, FDCAN and clock settings) instead of copying them. Exit criterion 2 of [v0.2](../../ROADMAP.md#v02-reference-board-on-the-bus) asks for it to have been followed from scratch; see the record at the end.
 
 ## 0. What you need

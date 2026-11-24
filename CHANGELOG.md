@@ -9,7 +9,9 @@ All notable changes to this project. The project is pre-alpha; nothing here is a
 - The reference board's firmware builds without STM32CubeIDE: `platforms/stm32g4/CMakeLists.txt` builds the reference controller (`oc-stm32g4-demo`) and the round-trip echo (`oc-stm32g4-echo`) with start-up, clock, FDCAN1 and linker script written here, and ST's CMSIS and HAL downloaded at pinned versions (SHA-256) from STMicroelectronics' repositories, never copied in. Same behaviour as the `USER CODE` zones, which stay for CubeIDE users.
 - `tools/board/`: `setup.sh` (gets a Linux PC ready: apt packages after asking, the pinned toolchain without sudo, permissions and hardware reported), `flash.sh` (build, program, verify and reset through the ST-LINK with OpenOCD), `reset.sh` (reset from the PC) and `arm_toolchain.sh` (Arm GNU Toolchain 14.2.rel1, SHA-256 checked).
 - CI job `firmware`: builds both firmwares with `-Werror`, checks that no CubeMX-generated function is in them, and keeps the ELF, BIN and MAP as an artefact.
-- ROADMAP: v0.2.2 "Board automation".
+- `tools/board/bench.sh`: the standard bench check, one command. It builds from the current commit, measures the bus round trip with the echo firmware, programs and verifies the reference controller, and runs every acceptance scenario. Before each scenario it resets the board from the PC and waits for its first TSC1. It ends with `report.md`, which compares the bench with the reference bench (`tools/board/bench_reference.csv`, the v0.2.1 board run; `tools/board/bench_report.py`). A section "Run the demo on a real board" in the README.
+- ROADMAP: v0.2.2 "Board automation". Its exit 2 asks for every reaction within one 10 ms step of v0.2.1's board run, not equal to it.
+- `platforms/stm32g4/BRINGUP.md` says it is the entry point with CubeIDE, and that test automation does not use it.
 
 ### Changed
 

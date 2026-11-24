@@ -313,6 +313,7 @@ The oracle and the criteria format are open-tick's (`opentick/oracle.h`, since v
 | Closed loop | cold start; load step and release; speed-command loss; engine-status loss; overspeed; ignored override; determinism | `tests/test_closed_loop.c` |
 | Portability | `portable/` on Cortex-M4F, symbols, includes | `tools/check_portable.sh` |
 | Board firmware | the reference controller and the echo build for the STM32G431KB with the pinned toolchain, with ST's CMSIS and HAL fetched at pinned versions; no CubeMX-generated function in the ELF | `platforms/stm32g4/CMakeLists.txt`, CI `firmware` job |
+| Bench check (on a board, run by hand) | bus round trip within limits, the seven scenarios pass with 0 late steps after a software reset each, every reaction within one 10 ms step of the reference bench | `tools/board/bench.sh`, `tools/board/bench_report.py` |
 | Undefined behaviour | ASan, UBSan, float-cast-overflow | CI `sanitizers` job |
 | Tests can fail | 19 deliberate mutations, each must fail the suite | `tools/mutation_check.sh` |
 | Behaviour unchanged by refactors | the trace of every scenario, byte for byte, against the pull request's base branch | `tools/compare_traces.sh`, CI `traces` job |

@@ -1,0 +1,20 @@
+# Reference bench for tools/board/bench.sh: NUCLEO-G431KB, MCP2562FD on a
+# breadboard, CANable 2.0-compatible adapter (slcan, 250 kbit/s), as in
+# platforms/stm32g4/README.md. Reaction times of the v0.2.1 board run
+# (2026-11-23, docs/acceptance.md "Results"). A bench matches when every
+# reaction is within one 10 ms controller step of these.
+scenario,criterion,reaction_ms
+cold_start,S2,990
+engine_status_loss,S2,990
+engine_status_loss,E1,20
+engine_status_loss,E2,210
+hoist_step,S2,1000
+hoist_step,H2,20
+hoist_step,H3,30
+override_ignored,O1,1500
+overspeed,S2,990
+overspeed,V1,640
+speed_command_loss,S2,990
+speed_command_loss,L1,710
+speed_command_loss,L2,530
+target_above_high_idle,S2,990
