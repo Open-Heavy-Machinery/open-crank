@@ -6,6 +6,7 @@
  *        the device under test sends. See docs/acceptance.md.
  *
  *     open-crank-accept vcan0 scenarios/hoist_step.csv [--criteria <file>] [--dut <address>] [--trace <out.csv>]
+ *                       [--verdicts <out.csv>]
  *
  * Every received frame goes to the oracle first and then to the bench, so
  * the oracle sees what the device under test sends even when fault
@@ -50,8 +51,9 @@ static void handle_sigint(int sig) {
 static void usage(void) {
     fprintf(stderr,
             "usage: open-crank-accept <can-interface> <scenario.csv> [--criteria <file>] [--dut <address>]"
-            " [--trace <out.csv>]\n"
+            " [--trace <out.csv>] [--verdicts <out.csv>]\n"
             "  --criteria  defaults to the scenario's path with .csv replaced by .accept.csv\n"
+            "  --verdicts  writes the oracle's verdicts, one row per criterion (open-tick docs/verdict-format.md)\n"
             "  --dut       source address of the device under test, default 0x%02X\n"
             "  example: open-crank-accept vcan0 scenarios/hoist_step.csv\n",
             (unsigned)OC_ACCEPT_DUT_DEFAULT);
@@ -72,12 +74,15 @@ int main(int argc, char **argv) {
     const char *scenario_path = NULL;
     const char *criteria_path = NULL;
     const char *trace_path = NULL;
+    const char *verdicts_path = NULL;
     uint8_t dut = OC_ACCEPT_DUT_DEFAULT;
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--trace") == 0 && i + 1 < argc) {
             trace_path = argv[++i];
         } else if (strcmp(argv[i], "--criteria") == 0 && i + 1 < argc) {
             criteria_path = argv[++i];
+        } else if (strcmp(argv[i], "--verdicts") == 0 && i + 1 < argc) {
+            verdicts_path = argv[++i];
         } else if (strcmp(argv[i], "--dut") == 0 && i + 1 < argc) {
             if (!parse_address(argv[++i], &dut)) {
                 fprintf(stderr, "open-crank-accept: bad address '%s' (0x00..0xFD)\n", argv[i]);
@@ -209,6 +214,14 @@ int main(int argc, char **argv) {
     const size_t total = otk_oracle_count(&g_oracle);
     const size_t failed = otk_oracle_failures(&g_oracle);
     const unsigned late = (unsigned)pacer.overruns;
+    if (verdicts_path != NULL) {
+        FILE *vf = fopen(verdicts_path, "w");
+        const bool written = vf != NULL && otk_oracle_write_verdicts(&g_oracle, vf);
+        if (vf == NULL || fclose(vf) != 0 || !written) {
+            fprintf(stderr, "open-crank-accept: cannot write %s\n", verdicts_path);
+            return EXIT_ERROR;
+        }
+    }
 
     if (dut_frames == 0U) {
         printf("open-crank-accept: no frames from 0x%02X were seen; is the device under test on the bus?\n",

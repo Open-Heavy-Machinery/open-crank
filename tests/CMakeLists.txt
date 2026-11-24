@@ -35,10 +35,20 @@ add_test(NAME test_scenario_files COMMAND test_scenario ${OC_SCENARIO_FILES})
 add_test(NAME run_hoist_step COMMAND open-crank-run ${OC_SCENARIO_DIR}/hoist_step.csv --quiet)
 
 # The reference controller passes the acceptance suite in the in-memory loop:
-# one test per scenarios/<name>.accept.csv, named accept_<name>.
+# one test per scenarios/<name>.accept.csv, named accept_<name>. Each also writes
+# its verdict file (open-tick docs/verdict-format.md) into the build tree.
 file(GLOB OC_ACCEPT_FILES CONFIGURE_DEPENDS ${OC_SCENARIO_DIR}/*.accept.csv)
 foreach(criteria ${OC_ACCEPT_FILES})
     get_filename_component(criteria_name ${criteria} NAME)
     string(REGEX REPLACE "\\.accept\\.csv$" "" scenario_name ${criteria_name})
-    add_test(NAME accept_${scenario_name} COMMAND open-crank-accept-loop ${OC_SCENARIO_DIR}/${scenario_name}.csv)
+    add_test(NAME accept_${scenario_name}
+             COMMAND open-crank-accept-loop ${OC_SCENARIO_DIR}/${scenario_name}.csv
+                     --verdicts ${CMAKE_CURRENT_BINARY_DIR}/${scenario_name}.verdicts.csv)
 endforeach()
+
+# hoist_step's verdict file is the one kept in tests/data, byte for byte.
+set_tests_properties(accept_hoist_step PROPERTIES FIXTURES_SETUP hoist_step_verdicts)
+add_test(NAME accept_verdicts_hoist_step
+         COMMAND ${CMAKE_COMMAND} -E compare_files ${CMAKE_CURRENT_SOURCE_DIR}/data/hoist_step.verdicts.csv
+                 ${CMAKE_CURRENT_BINARY_DIR}/hoist_step.verdicts.csv)
+set_tests_properties(accept_verdicts_hoist_step PROPERTIES FIXTURES_REQUIRED hoist_step_verdicts)
