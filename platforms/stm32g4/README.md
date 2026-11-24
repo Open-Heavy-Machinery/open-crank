@@ -67,7 +67,7 @@ The build type defaults to Debug (`-O0 -g`), as CubeIDE's, which is how the exec
 
 ### The bench check
 
-`tools/board/bench.sh [--iface can0] [SCENARIO...]` is the standard check of a physical setup. Run it before bringing your own firmware, and after changing anything on the bench.
+`tools/board/bench.sh [--iface can0] [--include-serials] [SCENARIO...]` is the standard check of a physical setup. Run it before bringing your own firmware, and after changing anything on the bench. The report names the ST-LINK and the USB-CAN adapter by their `/dev/serial/by-id` names. Their serial numbers are written as `<serial>`, so a report can be shared as it is; `--include-serials` keeps them, for example to tell two benches with the same hardware apart.
 
 1. **Round trip.** It programs `oc-stm32g4-echo` and sends 1000 requests at 100 Hz (`tools/can_rtt.py`). The limits are 0 lost and p99 ≤ 5 ms, half a controller step: above that, the bus could move reactions by more than one step. On the reference bench (2026-11-24): p50 1.499 ms, p99 1.735 ms.
 2. **The reference controller.** It programs `oc-stm32g4-demo`. OpenOCD's verify makes sure that the board runs exactly the firmware built from this commit. Then, for every scenario:

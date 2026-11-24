@@ -2,6 +2,12 @@
 
 All notable changes to this project. The project is pre-alpha; nothing here is a stable API yet.
 
+## Unreleased
+
+### Changed
+
+- `tools/board/bench.sh` writes the serial numbers of the ST-LINK and of the USB-CAN adapter as `<serial>` in `meta.txt` and `report.md`, so a report can be shared as it is. `--include-serials` keeps them.
+
 ## v0.2.2: Board automation (2026-11-24)
 
 The reference board is built, programmed and tested from the PC with one command, without STM32CubeIDE and without pressing a button: `tools/board/bench.sh`. The acceptance oracle now comes from open-tick v0.2.0.
