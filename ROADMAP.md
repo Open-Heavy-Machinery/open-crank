@@ -150,13 +150,13 @@ Once proven here, the oracle moves to open-tick (its v0.2), as the runtime did i
 
 - The board firmware (the reference controller and the round-trip echo) built with CMake and a pinned `arm-none-eabi-gcc`, from the repository alone: start-up, clock, FDCAN and linker script written here; ST's CMSIS and HAL downloaded from STMicroelectronics' repositories at pinned versions, never copied into the repository.
 - Programming and reset through the Nucleo's ST-LINK with OpenOCD, and a setup script that gets a Linux PC ready.
-- A runner that plays every acceptance scenario on the board, resetting it before each one and checking that it is alive and not in FAULT before grading, and that the board runs the firmware built from the current commit.
+- A standard bench check, one command: it measures the bus round trip with the echo firmware, then plays every acceptance scenario on the board, resetting it before each one and checking that it is alive and not in FAULT before grading, and that the board runs the firmware built from the current commit; it writes one report that compares the bench with the reference bench.
 - STM32CubeIDE stays as the entry point for beginners ([BRINGUP.md](platforms/stm32g4/BRINGUP.md)) and as a reference for applications that depend on it; test automation does not use it.
 
 **Exit criteria**
 
 1. The board firmware builds in CI from the repository alone (CMake, pinned toolchain, ST's CMSIS and HAL fetched at pinned versions, no CubeMX-generated code), and its size and stack figures come from CI.
-2. One command on the PC programs the board, checks that it runs the firmware built from the current commit, and runs the seven acceptance scenarios with a software reset before each and a check that the device under test is alive and not in FAULT: seven PASS, 0 late steps, reaction times equal to v0.2.1's board run.
+2. One command on the PC programs the board, checks that it runs the firmware built from the current commit, measures the bus round trip, and runs the seven acceptance scenarios with a software reset before each and a check that the device under test is alive and not in FAULT: 0 echoes lost, seven PASS, 0 late steps, every reaction time within one 10 ms step of v0.2.1's board run. *(Within one step, not equal: a reaction lands in the same 10 ms step as on the reference or the next one, depending on where the board's tick falls against the bench's after a reset.)*
 3. [BRINGUP.md](platforms/stm32g4/BRINGUP.md) stays the entry point for beginners and says that test automation does not use it.
 
 ---

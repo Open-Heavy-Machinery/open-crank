@@ -65,6 +65,19 @@ openocd -f interface/stlink.cfg -f target/stm32g4x.cfg -c "program build-stm32g4
 
 The build type defaults to Debug (`-O0 -g`), as CubeIDE's, which is how the execution times below were measured. CI builds both firmwares on every push (job `firmware`) and keeps the ELF, BIN and MAP files as an artefact.
 
+### The bench check
+
+`tools/board/bench.sh [--iface can0] [SCENARIO...]` is the standard check of a physical setup. Run it before bringing your own firmware, and after changing anything on the bench.
+
+1. **Round trip.** It programs `oc-stm32g4-echo` and sends 1000 requests at 100 Hz (`tools/can_rtt.py`). The limits are 0 lost and p99 ≤ 5 ms, half a controller step: above that, the bus could move reactions by more than one step. On the reference bench (2026-11-24): p50 1.499 ms, p99 1.735 ms.
+2. **The reference controller.** It programs `oc-stm32g4-demo`. OpenOCD's verify makes sure that the board runs exactly the firmware built from this commit. Then, for every scenario:
+   - it resets the board;
+   - it waits up to 2 s for its first TSC1. A fresh reset starts the controller in WAIT_ENGINE, never in FAULT, and the frame shows it is alive;
+   - it runs `open-crank-accept`.
+3. **Report.** `report.md` in the run directory (`bench-<date>-<time>/`), next to each scenario's report and trace and the round-trip CSV. Every reaction is compared with the reference bench ([`tools/board/bench_reference.csv`](../../tools/board/bench_reference.csv), the v0.2.1 board run). A reaction matches when it is within one 10 ms step of the reference: it lands in the same step or the next one, depending on where the board's tick falls after the reset.
+
+Exit 0 **BENCH OK**, 1 the bench does not match (the report lists why), 2 the PC or the CAN interface is not ready. A full run takes about 2.5 minutes. On the reference bench (2026-11-24), in 2 min 19 s: round trip 0 lost, p99 1.768 ms; seven PASS, 0 late steps, every reaction within one step.
+
 ### Where each piece comes from
 
 | Piece | Source | Licence |

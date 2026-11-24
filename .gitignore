@@ -56,6 +56,8 @@ dkms.conf
 
 build/
 build-stm32g4/
+# Bench runs (tools/board/bench.sh)
+bench-*/
 # Editor tooling
 .cache/
 compile_commands.json
