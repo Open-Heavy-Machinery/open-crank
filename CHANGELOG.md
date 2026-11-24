@@ -4,7 +4,16 @@ All notable changes to this project. The project is pre-alpha; nothing here is a
 
 ## Unreleased
 
+### Added
+
+- The reference board's firmware builds without STM32CubeIDE: `platforms/stm32g4/CMakeLists.txt` builds the reference controller (`oc-stm32g4-demo`) and the round-trip echo (`oc-stm32g4-echo`) with start-up, clock, FDCAN1 and linker script written here, and ST's CMSIS and HAL downloaded at pinned versions (SHA-256) from STMicroelectronics' repositories, never copied in. Same behaviour as the `USER CODE` zones, which stay for CubeIDE users.
+- `tools/board/`: `setup.sh` (gets a Linux PC ready: apt packages after asking, the pinned toolchain without sudo, permissions and hardware reported), `flash.sh` (build, program, verify and reset through the ST-LINK with OpenOCD), `reset.sh` (reset from the PC) and `arm_toolchain.sh` (Arm GNU Toolchain 14.2.rel1, SHA-256 checked).
+- CI job `firmware`: builds both firmwares with `-Werror`, checks that no CubeMX-generated function is in them, and keeps the ELF, BIN and MAP as an artefact.
+- ROADMAP: v0.2.2 "Board automation".
+
 ### Changed
+
+- CI's Cortex-M4F checks use the pinned Arm GNU Toolchain 14.2.rel1 (`tools/board/arm_toolchain.sh`) instead of whatever `apt` installs on `ubuntu-latest`.
 
 - The acceptance oracle now lives in open-tick `v0.2.0` (`opentick/oracle.h`, `otk_oracle_*`, time in `OtkNs`); `sim/oracle/` is deleted and `sim/accept` builds on `opentick::core`. `test_oracle` is now `test_accept` and keeps only open-crank's observables; the oracle itself is tested in open-tick. The verdicts and reports of the seven scenarios (`open-crank-accept-loop`) are identical byte for byte, and so is the output of `tools/accept_mutants.sh`.
 

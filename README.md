@@ -103,7 +103,7 @@ open-crank/
 │   ├── host/        open-crank-run, open-crank-accept-loop: headless closed loop
 │   ├── linux-socketcan/  open-crank-sil, open-crank-mc, open-crank-accept
 │   ├── renode/      (track R)
-│   ├── stm32g4/     v0.2 reference board: see platforms/stm32g4/README.md
+│   ├── stm32g4/     reference board firmware (CMake, no CubeIDE): see platforms/stm32g4/README.md
 │   └── fpga/        (reserved)
 ├── scenarios/     operating profiles and fault cases, as CSV
 ├── tests/         unit and closed-loop tests
@@ -156,7 +156,8 @@ To test your own controller instead of `open-crank-mc`, follow [docs/bus-interfa
 
 ## Checks
 
-- `tools/check_portable.sh` builds `portable/` for Cortex-M4F and checks that it needs nothing from outside but `memcpy`/`memmove`/`memset`/`memcmp`, and includes nothing outside itself. Needs `arm-none-eabi-gcc`.
+- `tools/check_portable.sh` builds `portable/` for Cortex-M4F and checks that it needs nothing from outside but `memcpy`/`memmove`/`memset`/`memcmp`, and includes nothing outside itself. Needs `arm-none-eabi-gcc` (the pinned version: `tools/board/arm_toolchain.sh`).
+- `tools/board/setup.sh`, `tools/board/flash.sh` and `tools/board/reset.sh` get a Linux PC ready, build and program the reference board's firmware, and reset the board, all through the Nucleo's ST-LINK (see [platforms/stm32g4/README.md](platforms/stm32g4/README.md#build-and-program-without-cubeide)).
 - `tools/check_misra.sh` runs cppcheck's MISRA addon over `portable/` and fails on any finding beyond its baseline, `tools/misra-baseline.txt` (MISRA-oriented: it does not imply compliance). Every finding kept in the baseline is documented as a deviation in [`docs/misra_deviations.md`](docs/misra_deviations.md). `tools/check_misra_docker.sh` runs it, `--update` included, inside `ubuntu:26.04` with the same cppcheck as CI; needs Docker.
 - `tools/mutation_check.sh` breaks each safety-relevant behaviour on purpose and checks that the tests catch it.
 - `tools/compare_traces.sh` runs every scenario with two builds and compares the traces byte for byte. CI runs it on every pull request against its base branch, so a refactor that changes behaviour fails. A pull request that changes behaviour on purpose carries the `behaviour-change` label.

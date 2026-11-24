@@ -10,6 +10,7 @@ Scope is deliberately narrow. Each milestone is small enough to finish and usefu
 | **v0.1.x** (done) | MISRA-oriented checks and stack usage in CI | 1 |
 | **v0.2** (done) | Reference board on the bus | 1 |
 | **v0.2.1** (done) | Acceptance suite over the bus | 1 |
+| **v0.2.2** | Board automation | 1 |
 | **v0.3** | Robustness on the board | 1 |
 | **v0.4** | Level 2: your firmware as the engine ECU | 2 |
 | **v0.5** | Two engines on one machine | 1 |
@@ -138,6 +139,25 @@ Once proven here, the oracle moves to open-tick (its v0.2), as the runtime did i
 2. A deliberately broken controller fails.
 
 **Met on 2026-11-23.** 1: [docs/acceptance.md](docs/acceptance.md#results), the reference controller passes all seven scenarios on `vcan` (in CI) and on the reference board. 2: [docs/acceptance.md](docs/acceptance.md#deliberately-broken-controllers), six mutated controllers fail by the expected criteria in CI; one accepted survivor, with its reason.
+
+---
+
+## v0.2.2: Board automation
+
+**Goal.** The reference board is built, programmed and tested from the PC with one command, without STM32CubeIDE and without pressing a button, so that v0.3's fault scenarios can be run on the board as often as in SIL.
+
+**In scope**
+
+- The board firmware (the reference controller and the round-trip echo) built with CMake and a pinned `arm-none-eabi-gcc`, from the repository alone: start-up, clock, FDCAN and linker script written here; ST's CMSIS and HAL downloaded from STMicroelectronics' repositories at pinned versions, never copied into the repository.
+- Programming and reset through the Nucleo's ST-LINK with OpenOCD, and a setup script that gets a Linux PC ready.
+- A runner that plays every acceptance scenario on the board, resetting it before each one and checking that it is alive and not in FAULT before grading, and that the board runs the firmware built from the current commit.
+- STM32CubeIDE stays as the entry point for beginners ([BRINGUP.md](platforms/stm32g4/BRINGUP.md)) and as a reference for applications that depend on it; test automation does not use it.
+
+**Exit criteria**
+
+1. The board firmware builds in CI from the repository alone (CMake, pinned toolchain, ST's CMSIS and HAL fetched at pinned versions, no CubeMX-generated code), and its size and stack figures come from CI.
+2. One command on the PC programs the board, checks that it runs the firmware built from the current commit, and runs the seven acceptance scenarios with a software reset before each and a check that the device under test is alive and not in FAULT: seven PASS, 0 late steps, reaction times equal to v0.2.1's board run.
+3. [BRINGUP.md](platforms/stm32g4/BRINGUP.md) stays the entry point for beginners and says that test automation does not use it.
 
 ---
 

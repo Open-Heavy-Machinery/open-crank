@@ -89,12 +89,50 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: true
-      - name: Install the Arm GNU toolchain
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends gcc-arm-none-eabi binutils-arm-none-eabi
+      - name: Cache the pinned Arm GNU toolchain
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/open-crank
+          key: arm-gnu-toolchain-14.2.rel1-${{ runner.os }}-${{ runner.arch }}
+      - name: Install the pinned Arm GNU toolchain (14.2.rel1, SHA-256 checked)
+        run: tools/board/arm_toolchain.sh >> "$GITHUB_PATH"
       - name: Build for the MCU, check undefined symbols, stack usage and includes
-        run: tools/check_portable.sh
+        run: |
+          arm-none-eabi-gcc --version | head -1
+          tools/check_portable.sh
+
+  firmware:
+    name: STM32G4 firmware (CMake, no CubeIDE)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cache the pinned Arm GNU toolchain
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/open-crank
+          key: arm-gnu-toolchain-14.2.rel1-${{ runner.os }}-${{ runner.arch }}
+      - name: Install the pinned Arm GNU toolchain (14.2.rel1, SHA-256 checked)
+        run: tools/board/arm_toolchain.sh >> "$GITHUB_PATH"
+      - name: Build the demo and the echo (ST's CMSIS and HAL fetched, pinned by SHA-256)
+        run: |
+          arm-none-eabi-gcc --version | head -1
+          cmake -S platforms/stm32g4 -B build-stm32g4 -DCMAKE_TOOLCHAIN_FILE=$PWD/cmake/arm-none-eabi.cmake -DOC_WERROR=ON
+          cmake --build build-stm32g4
+      - name: No CubeMX-generated code in the firmware
+        run: |
+          for elf in build-stm32g4/*.elf; do
+            if arm-none-eabi-nm "$elf" | grep -E ' (MX_[A-Za-z0-9_]+|SystemClock_Config)$'; then
+              echo "FAIL: $elf has CubeMX-generated functions"; exit 1
+            fi
+          done
+          echo "no MX_* or SystemClock_Config symbols"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stm32g4-firmware
+          path: |
+            build-stm32g4/*.elf
+            build-stm32g4/*.bin
+            build-stm32g4/*.map
 
   misra:
     name: MISRA-oriented check of portable/ (against the baseline)
