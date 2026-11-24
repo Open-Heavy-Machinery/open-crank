@@ -60,7 +60,7 @@ flowchart LR
 |---|---|---|---|
 | `portable/` | J1939 codec, bench messages, machine-controller logic | nothing but `<stdint.h>`, `<stdbool.h>`, `<stddef.h>` | `printf`, `malloc`, files, sockets, OS calls, the plant, `double`, open-tick |
 | `sim/` | plant physics, plants, loads, simulated engine ECU, bench, signals, trace columns, J1939 ↔ open-tick frames | `portable/`, open-tick's core, the C standard library | sockets, a specific OS, firmware HALs |
-| `platforms/` | host runner, SIL programs, the STM32G4 reference board's `USER CODE` zones; (later) Renode glue, FPGA glue | `portable/`, `sim/`, open-tick (core and host) | control logic, physics |
+| `platforms/` | host runner, SIL programs, the STM32G4 reference board's firmware (and its `USER CODE` zones for CubeIDE); (later) Renode glue, FPGA glue | `portable/`, `sim/`, open-tick (core and host) | control logic, physics |
 
 **The rule: dependencies point one way, and `portable/` depends on nothing else in the repo.**
 
@@ -269,7 +269,7 @@ Thin glue per target; no control logic or physics.
 
 - `host`: `open-crank-run`, the free-running closed loop. Plain C, builds anywhere.
 - `linux-socketcan`: `open-crank-sil` (bench) and `open-crank-mc` (reference controller), each paced by open-tick's pacer on open-tick's SocketCAN bridge. J1939 uses 29-bit classic frames only; `sim/can_otk` drops anything else.
-- `stm32g4` (v0.2): the reference board, as `USER CODE` zones to paste into an STM32CubeIDE project that links `portable/` unchanged and builds it with CubeIDE's own toolchain. CI builds `portable/` for the Cortex-M4F separately, with `cmake/arm-none-eabi.cmake`. See [platforms/stm32g4/README.md](platforms/stm32g4/README.md). Bus-off handling and the watchdog follow in v0.3, the engine-ECU firmware in v0.4.
+- `stm32g4` (v0.2, built without CubeIDE since v0.2.2): the reference board. Its own CMake project (`platforms/stm32g4/CMakeLists.txt`, cross-compiled with `cmake/arm-none-eabi.cmake`) builds the reference controller and the round-trip echo as complete firmware: start-up, clock, FDCAN1 and linker script are written here, ST's CMSIS and HAL are downloaded at pinned versions and never copied in. CI builds it (job `firmware`); `tools/board/` programs and resets the board with OpenOCD. The `USER CODE` zones for an STM32CubeIDE project stay as the beginners' entry point ([BRINGUP.md](platforms/stm32g4/BRINGUP.md)), not used for tests. See [platforms/stm32g4/README.md](platforms/stm32g4/README.md). Bus-off handling and the watchdog follow in v0.3, the engine-ECU firmware in v0.4.
 - `fpga` *(reserved, v0.4)*: time and I/O backend for hard real time.
 - `renode` *(Track R)*: the board's platform description and scripts. The virtual-time driver belongs to open-tick's Track R.
 
@@ -312,6 +312,7 @@ The oracle and the criteria format are open-tick's (`opentick/oracle.h`, since v
 | Bench, scenarios | message periods, routing, fault switches; CSV parser and every shipped scenario file | `tests/test_bench.c`, `tests/test_scenario.c` |
 | Closed loop | cold start; load step and release; speed-command loss; engine-status loss; overspeed; ignored override; determinism | `tests/test_closed_loop.c` |
 | Portability | `portable/` on Cortex-M4F, symbols, includes | `tools/check_portable.sh` |
+| Board firmware | the reference controller and the echo build for the STM32G431KB with the pinned toolchain, with ST's CMSIS and HAL fetched at pinned versions; no CubeMX-generated function in the ELF | `platforms/stm32g4/CMakeLists.txt`, CI `firmware` job |
 | Undefined behaviour | ASan, UBSan, float-cast-overflow | CI `sanitizers` job |
 | Tests can fail | 19 deliberate mutations, each must fail the suite | `tools/mutation_check.sh` |
 | Behaviour unchanged by refactors | the trace of every scenario, byte for byte, against the pull request's base branch | `tools/compare_traces.sh`, CI `traces` job |

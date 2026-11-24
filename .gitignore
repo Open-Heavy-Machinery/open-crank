@@ -55,6 +55,7 @@ dkms.conf
 *.dwo
 
 build/
+build-stm32g4/
 # Editor tooling
 .cache/
 compile_commands.json
