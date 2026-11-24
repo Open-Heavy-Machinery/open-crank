@@ -10,7 +10,7 @@ Scope is deliberately narrow. Each milestone is small enough to finish and usefu
 | **v0.1.x** (done) | MISRA-oriented checks and stack usage in CI | 1 |
 | **v0.2** (done) | Reference board on the bus | 1 |
 | **v0.2.1** (done) | Acceptance suite over the bus | 1 |
-| **v0.2.2** | Board automation | 1 |
+| **v0.2.2** (done) | Board automation | 1 |
 | **v0.3** | Robustness on the board | 1 |
 | **v0.4** | Level 2: your firmware as the engine ECU | 2 |
 | **v0.5** | Two engines on one machine | 1 |
@@ -148,7 +148,7 @@ Once proven here, the oracle moves to open-tick (its v0.2), as the runtime did i
 
 **In scope**
 
-- The board firmware (the reference controller and the round-trip echo) built with CMake and a pinned `arm-none-eabi-gcc`, from the repository alone: start-up, clock, FDCAN and linker script written here; ST's CMSIS and HAL downloaded from STMicroelectronics' repositories at pinned versions, never copied into the repository.
+- The board firmware (the reference controller and the round-trip echo) built with CMake and a pinned `arm-none-eabi-gcc`, from the repository alone: clock, FDCAN, HAL configuration and linker script written here; ST's CMSIS, start-up file and HAL downloaded from STMicroelectronics' repositories at pinned versions, never copied into the repository.
 - Programming and reset through the Nucleo's ST-LINK with OpenOCD, and a setup script that gets a Linux PC ready.
 - A standard bench check, one command: it measures the bus round trip with the echo firmware, then plays every acceptance scenario on the board, resetting it before each one and checking that it is alive and not in FAULT before grading, and that the board runs the firmware built from the current commit; it writes one report that compares the bench with the reference bench.
 - STM32CubeIDE stays as the entry point for beginners ([BRINGUP.md](platforms/stm32g4/BRINGUP.md)) and as a reference for applications that depend on it; test automation does not use it.
@@ -158,6 +158,17 @@ Once proven here, the oracle moves to open-tick (its v0.2), as the runtime did i
 1. The board firmware builds in CI from the repository alone (CMake, pinned toolchain, ST's CMSIS and HAL fetched at pinned versions, no CubeMX-generated code), and its size and stack figures come from CI.
 2. One command on the PC programs the board, checks that it runs the firmware built from the current commit, measures the bus round trip, and runs the seven acceptance scenarios with a software reset before each and a check that the device under test is alive and not in FAULT: 0 echoes lost, seven PASS, 0 late steps, every reaction time within one 10 ms step of v0.2.1's board run. *(Within one step, not equal: a reaction lands in the same 10 ms step as on the reference or the next one, depending on where the board's tick falls against the bench's after a reset.)*
 3. [BRINGUP.md](platforms/stm32g4/BRINGUP.md) stays the entry point for beginners and says that test automation does not use it.
+
+**Met on 2026-11-24.**
+
+1. CI's `firmware` job builds `oc-stm32g4-demo` and `oc-stm32g4-echo` with the pinned Arm GNU Toolchain 14.2.rel1 and checks that no CubeMX-generated function is in them. The `portable-cortex-m4f` job gives the stack figures with the same toolchain (`mc_handle_frame` 96 B, `mc_step` 68 B). See [platforms/stm32g4/README.md](platforms/stm32g4/README.md#build-and-program-without-cubeide).
+2. `tools/board/bench.sh` on the reference bench, on this release's commit, gave BENCH OK:
+   - round trip 1000 of 1000, p99 1.895 ms;
+   - seven PASS, 0 late steps;
+   - every reaction within one step of v0.2.1's board run.
+
+   See [platforms/stm32g4/README.md](platforms/stm32g4/README.md#the-bench-check). The report and the traces are to be attached to the GitHub release of v0.2.2.
+3. [BRINGUP.md](platforms/stm32g4/BRINGUP.md) opens with "Two ways in".
 
 ---
 

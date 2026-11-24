@@ -76,7 +76,7 @@ The build type defaults to Debug (`-O0 -g`), as CubeIDE's, which is how the exec
    - it runs `open-crank-accept`.
 3. **Report.** `report.md` in the run directory (`bench-<date>-<time>/`), next to each scenario's report and trace and the round-trip CSV. Every reaction is compared with the reference bench ([`tools/board/bench_reference.csv`](../../tools/board/bench_reference.csv), the v0.2.1 board run). A reaction matches when it is within one 10 ms step of the reference: it lands in the same step or the next one, depending on where the board's tick falls after the reset.
 
-Exit 0 **BENCH OK**, 1 the bench does not match (the report lists why), 2 the PC or the CAN interface is not ready. A full run takes about 2.5 minutes. On the reference bench (2026-11-24), in 2 min 19 s: round trip 0 lost, p99 1.768 ms; seven PASS, 0 late steps, every reaction within one step.
+Exit 0 **BENCH OK**, 1 the bench does not match (the report lists why), 2 the PC or the CAN interface is not ready. A full run takes about 2.5 minutes. On the reference bench, on v0.2.2's commit (2026-11-24): BENCH OK; round trip 0 lost, p99 1.895 ms; seven PASS, 0 late steps, every reaction within one step.
 
 ### Where each piece comes from
 
