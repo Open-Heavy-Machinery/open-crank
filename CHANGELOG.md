@@ -4,7 +4,15 @@ All notable changes to this project. The project is pre-alpha; nothing here is a
 
 ## Unreleased
 
+### Added
+
+- `--verdicts <file>` in `open-crank-accept` and `open-crank-accept-loop`: the oracle's verdicts, one row per criterion, in open-tick's verdict format (open-tick v0.2.1, `docs/verdict-format.md`), for open-rig to draw over the trace. The reports are unchanged, byte for byte.
+- `tools/board/bench.sh` writes `<scenario>.verdicts.csv` next to each trace.
+- The `accept_*` tests write their verdict files. `accept_verdicts_hoist_step` compares hoist_step's with `tests/data/hoist_step.verdicts.csv` (19 tests).
+
 ### Changed
+
+- `external/open-tick` at the tag `v0.2.1` (verdict files).
 
 - `tools/board/bench.sh` writes the serial numbers of the ST-LINK and of the USB-CAN adapter as `<serial>` in `meta.txt` and `report.md`, so a report can be shared as it is. `--include-serials` keeps them.
 

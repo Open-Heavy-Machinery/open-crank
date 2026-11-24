@@ -8,7 +8,7 @@
  * open-crank-accept, but in the closed loop of sim/runtime/loop.c: no bus, no
  * wall clock, as fast as the CPU allows. See docs/acceptance.md.
  *
- *     open-crank-accept-loop scenarios/hoist_step.csv [--criteria <file>]
+ *     open-crank-accept-loop scenarios/hoist_step.csv [--criteria <file>] [--verdicts <out.csv>]
  *
  * The frames in the loop's to_bench queue are those the controller sent in
  * the previous step; oc_loop_step() hands them to the bench at the start of
@@ -35,8 +35,9 @@ static OcLoop g_loop;
 
 static void usage(void) {
     fprintf(stderr,
-            "usage: open-crank-accept-loop <scenario.csv> [--criteria <file>]\n"
+            "usage: open-crank-accept-loop <scenario.csv> [--criteria <file>] [--verdicts <out.csv>]\n"
             "  --criteria  defaults to the scenario's path with .csv replaced by .accept.csv\n"
+            "  --verdicts  writes the oracle's verdicts, one row per criterion (open-tick docs/verdict-format.md)\n"
             "  Grades the reference machine controller (0x%02X) in the in-memory loop.\n",
             (unsigned)OC_ACCEPT_DUT_DEFAULT);
 }
@@ -44,9 +45,12 @@ static void usage(void) {
 int main(int argc, char **argv) {
     const char *scenario_path = NULL;
     const char *criteria_path = NULL;
+    const char *verdicts_path = NULL;
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--criteria") == 0 && i + 1 < argc) {
             criteria_path = argv[++i];
+        } else if (strcmp(argv[i], "--verdicts") == 0 && i + 1 < argc) {
+            verdicts_path = argv[++i];
         } else if (argv[i][0] != '-' && scenario_path == NULL) {
             scenario_path = argv[i];
         } else {
@@ -106,6 +110,14 @@ int main(int argc, char **argv) {
     }
 
     const bool pass = otk_oracle_report(&g_oracle, stdout);
+    if (verdicts_path != NULL) {
+        FILE *vf = fopen(verdicts_path, "w");
+        const bool written = vf != NULL && otk_oracle_write_verdicts(&g_oracle, vf);
+        if (vf == NULL || fclose(vf) != 0 || !written) {
+            fprintf(stderr, "open-crank-accept-loop: cannot write %s\n", verdicts_path);
+            return EXIT_ERROR;
+        }
+    }
     const size_t total = otk_oracle_count(&g_oracle);
     if (pass) {
         printf("open-crank-accept-loop: PASS (%zu of %zu criteria)\n", total, total);

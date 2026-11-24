@@ -125,6 +125,7 @@ for s in "${scenarios[@]}"; do
         continue
     fi
     "$OC_ROOT/build/open-crank-accept" "$iface" "$OC_ROOT/scenarios/$s.csv" --trace "$out/$s.csv" \
+        --verdicts "$out/$s.verdicts.csv" \
         | tee "$out/$s.txt" || true
 done
 

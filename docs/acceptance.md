@@ -125,11 +125,13 @@ With the board on the bus (see [platforms/stm32g4/README.md](../platforms/stm32g
 
 ```
 open-crank-accept <can-interface> <scenario.csv> [--criteria <file>] [--dut <address>] [--trace <out.csv>]
+                  [--verdicts <out.csv>]
 ```
 
 - `--criteria`: by default, the scenario's path with `.csv` replaced by `.accept.csv`.
 - `--dut`: the DUT's source address, `0x27` by default.
 - `--trace`: the same CSV trace as `open-crank-sil` writes.
+- `--verdicts`: the oracle's verdicts, one row per criterion: verdict, status, window, event, reaction and first violation, in seconds on the trace's time axis. The format is open-tick's ([docs/verdict-format.md](https://github.com/Open-Heavy-Machinery/open-tick/blob/v0.2.1/docs/verdict-format.md)). Open it in [open-rig](https://github.com/Open-Heavy-Machinery/open-rig) next to the trace to see each window, reaction and failure over the signals. It is written from the same oracle state as the report, so the two always agree.
 
 Every received frame goes to the oracle before it goes to the simulated machine, so the oracle sees what the DUT sends even while `fault.mc_tx_lost` keeps it from the engine. The run ends when the scenario reaches `end`; the last line is one of:
 
@@ -153,16 +155,16 @@ A late step is a step that started after its wall-clock deadline: the simulated 
 ### In memory, with the reference controller
 
 ```
-open-crank-accept-loop <scenario.csv> [--criteria <file>]
+open-crank-accept-loop <scenario.csv> [--criteria <file>] [--verdicts <out.csv>]
 ```
 
-`open-crank-accept-loop` grades only the reference controller (`MC_DEFAULT_PARAMS`, `0x27`), or a mutant built from it, with the same oracle and criteria as `open-crank-accept`, but in the closed loop of `sim/runtime/loop.c`: no bus, no wall clock, as fast as the CPU allows (a fraction of a second per scenario). `--criteria` defaults to the same file as for `open-crank-accept`. It prints the same report and ends with `open-crank-accept-loop: PASS (N of N criteria)` or `open-crank-accept-loop: FAIL (K of N criteria failed)`; it exits with 0 if the run passes, 1 if it fails, and 2 on a usage, format or I/O error. It builds on any host, Linux or not.
+`open-crank-accept-loop` grades only the reference controller (`MC_DEFAULT_PARAMS`, `0x27`), or a mutant built from it, with the same oracle and criteria as `open-crank-accept`, but in the closed loop of `sim/runtime/loop.c`: no bus, no wall clock, as fast as the CPU allows (a fraction of a second per scenario). `--criteria` defaults to the same file as for `open-crank-accept`, and `--verdicts` writes the same verdict file. It prints the same report and ends with `open-crank-accept-loop: PASS (N of N criteria)` or `open-crank-accept-loop: FAIL (K of N criteria failed)`; it exits with 0 if the run passes, 1 if it fails, and 2 on a usage, format or I/O error. It builds on any host, Linux or not.
 
 ```sh
 ./build/open-crank-accept-loop scenarios/engine_status_loss.csv
 ```
 
-`ctest` runs it on the seven scenarios, as the tests `accept_cold_start`, `accept_engine_status_loss`, `accept_hoist_step`, `accept_override_ignored`, `accept_overspeed`, `accept_speed_command_loss` and `accept_target_above_high_idle`.
+`ctest` runs it on the seven scenarios, as the tests `accept_cold_start`, `accept_engine_status_loss`, `accept_hoist_step`, `accept_override_ignored`, `accept_overspeed`, `accept_speed_command_loss` and `accept_target_above_high_idle`. Each writes its verdict file into the build tree, and `accept_verdicts_hoist_step` compares hoist_step's with [tests/data/hoist_step.verdicts.csv](../tests/data/hoist_step.verdicts.csv), byte for byte.
 
 ## Results
 
