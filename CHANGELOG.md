@@ -12,7 +12,7 @@ All notable changes to this project. The project is pre-alpha; nothing here is a
 
 ### Changed
 
-- `external/open-tick` at `v0.2.1` (verdict files).
+- `external/open-tick` at the tag `v0.2.1` (verdict files).
 
 - `tools/board/bench.sh` writes the serial numbers of the ST-LINK and of the USB-CAN adapter as `<serial>` in `meta.txt` and `report.md`, so a report can be shared as it is. `--include-serials` keeps them.
 
