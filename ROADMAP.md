@@ -196,15 +196,16 @@ Fault injection pulls in protocol work that v0.1 left out on purpose:
 **Status: in progress, in three steps.**
 
 1. **Done (open-tick v0.3, step 1):** links and transport faults in open-tick's core.
-2. **Done in SIL and on `vcan` (this step):**
+2. **Done in SIL and on `vcan` (step 2, #33):**
    - the bench has two links, `mc` and `engine`;
    - four fault scenarios: `engine_status_delay`, `engine_status_jitter`, `speed_command_intermittent`, `mc_bus_off`;
    - the safe state and the requirements `SR-1`…`SR-9` in [`docs/safety.md`](docs/safety.md), checked in CI by `tools/check_requirements.py`.
-3. **Planned, v0.3.1, on the board:**
-   - the fault scenarios in `tools/board/bench.sh`, with board reference times;
-   - the watchdog with a defined state after reset;
-   - DM1 from the engine with limp-home, and the controller's own DM1 (BAM with more than one code);
-   - the TSC1 counter and checksum (SPN 4206/4207), with a `corrupt` scenario.
+3. **In progress, v0.3.1, on the board** (steps 3a to 3d):
+   - *done (step 3a):* the fault scenarios in `tools/board/bench.sh`, with board reference times;
+   - 3b: the TSC1 counter and checksum (SPN 4206/4207), with a `corrupt` scenario;
+   - 3c: the watchdog, after whose reset the controller starts in FAULT and waits for the operator's fault reset;
+   - 3d: DM1 from the engine (read with BAM when more than one code is active), and limp-home: requested speed at most 1200 rpm and pump at most 50 %, reached smoothly, while the amber lamp is on.
+   - The controller's own DM1 is left for after v0.3.1.
 
 **Exit criteria**
 
