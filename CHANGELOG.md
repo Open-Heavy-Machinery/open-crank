@@ -19,7 +19,7 @@ All notable changes to this project. The project is pre-alpha; nothing here is a
 ### Changed
 
 - `external/open-tick` at the tag `v0.2.1` (verdict files).
-- `external/open-tick` at `e9eb124`, open-tick's `main` with the links *(to move to the tag `v0.3.0` before this is released)*.
+- `external/open-tick` at the tag `v0.3.0` (links and transport faults).
 - The text of the criteria that check a safety requirement starts with `SR-n: `, so the seven older scenarios' reports and verdict files change in that text only. `tests/data/hoist_step.verdicts.csv` is updated. Their traces are the same, byte for byte.
 - `open-crank-accept` and `open-crank-accept-loop` give no verdict and exit with code 2 if a link was full (a frame lost that no fault asked for).
 
