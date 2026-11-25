@@ -1,0 +1,15 @@
+# Jittery engine status.
+# Every frame the engine sends reaches the controller between 0 and 150 ms
+# late, drawn at random from a fixed seed, while the hoist is working. That is
+# below the controller's 200 ms EEC1 timeout, so the controller must not
+# fault: it keeps speed control and the pump command the whole time.
+time_s,signal,value
+0.0,key_on,1
+0.0,target_rpm,1500
+0.0,hoist_load_bar,250
+0.5,start,1
+3.0,start,0
+6.0,hoist_demand_pct,50
+8.0,fault.link.engine.jitter_ms,150
+14.0,fault.link.engine.jitter_ms,0
+16.0,end,0

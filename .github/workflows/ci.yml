@@ -164,6 +164,8 @@ jobs:
         run: tools/mutation_check.sh
       - name: Break each controller behaviour; the acceptance suite must catch it
         run: tools/accept_mutants.sh
+      - name: Every safety requirement is checked by a criterion or a test (docs/safety.md)
+        run: python3 tools/check_requirements.py
 
   traces:
     name: traces unchanged versus the base branch

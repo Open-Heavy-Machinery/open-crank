@@ -27,6 +27,7 @@
 #include <opencrank/plant.h>
 #include <opencrank/runtime/scenario.h>
 #include <opencrank/runtime/signals.h>
+#include <opentick/link.h>
 #include <opentick/player.h>
 
 /** @brief What the bench simulates, and how. */
@@ -41,6 +42,13 @@ typedef struct {
     uint32_t et1_period_ms;
     uint32_t operator_period_ms;
 } OcBenchConfig;
+
+/**
+ * @brief Seeds of the links' PRNGs (jitter). Fixed, so a scenario with jitter
+ *        gives the same trace on every run.
+ */
+#define OC_BENCH_LINK_MC_SEED 1U
+#define OC_BENCH_LINK_ENGINE_SEED 2U
 
 /** @brief The reference configuration: d936la6 plant and ECU, hoist pump. */
 extern const OcBenchConfig OC_BENCH_D936LA6;
@@ -62,7 +70,18 @@ typedef struct {
     double load_torque_nm;       /**< total load torque applied in the last step */
 
     uint32_t rx_frames;          /**< frames accepted from the device under test */
-    uint32_t rx_dropped;         /**< frames dropped by fault injection */
+    uint32_t rx_dropped;         /**< frames dropped by fault.mc_tx_lost */
+
+    /**
+     * Transport faults (opentick/link.h), driven by the fault.link.* signals.
+     * mc: what the controller sends to the machine (TSC1, OC_PUMP_CMD), applied
+     * in oc_bench_rx(). engine: what the engine sends to the controller (EEC1,
+     * ET1, EFL/P1), applied in oc_bench_step(); the operator panel's frames do
+     * not pass through it. No filters: a fault applies to every frame of its
+     * direction. With no fault set, both are transparent.
+     */
+    OtkLink mc_link;
+    OtkLink engine_link;
 } OcBench;
 
 void oc_bench_init(OcBench *b, const OcBenchConfig *cfg);
@@ -73,7 +92,10 @@ void oc_bench_set_scenario(OcBench *b, const OcScenario *s);
 /** @brief True once the scenario's `end` time is reached (never true without a scenario or `end`). */
 bool oc_bench_scenario_done(const OcBench *b);
 
-/** @brief Hands the bench one frame received from the device under test. */
+/**
+ * @brief Hands the bench one frame received from the device under test. It
+ *        passes through the mc link: with no fault set it applies at once.
+ */
 void oc_bench_rx(OcBench *b, const J1939Frame *f);
 
 /**
@@ -81,6 +103,12 @@ void oc_bench_rx(OcBench *b, const J1939Frame *f);
  * @return number of frames written to @p tx (at most @p cap) to put on the bus.
  */
 size_t oc_bench_step(OcBench *b, J1939Frame *tx, size_t cap);
+
+/**
+ * @brief Frames lost because a link's line was full (opentick/link.h). Not a
+ *        fault the scenario asked for: a run with any is broken.
+ */
+uint32_t oc_bench_link_overflows(const OcBench *b);
 
 /** @brief Simulated time in seconds. */
 double oc_bench_time_s(const OcBench *b);

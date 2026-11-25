@@ -2,7 +2,7 @@
 /**
  * @file test_bench.c
  * @brief The simulated machine on the bus: message periods, TSC1 reaching
- *        the engine ECU, pump command timeout, fault injection.
+ *        the engine ECU, pump command timeout, fault injection, links.
  */
 
 #include "check.h"
@@ -107,6 +107,49 @@ static void test_mc_frames_lost(void) {
     CHECK(b.ecu.source == ECU_SPEED_SOURCE_LOW_IDLE);
 }
 
+/* The engine link delays the engine's frames, not the operator panel's. */
+static void test_engine_link_delay(void) {
+    OcBench b;
+    oc_bench_init(&b, &OC_BENCH_D936LA6);
+    start_engine(&b);
+    b.sig.link_engine.delay = otk_ns_from_ms(100);
+    Counts c = run(&b, 90U);
+    CHECK(c.eec1 == 0U); /* every EEC1 sent so far is still in flight */
+    CHECK(c.op > 0U);
+    c = run(&b, 200U);
+    CHECK(c.eec1 == 19U); /* then one every 10 ms again, 100 ms old: the first is due 110 ms after the change */
+    CHECK(b.engine_link.overflows == 0U);
+}
+
+/* The mc link delays the controller's frames on their way to the ECU. */
+static void test_mc_link_delay(void) {
+    OcBench b;
+    oc_bench_init(&b, &OC_BENCH_D936LA6);
+    start_engine(&b);
+    b.sig.link_mc.delay = otk_ns_from_ms(50);
+    (void)run(&b, 10U); /* the link takes the new value at the start of a step */
+    send_tsc1(&b, J1939_OVERRIDE_SPEED, 1500.0f);
+    (void)run(&b, 30U);
+    CHECK(b.ecu.source == ECU_SPEED_SOURCE_LOW_IDLE);
+    (void)run(&b, 30U);
+    CHECK(b.ecu.source == ECU_SPEED_SOURCE_REQUEST);
+    CHECK(b.rx_frames == 1U);
+}
+
+/* Bus-off in the mc direction: nothing the controller sends arrives. */
+static void test_mc_link_bus_off(void) {
+    OcBench b;
+    oc_bench_init(&b, &OC_BENCH_D936LA6);
+    start_engine(&b);
+    b.sig.link_mc.bus_off = true;
+    (void)run(&b, 10U);
+    send_tsc1(&b, J1939_OVERRIDE_SPEED, 1500.0f);
+    (void)run(&b, 10U);
+    CHECK(b.ecu.source == ECU_SPEED_SOURCE_LOW_IDLE);
+    CHECK(b.mc_link.bus_off_lost == 1U);
+    CHECK(b.rx_frames == 0U);
+}
+
 static void test_pump_command_times_out(void) {
     OcBench b;
     oc_bench_init(&b, &OC_BENCH_D936LA6);
@@ -127,5 +170,8 @@ int main(void) {
     RUN_TEST(test_tsc1_reaches_engine_ecu);
     RUN_TEST(test_mc_frames_lost);
     RUN_TEST(test_pump_command_times_out);
+    RUN_TEST(test_engine_link_delay);
+    RUN_TEST(test_mc_link_delay);
+    RUN_TEST(test_mc_link_bus_off);
     return check_report();
 }

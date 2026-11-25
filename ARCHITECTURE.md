@@ -255,6 +255,7 @@ time_s,signal,value
 | `fault.engine_tx_lost` | the engine stops transmitting |
 | `fault.ecu_ignores_tsc1` | the engine ECU ignores speed requests |
 | `fault.overrun_torque_nm` | external torque driving the crankshaft |
+| `fault.link.mc.*`, `fault.link.engine.*` | transport faults of the two links (drop, drop one in N, delay, jitter, corrupt, bus-off): `mc` carries what the device under test sends to the machine, `engine` what the engine sends to it ([docs/acceptance.md](docs/acceptance.md#link-faults)) |
 | `end` | end of the scenario |
 
 The parser is open-tick's; times are rounded to the nearest nanosecond, and `end` is reserved by open-tick. Unknown signals, bad numbers, decreasing times and events after `end` are errors with a line number: a typo must fail loudly, not run a different test.
@@ -309,11 +310,11 @@ The oracle and the criteria format are open-tick's (`opentick/oracle.h`, since v
 | Pump | torque formula, standby, relief, lag, standstill | `tests/test_hydraulic_pump.c` |
 | Engine ECU | key off, fuel enable, start and idle, speed requests, clamping, timeout, override modes, overspeed latch, stall, droop | `tests/test_engine_ecu.c` |
 | Controller | state machine, confirmations, slew limit, clamping, timeouts, override check, reset on press, time wrap-around | `tests/test_machine_ctrl.c` |
-| Bench, scenarios | message periods, routing, fault switches; CSV parser and every shipped scenario file | `tests/test_bench.c`, `tests/test_scenario.c` |
+| Bench, scenarios | message periods, routing, fault switches, links; CSV parser and every shipped scenario file | `tests/test_bench.c`, `tests/test_scenario.c` |
 | Closed loop | cold start; load step and release; speed-command loss; engine-status loss; overspeed; ignored override; determinism | `tests/test_closed_loop.c` |
 | Portability | `portable/` on Cortex-M4F, symbols, includes | `tools/check_portable.sh` |
 | Board firmware | the reference controller and the echo build for the STM32G431KB with the pinned toolchain, with ST's CMSIS and HAL fetched at pinned versions; no CubeMX-generated function in the ELF | `platforms/stm32g4/CMakeLists.txt`, CI `firmware` job |
-| Bench check (on a board, run by hand) | bus round trip within limits, the seven scenarios pass with 0 late steps after a software reset each, every reaction within one 10 ms step of the reference bench | `tools/board/bench.sh`, `tools/board/bench_report.py` |
+| Bench check (on a board, run by hand) | bus round trip within limits, every scenario passes with 0 late steps after a software reset each, every reaction within one 10 ms step of the reference bench (the four link-fault scenarios have no reference times yet: v0.3.1) | `tools/board/bench.sh`, `tools/board/bench_report.py` |
 | Undefined behaviour | ASan, UBSan, float-cast-overflow | CI `sanitizers` job |
 | Tests can fail | 19 deliberate mutations, each must fail the suite | `tools/mutation_check.sh` |
 | Behaviour unchanged by refactors | the trace of every scenario, byte for byte, against the pull request's base branch | `tools/compare_traces.sh`, CI `traces` job |
@@ -321,7 +322,8 @@ The oracle and the criteria format are open-tick's (`opentick/oracle.h`, since v
 | MISRA-oriented check | `portable/` against the rules the cppcheck MISRA addon covers; fails on a finding beyond the baseline (counts per rule and file), which goes down as findings are fixed or documented as deviations. Does not imply compliance | `tools/check_misra.sh`, `tools/misra-baseline.txt`, `docs/misra_deviations.md`, CI `misra` job |
 | Stack usage | stack per function in the Cortex-M4F MinSizeRel build (`-fstack-usage`), printed largest first, and the worst-case stack of each public controller function along the call graph (`-fcallgraph-info=su`, `tools/stack_budget.py`); fails if a function's stack is not `static`, on recursion, on an indirect call, or above 1024 bytes | `tools/check_portable.sh`, `tools/stack_budget.py`, CI `portable-cortex-m4f` job |
 | Board vs SIL | `hoist_step` with the board in the loop vs the wall-clock-paced SIL, within tolerances written down before comparing | v0.2 |
-| Acceptance over the bus | any device under test graded by its CAN frames alone, pass/fail per scenario; deliberately broken controllers must fail it | `open-crank-accept`, `docs/acceptance.md`, `tools/accept_vcan.sh` (CI `vcan-demo` job), `tools/accept_mutants.sh` (CI `mutation` job) |
+| Acceptance over the bus | any device under test graded by its CAN frames alone, pass/fail per scenario, eleven scenarios with four of transport faults; deliberately broken controllers must fail it | `open-crank-accept`, `docs/acceptance.md`, `tools/accept_vcan.sh` (CI `vcan-demo` job), `tools/accept_mutants.sh` (CI `mutation` job) |
+| Safety requirements traced | every `SR-n` of `docs/safety.md` cited by an acceptance criterion or a unit test, and every citation exists | `tools/check_requirements.py`, CI `mutation` job |
 | Emulator vs board | the trace in Renode vs the board's, within the stated tolerance | Track R |
 
 Conventions:

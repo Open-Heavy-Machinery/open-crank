@@ -1,9 +1,9 @@
 # Acceptance criteria for scenarios/hoist_step.csv. Format: docs/acceptance.md.
 id,from,until,tolerance_ms,condition,text
-S1,begin,start=1-10ms,0,tsc1_override == 0,no override requested before the starter is pressed
+S1,begin,start=1-10ms,0,tsc1_override == 0,SR-1: no override requested before the starter is pressed
 S2,start=1+2000ms,end,0,tsc1_speed_control == 1,speed control taken within 2 s of start and kept
-G1,begin,end,0,tsc1_speed_control == 1 -> tsc1_speed_rpm <= 2100,requested speed never above high idle (2100 rpm)
-G2,begin,end,20,pump_cmd_pct > 0 -> tsc1_speed_control == 1,pump commanded only while in speed control
+G1,begin,end,0,tsc1_speed_control == 1 -> tsc1_speed_rpm <= 2100,SR-2: requested speed never above high idle (2100 rpm)
+G2,begin,end,20,pump_cmd_pct > 0 -> tsc1_speed_control == 1,SR-3: pump commanded only while in speed control
 H1,5.0,end,0,tsc1_speed_rpm >= 1499 && tsc1_speed_rpm <= 1501,requested speed at the operator's 1500 rpm
 H2,hoist_demand_pct=85+100ms,hoist_demand_pct=0-10ms,0,pump_cmd_pct >= 84.6 && pump_cmd_pct <= 85.4,pump follows the hoist lever (85 %) within 100 ms
-H3,hoist_demand_pct=0+100ms,end,0,pump_cmd_pct == 0,pump back to 0 within 100 ms of releasing the lever
+H3,hoist_demand_pct=0+100ms,end,0,pump_cmd_pct == 0,SR-8: pump back to 0 within 100 ms of releasing the lever

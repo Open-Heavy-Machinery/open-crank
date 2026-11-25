@@ -1,6 +1,6 @@
 # Acceptance criteria for scenarios/override_ignored.csv. Format: docs/acceptance.md.
 id,from,until,tolerance_ms,condition,text
-S1,begin,start=1-10ms,0,tsc1_override == 0,no override requested before the starter is pressed
-G1,begin,end,0,tsc1_speed_control == 1 -> tsc1_speed_rpm <= 2100,requested speed never above high idle (2100 rpm)
-G2,begin,end,20,pump_cmd_pct > 0 -> tsc1_speed_control == 1,pump commanded only while in speed control
-O1,start=1+2500ms,end,0,tsc1_override == 0 && pump_cmd_pct == 0,override released when the engine does not honour it (by 2.5 s after start), and kept
+S1,begin,start=1-10ms,0,tsc1_override == 0,SR-1: no override requested before the starter is pressed
+G1,begin,end,0,tsc1_speed_control == 1 -> tsc1_speed_rpm <= 2100,SR-2: requested speed never above high idle (2100 rpm)
+G2,begin,end,20,pump_cmd_pct > 0 -> tsc1_speed_control == 1,SR-3: pump commanded only while in speed control
+O1,start=1+2500ms,end,0,tsc1_override == 0 && pump_cmd_pct == 0,SR-5, SR-7: override released when the engine does not honour it (by 2.5 s after start), and kept

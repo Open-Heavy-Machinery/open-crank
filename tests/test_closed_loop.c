@@ -135,6 +135,7 @@ static void test_load_step_and_release(void) {
 
 /* The controller's frames stop arriving: the engine must drop the stale
  * request and return to idle; the controller must notice it lost control. */
+/* SR-5 */
 static void test_speed_command_loss(void) {
     Window w;
     start(SPEED_COMMAND_LOSS);
@@ -160,6 +161,7 @@ static void test_speed_command_loss(void) {
 
 /* The engine goes silent: the controller faults and releases the override;
  * the pump command drops to zero; the engine returns to idle. */
+/* SR-4 */
 static void test_engine_status_loss(void) {
     Window w;
     start(ENGINE_STATUS_LOSS);
@@ -180,6 +182,7 @@ static void test_engine_status_loss(void) {
 }
 
 /* An overrunning load drives the engine past its limits. */
+/* SR-6 */
 static void test_overspeed_protection(void) {
     Window w;
     start(OVERSPEED);
@@ -200,6 +203,7 @@ static void test_overspeed_protection(void) {
 }
 
 /* The engine never honours the override: the controller must not believe it does. */
+/* SR-5 */
 static void test_override_ignored(void) {
     Window w;
     start(OVERRIDE_IGNORED);

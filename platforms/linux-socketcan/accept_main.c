@@ -14,7 +14,7 @@
  * evaluates once per step, after the received frames. The run ends when the
  * scenario reaches `end`.
  *
- * Exit codes: 0 pass, 1 fail, 2 usage, format, I/O or Ctrl+C, 3 invalid
+ * Exit codes: 0 pass, 1 fail, 2 usage, format, I/O, Ctrl+C or a full link, 3 invalid
  * (late steps: the timing of the run cannot be trusted).
  */
 
@@ -210,6 +210,11 @@ int main(int argc, char **argv) {
         return EXIT_ERROR;
     }
 
+    if (oc_bench_link_overflows(&bench) != 0U) {
+        fprintf(stderr, "open-crank-accept: %u frames lost because a link was full; no verdict\n",
+                (unsigned)oc_bench_link_overflows(&bench));
+        return EXIT_ERROR;
+    }
     const bool pass = otk_oracle_report(&g_oracle, stdout);
     const size_t total = otk_oracle_count(&g_oracle);
     const size_t failed = otk_oracle_failures(&g_oracle);

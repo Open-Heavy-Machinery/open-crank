@@ -86,6 +86,7 @@ static void h_to_run(Harness *h) {
     CHECK(h->mc.state == MC_STATE_RUN);
 }
 
+/* SR-1 */
 static void test_waits_for_engine(void) {
     Harness h;
     h_init(&h, 0U);
@@ -97,6 +98,7 @@ static void test_waits_for_engine(void) {
     CHECK(h.pump.displacement_valid && h.pump.displacement_pct == 0.0f);
 }
 
+/* SR-1 */
 static void test_run_after_confirmation(void) {
     Harness h;
     h_init(&h, 0U);
@@ -132,6 +134,7 @@ static void test_request_is_slew_limited(void) {
     CHECK_NEAR(h.mc.requested_rpm, 1500.0, 0.01);
 }
 
+/* SR-2 */
 static void test_request_clamped(void) {
     Harness h;
     h_init(&h, 0U);
@@ -144,6 +147,7 @@ static void test_request_clamped(void) {
     CHECK_NEAR(h.mc.requested_rpm, P->request_min_rpm, 0.01);
 }
 
+/* SR-3 */
 static void test_hoist_only_in_run(void) {
     Harness h;
     h_init(&h, 0U);
@@ -158,6 +162,7 @@ static void test_hoist_only_in_run(void) {
     CHECK(h.pump.displacement_pct == 0.0f);
 }
 
+/* SR-4 */
 static void test_engine_status_timeout(void) {
     Harness h;
     h_init(&h, 0U);
@@ -179,6 +184,7 @@ static void test_engine_status_timeout(void) {
     CHECK(g.mc.fault == MC_FAULT_ENGINE_STATUS_LOST);
 }
 
+/* SR-6 */
 static void test_overspeed_and_stall(void) {
     Harness h;
     h_init(&h, 0U);
@@ -196,6 +202,7 @@ static void test_overspeed_and_stall(void) {
     CHECK(s.mc.fault == MC_FAULT_STALL);
 }
 
+/* SR-5 */
 static void test_override_must_be_honoured(void) {
     Harness h;
     h_init(&h, 0U);
@@ -210,6 +217,7 @@ static void test_override_must_be_honoured(void) {
     CHECK(h.mc.fault == MC_FAULT_OVERRIDE_REJECTED);
 }
 
+/* SR-7 */
 static void test_reset_on_press_only(void) {
     Harness h;
     h_init(&h, 0U);

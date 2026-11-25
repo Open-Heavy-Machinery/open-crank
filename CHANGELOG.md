@@ -6,6 +6,12 @@ All notable changes to this project. The project is pre-alpha; nothing here is a
 
 ### Added
 
+- **Transport faults in the simulated machine** (open-crank v0.3, step 2). The bench has two of open-tick's links: `mc`, what the controller sends to the machine (TSC1, OC_PUMP_CMD), and `engine`, what the engine sends to the controller (EEC1, ET1, EFL/P1). Their signals are `fault.link.mc.*` and `fault.link.engine.*`: drop, drop one in N, delay, jitter, corrupt and bus-off. Fixed seeds, no filters. The same bench runs in memory, on `vcan` and against a board. See `docs/acceptance.md`, "Link faults".
+- **Four fault scenarios** with their criteria: `engine_status_delay` (EEC1 300 ms late: release, latched until the fault reset), `engine_status_jitter` (up to 150 ms of jitter: no fault), `speed_command_intermittent` (one frame in three lost: no fault) and `mc_bus_off` (the controller's direction bus-off for 6 s: release, then recover after the reset). The suite has eleven scenarios.
+- **Four broken controllers** in `tools/accept_mutants.sh`, one per new scenario: 10 killed, 1 accepted survivor.
+- **`docs/safety.md`**: the safe state, and nine numbered safety requirements `SR-1` to `SR-9`, each with its reason and the tests that check it. Criteria cite them at the start of their text (`SR-4, SR-7: …`), unit tests with `/* SR-n */`. `tools/check_requirements.py`, in CI, fails if a requirement is checked by nothing or a citation does not exist.
+- Unit tests of the bench's links (`test_bench`: engine delay, mc delay, mc bus-off).
+
 - `--verdicts <file>` in `open-crank-accept` and `open-crank-accept-loop`: the oracle's verdicts, one row per criterion, in open-tick's verdict format (open-tick v0.2.1, `docs/verdict-format.md`), for open-rig to draw over the trace. The reports are unchanged, byte for byte.
 - `tools/board/bench.sh` writes `<scenario>.verdicts.csv` next to each trace.
 - The `accept_*` tests write their verdict files. `accept_verdicts_hoist_step` compares hoist_step's with `tests/data/hoist_step.verdicts.csv` (19 tests).
@@ -13,6 +19,9 @@ All notable changes to this project. The project is pre-alpha; nothing here is a
 ### Changed
 
 - `external/open-tick` at the tag `v0.2.1` (verdict files).
+- `external/open-tick` at `e9eb124`, open-tick's `main` with the links *(to move to the tag `v0.3.0` before this is released)*.
+- The text of the criteria that check a safety requirement starts with `SR-n: `, so the seven older scenarios' reports and verdict files change in that text only. `tests/data/hoist_step.verdicts.csv` is updated. Their traces are the same, byte for byte.
+- `open-crank-accept` and `open-crank-accept-loop` give no verdict and exit with code 2 if a link was full (a frame lost that no fault asked for).
 
 - `tools/board/bench.sh` writes the serial numbers of the ST-LINK and of the USB-CAN adapter as `<serial>` in `meta.txt` and `report.md`, so a report can be shared as it is. `--include-serials` keeps them.
 

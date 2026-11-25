@@ -18,6 +18,8 @@ static const char *const NAMES[OC_SIG_END] = {
     [OC_SIG_FAULT_ENGINE_TX_LOST] = "fault.engine_tx_lost",
     [OC_SIG_FAULT_ECU_IGNORES_TSC1] = "fault.ecu_ignores_tsc1",
     [OC_SIG_FAULT_OVERRUN_TORQUE_NM] = "fault.overrun_torque_nm",
+    [OC_SIG_LINK_MC] = OTK_LINK_SIGNAL_NAMES("mc"),
+    [OC_SIG_LINK_ENGINE] = OTK_LINK_SIGNAL_NAMES("engine"),
 };
 
 const OtkSignalTable OC_SIGNAL_TABLE = { NAMES, OC_SIG_END };
@@ -40,6 +42,10 @@ const char *oc_signal_name(OcSignalId id) {
 
 void oc_signals_set(OcSignals *s, OcSignalId id, double value) {
     const bool on = value != 0.0;
+    if (otk_link_signal(&s->link_mc, (OtkSignalId)OC_SIG_LINK_MC, (OtkSignalId)id, value) ||
+        otk_link_signal(&s->link_engine, (OtkSignalId)OC_SIG_LINK_ENGINE, (OtkSignalId)id, value)) {
+        return; /* fault.link.*: applied to the links by the bench each step */
+    }
     switch (id) {
     case OC_SIG_KEY_ON:
         s->key_on = on;

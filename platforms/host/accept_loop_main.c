@@ -15,7 +15,7 @@
  * the step, so the oracle sees them with the same bench time as in the
  * socket runner.
  *
- * Exit codes: 0 pass, 1 fail, 2 usage, format or I/O.
+ * Exit codes: 0 pass, 1 fail, 2 usage, format, I/O or a full link (no verdict).
  */
 
 #include <stdio.h>
@@ -109,6 +109,11 @@ int main(int argc, char **argv) {
         oc_loop_step(&g_loop);
     }
 
+    if (oc_bench_link_overflows(&g_loop.bench) != 0U) {
+        fprintf(stderr, "open-crank-accept-loop: %u frames lost because a link was full; no verdict\n",
+                (unsigned)oc_bench_link_overflows(&g_loop.bench));
+        return EXIT_ERROR;
+    }
     const bool pass = otk_oracle_report(&g_oracle, stdout);
     if (verdicts_path != NULL) {
         FILE *vf = fopen(verdicts_path, "w");

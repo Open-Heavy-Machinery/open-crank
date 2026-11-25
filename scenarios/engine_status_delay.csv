@@ -1,0 +1,19 @@
+# Late engine status.
+# Everything the engine sends reaches the controller 300 ms late, more than
+# the controller's 200 ms EEC1 timeout, while the hoist is working. For the
+# first 300 ms nothing arrives: the controller must fault, release the
+# override and bring the pump command to zero. Its fault latches, so it must
+# stay released after the frames flow again, only 300 ms old, until the
+# delay is gone and the operator presses fault reset.
+time_s,signal,value
+0.0,key_on,1
+0.0,target_rpm,1500
+0.0,hoist_load_bar,250
+0.5,start,1
+3.0,start,0
+6.0,hoist_demand_pct,50
+8.0,fault.link.engine.delay_ms,300
+14.0,fault.link.engine.delay_ms,0
+14.5,fault_reset,1
+15.0,fault_reset,0
+25.0,end,0
