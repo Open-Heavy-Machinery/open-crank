@@ -12,7 +12,7 @@ function defined in that object, with its own stack; a node without bytes
 files are merged by function name.
 
 Roots are the public functions of portable/machine_ctrl: mc_init,
-mc_handle_frame, mc_step and mc_clear_fault. The worst-case stack of a
+mc_init_after_watchdog, mc_handle_frame, mc_step and mc_clear_fault. The worst-case stack of a
 function is its own stack plus the largest worst-case stack among the
 functions it calls. memcpy, memmove, memset and memcmp count as 0 bytes and
 are listed as not counted (C library).
@@ -28,7 +28,7 @@ import argparse
 import re
 import sys
 
-ROOTS = ("mc_init", "mc_handle_frame", "mc_step", "mc_clear_fault")
+ROOTS = ("mc_init", "mc_init_after_watchdog", "mc_handle_frame", "mc_step", "mc_clear_fault")
 ALLOWED_EXTERNAL = {"memcpy", "memmove", "memset", "memcmp"}
 INDIRECT = "__indirect_call"
 

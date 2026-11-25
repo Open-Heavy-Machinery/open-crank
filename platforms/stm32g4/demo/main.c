@@ -5,6 +5,14 @@
  * every frame into RX FIFO 0, mc_step every 10 ms, TX never blocks, and the
  * DWT cycle counter keeps the worst observed mc_step in mc_step_cycles_max.
  * Keep the two in step when either changes.
+ *
+ * Since v0.3.1 (CMake build only, not yet in main_user_code.c): the IWDG
+ * (board/watchdog.h, 100 ms) is kicked every control period, and after a
+ * watchdog reset the controller starts in FAULT (mc_init_after_watchdog,
+ * docs/safety.md SR-11). Built with OC_WDG_HANG_TEST (the separate target
+ * oc-stm32g4-demo-hangtest, never the reference firmware), the board hangs
+ * on purpose when it receives the test frame OC_TEST_HANG_ID, so that the
+ * watchdog can be tested on the bus.
  */
 #include <stddef.h>
 #include <stdint.h>
@@ -13,12 +21,27 @@
 #include <opencrank/machine_ctrl.h>
 
 #include "board.h"
+#include "watchdog.h"
 
 #define MC_PERIOD_MS 10U /* TSC1 and pump command every 10 ms */
 
 static McCtx mc;
 static uint32_t tx_dropped;
 static volatile uint32_t mc_step_cycles_max; /* worst observed mc_step, in CPU cycles */
+static volatile bool started_after_watchdog;   /* for a debugger: this start followed an IWDG reset */
+
+#ifdef OC_WDG_HANG_TEST
+/* Test build only. Bench test frame, from the bench (0xFC), PGN 0xFF2D: the
+ * same value as OC_TEST_HANG_ID in sim/runtime/src/bench.c. */
+#define OC_TEST_HANG_ID 0x18FF2DFCUL
+
+/* Stops the control loop without kicking the watchdog. */
+static void __attribute__((noreturn, noinline)) oc_test_hang(void) {
+    for (;;) {
+        __NOP();
+    }
+}
+#endif
 
 static void can_poll_rx(uint32_t now_ms) {
     FDCAN_RxHeaderTypeDef rx;
@@ -39,6 +62,11 @@ static void can_poll_rx(uint32_t now_ms) {
         }
         J1939Frame f;
         f.id = rx.Identifier & 0x1FFFFFFFU;
+#ifdef OC_WDG_HANG_TEST
+        if (f.id == OC_TEST_HANG_ID) {
+            oc_test_hang();
+        }
+#endif
         f.dlc = (uint8_t)len;
         for (uint32_t i = 0U; i < 8U; i++) {
             f.data[i] = (i < len) ? d[i] : 0xFFU;
@@ -70,6 +98,8 @@ static void can_send(const J1939Frame *f) {
 }
 
 int main(void) {
+    /* Read the reset cause first; this also clears the reset flags (RMVF). */
+    started_after_watchdog = oc_wdg_reset_was_watchdog();
     board_init(false);
 
     /* Accept every frame into RX FIFO 0: the controller decides what it needs. */
@@ -86,7 +116,12 @@ int main(void) {
     DWT->CYCCNT = 0U;
     DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
 
-    mc_init(&mc, &MC_DEFAULT_PARAMS);
+    if (started_after_watchdog) {
+        mc_init_after_watchdog(&mc, &MC_DEFAULT_PARAMS); /* FAULT until the operator's fault reset */
+    } else {
+        mc_init(&mc, &MC_DEFAULT_PARAMS);
+    }
+    oc_wdg_start();
     uint32_t next = HAL_GetTick() + MC_PERIOD_MS;
 
     for (;;) {
@@ -108,6 +143,7 @@ int main(void) {
             for (size_t k = 0U; k < n; k++) {
                 can_send(&out[k]);
             }
+            oc_wdg_kick(); /* once per control period: a stuck loop stops kicking */
         }
     }
 }

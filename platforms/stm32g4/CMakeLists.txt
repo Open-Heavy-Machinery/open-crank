@@ -80,6 +80,7 @@ set(OC_WARNINGS -Wall -Wextra -Wpedantic -Wshadow -Wconversion -Wdouble-promotio
 # so the linker keeps the vector table.
 add_library(oc_board OBJECT
     ${OC_BOARD_DIR}/board.c
+    ${OC_BOARD_DIR}/watchdog.c
     ${st_cmsis_device_g4_SOURCE_DIR}/Source/Templates/gcc/startup_stm32g431xx.s
 )
 target_link_libraries(oc_board PUBLIC st_hal_g4)
@@ -103,4 +104,8 @@ function(oc_firmware name main)
 endfunction()
 
 oc_firmware(oc-stm32g4-demo ${CMAKE_CURRENT_SOURCE_DIR}/demo/main.c opencrank_portable)
+# Test build only: the demo plus an intentional hang on the test frame, to test
+# the watchdog on the bus (tools/board/watchdog_check.sh). Never the reference.
+oc_firmware(oc-stm32g4-demo-hangtest ${CMAKE_CURRENT_SOURCE_DIR}/demo/main.c opencrank_portable)
+target_compile_definitions(oc-stm32g4-demo-hangtest PRIVATE OC_WDG_HANG_TEST=1)
 oc_firmware(oc-stm32g4-echo ${CMAKE_CURRENT_SOURCE_DIR}/echo/main.c)

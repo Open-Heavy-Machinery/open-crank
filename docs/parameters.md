@@ -75,6 +75,7 @@ Provenance labels:
 | `operator_timeout_ms` | 200 ms | Choice | 10 missed operator messages; then target falls to idle and the hoist command to zero. |
 | `run_confirm_ms` | 500 ms | Choice | Engine speed must stay above `running_rpm` this long before RUN. |
 | `override_confirm_ms` | 500 ms | Choice | Time allowed for EEC1 SPN 1483 to show this controller in control. |
+| watchdog timeout (`OC_WDG_TIMEOUT_MS`, reference board) | 100 ms | Choice | 10 control periods. Below the engine's 200 ms request timeout, so a hung controller is restarted before its last TSC1 would expire on its own. LSI 32 kHz / 32, reload 99 (`platforms/stm32g4/board/watchdog.c`). |
 | `running_rpm` | 600 rpm | Choice | Between the ECU's running threshold (500) and low idle (750). |
 | `stall_rpm` | 400 rpm | Choice | Above the ECU's own stall threshold (300), so the controller notices first. |
 | `overspeed_rpm` | 2300 rpm | Choice | Above the governed ceiling (2100), below the ECU trip (2400). |

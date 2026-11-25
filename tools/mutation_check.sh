@@ -109,6 +109,11 @@ mutate "codec: 'not available' decoded as a value" portable/j1939/src/j1939_scal
 # one breaks open-crank's binding to it instead.
 mutate "scenario: events never reach the bench's signals" sim/runtime/src/bench.c \
     "oc_signals_set((OcSignals *)ctx, (OcSignalId)signal, value);" "(void)ctx; (void)signal; (void)value;"
+mutate "controller: after a watchdog restart it starts in WAIT_ENGINE" $MC \
+    "    c->state = MC_STATE_FAULT;
+    c->fault = MC_FAULT_WATCHDOG_RESET;" "    c->fault = MC_FAULT_NONE;"
+mutate "controller: a button held through a watchdog restart counts as a press" $MC \
+    "c->reset_was_pressed = true; /* a button held through the restart is not a new press */" "(void)0;"
 mutate "codec: TSC1 checksum not written" portable/j1939/src/j1939.c \
     "f->data[7] = (uint8_t)((uint8_t)(j1939_tsc1_checksum(f, counter) << 4U) | counter);" "f->data[7] = counter;"
 mutate "codec: TSC1 checksum leaves out the identifier" portable/j1939/src/j1939.c \

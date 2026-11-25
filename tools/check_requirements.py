@@ -8,7 +8,8 @@ cites a requirement must cite one that exists.
 
 - A requirement is defined by a heading that starts with "### SR-n:".
 - An acceptance criterion cites requirements at the start of its text (the
-  field after the fifth comma of a row in scenarios/*.accept.csv):
+  field after the fifth comma of a row in scenarios/*.accept.csv or
+  scenarios/board/*.accept.csv):
   "SR-4: ..." or "SR-4, SR-7: ...".
 - A unit test cites them with a comment in tests/*.c: /* SR-4 */ or
   /* SR-4, SR-7 */.
@@ -44,7 +45,7 @@ def requirements():
 def criteria():
     """(where, [SR ids]) for each criterion, and the rows that mention SR- without the prefix format."""
     cited, malformed = [], []
-    for path in sorted((ROOT / "scenarios").glob("*.accept.csv")):
+    for path in sorted([*(ROOT / "scenarios").glob("*.accept.csv"), *(ROOT / "scenarios/board").glob("*.accept.csv")]):
         for number, line in enumerate(path.read_text().splitlines(), 1):
             if not line or line.startswith("#") or line.startswith("id,"):
                 continue

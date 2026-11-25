@@ -257,6 +257,7 @@ time_s,signal,value
 | `fault.engine_tx_lost` | the engine stops transmitting |
 | `fault.ecu_ignores_tsc1` | the engine ECU ignores speed requests |
 | `fault.overrun_torque_nm` | external torque driving the crankshaft |
+| `test.dut_hang` | test only: the bench sends the frame that hangs the board's hang-test build (watchdog test, `tools/board/watchdog_check.sh`) |
 | `fault.link.mc.*`, `fault.link.engine.*` | transport faults of the two links (drop, drop one in N, delay, jitter, corrupt, bus-off): `mc` carries what the device under test sends to the machine, `engine` what the engine sends to it ([docs/acceptance.md](docs/acceptance.md#link-faults)) |
 | `end` | end of the scenario |
 
@@ -325,6 +326,7 @@ The oracle and the criteria format are open-tick's (`opentick/oracle.h`, since v
 | Stack usage | stack per function in the Cortex-M4F MinSizeRel build (`-fstack-usage`), printed largest first, and the worst-case stack of each public controller function along the call graph (`-fcallgraph-info=su`, `tools/stack_budget.py`); fails if a function's stack is not `static`, on recursion, on an indirect call, or above 1024 bytes | `tools/check_portable.sh`, `tools/stack_budget.py`, CI `portable-cortex-m4f` job |
 | Board vs SIL | `hoist_step` with the board in the loop vs the wall-clock-paced SIL, within tolerances written down before comparing | v0.2 |
 | Acceptance over the bus | any device under test graded by its CAN frames alone, pass/fail per scenario, twelve scenarios with five of transport faults (one corrupts TSC1, refused by its checksum); deliberately broken controllers must fail it | `open-crank-accept`, `docs/acceptance.md`, `tools/accept_vcan.sh` (CI `vcan-demo` job), `tools/accept_mutants.sh` (CI `mutation` job) |
+| Watchdog (on a board, run by hand) | after a hang the IWDG restarts the board and the controller starts in FAULT until the fault reset (SR-11); the hang exists only in a test build, which CI checks | `tools/board/watchdog_check.sh`, `scenarios/board/watchdog_reset.csv`, CI `firmware` job |
 | Safety requirements traced | every `SR-n` of `docs/safety.md` cited by an acceptance criterion or a unit test, and every citation exists | `tools/check_requirements.py`, CI `mutation` job |
 | Emulator vs board | the trace in Renode vs the board's, within the stated tolerance | Track R |
 

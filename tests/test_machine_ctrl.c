@@ -5,6 +5,7 @@
  *        timeouts, slew limit, override confirmation, outputs.
  */
 
+#include <string.h>
 #include <stdint.h>
 
 #include "check.h"
@@ -217,6 +218,35 @@ static void test_override_must_be_honoured(void) {
     CHECK(h.mc.fault == MC_FAULT_OVERRIDE_REJECTED);
 }
 
+/* SR-11 */
+/* After a watchdog restart the controller starts in FAULT, in the safe
+ * state, and only a new press of the fault reset lets it take control again. */
+static void test_starts_in_fault_after_watchdog(void) {
+    Harness h;
+    h_init(&h, 0U);
+    mc_init_after_watchdog(&h.mc, P);
+    CHECK(h.mc.state == MC_STATE_FAULT);
+    CHECK(h.mc.fault == MC_FAULT_WATCHDOG_RESET);
+
+    h.engine_rpm = 1500.0f; /* the engine is still running */
+    h.hoist_pct = 60.0f;
+    h.reset_pressed = true; /* held through the restart: not a new press */
+    h_run(&h, 2000U);
+    CHECK(h.mc.state == MC_STATE_FAULT);
+    CHECK(h.tsc1.override_mode == J1939_OVERRIDE_DISABLED);
+    CHECK(h.pump.displacement_valid && h.pump.displacement_pct == 0.0f);
+
+    h.reset_pressed = false;
+    h_run(&h, 100U);
+    CHECK(h.mc.state == MC_STATE_FAULT);
+    h.reset_pressed = true; /* a new press */
+    h_run(&h, 20U);
+    CHECK(h.mc.state == MC_STATE_WAIT_ENGINE);
+    h_run(&h, P->run_confirm_ms + 50U);
+    CHECK(h.mc.state == MC_STATE_RUN);
+    CHECK(strcmp(mc_fault_name(MC_FAULT_WATCHDOG_RESET), "watchdog reset") == 0);
+}
+
 /* SR-7 */
 static void test_reset_on_press_only(void) {
     Harness h;
@@ -285,6 +315,7 @@ int main(void) {
     RUN_TEST(test_overspeed_and_stall);
     RUN_TEST(test_override_must_be_honoured);
     RUN_TEST(test_reset_on_press_only);
+    RUN_TEST(test_starts_in_fault_after_watchdog);
     RUN_TEST(test_operator_timeout);
     RUN_TEST(test_time_wraps);
     return check_report();
