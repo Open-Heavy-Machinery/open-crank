@@ -1,0 +1,10 @@
+# Acceptance criteria for scenarios/speed_command_corrupt.csv. Format: docs/acceptance.md.
+id,from,until,tolerance_ms,condition,text
+S1,begin,start=1-10ms,0,tsc1_override == 0,SR-1: no override requested before the starter is pressed
+S2,start=1+2000ms,fault.link.mc.corrupt=3-10ms,0,tsc1_speed_control == 1,speed control taken within 2 s of start and kept
+G1,begin,end,0,tsc1_speed_control == 1 -> tsc1_speed_rpm <= 2100,SR-2: requested speed never above high idle (2100 rpm)
+G2,begin,end,20,pump_cmd_pct > 0 -> tsc1_speed_control == 1,SR-3: pump commanded only while in speed control
+G3,begin,end,0,tsc1_intact == 1,SR-10: every TSC1 carries a valid checksum and a counter that moves by one
+K1,fault.link.mc.corrupt=3+1000ms,fault_reset=1-10ms,0,tsc1_override == 0 && pump_cmd_pct == 0,SR-5, SR-7: override released within 1 s of the engine refusing the corrupted requests, and not taken again before the fault reset
+K2,fault_reset=1+1000ms,end,0,tsc1_speed_control == 1,speed control taken again within 1 s of the fault reset
+K3,18.0,end,0,tsc1_speed_rpm >= 1499 && tsc1_speed_rpm <= 1501,requested speed back at the operator's 1500 rpm

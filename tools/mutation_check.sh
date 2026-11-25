@@ -109,6 +109,16 @@ mutate "codec: 'not available' decoded as a value" portable/j1939/src/j1939_scal
 # one breaks open-crank's binding to it instead.
 mutate "scenario: events never reach the bench's signals" sim/runtime/src/bench.c \
     "oc_signals_set((OcSignals *)ctx, (OcSignalId)signal, value);" "(void)ctx; (void)signal; (void)value;"
+mutate "codec: TSC1 checksum not written" portable/j1939/src/j1939.c \
+    "f->data[7] = (uint8_t)((uint8_t)(j1939_tsc1_checksum(f, counter) << 4U) | counter);" "f->data[7] = counter;"
+mutate "codec: TSC1 checksum leaves out the identifier" portable/j1939/src/j1939.c \
+    "sum += (f->id >> 24U) & 0xFFU;" "sum = (uint32_t)counter & 0x0FU; for (uint32_t k = 0U; k < 7U; k++) { sum += (uint32_t)f->data[k]; }"
+mutate "bench: the engine ECU accepts a TSC1 with a wrong checksum" sim/runtime/src/bench.c \
+    "if (!tsc1.checksum_valid || repeated) {" "if (repeated) {"
+mutate "bench: the engine ECU accepts a repeated TSC1 counter" sim/runtime/src/bench.c \
+    "if (!tsc1.checksum_valid || repeated) {" "if (!tsc1.checksum_valid) {"
+mutate "oracle: tsc1_intact ignores the counter" sim/accept/src/accept.c \
+    "(tsc1.checksum_valid && next) ? 1.0 : 0.0" "(tsc1.checksum_valid || !next) ? 1.0 : 0.0"
 
 echo
 echo "$killed mutations killed, $problems problems"

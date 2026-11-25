@@ -6,6 +6,13 @@ All notable changes to this project. The project is pre-alpha; nothing here is a
 
 ### Added
 
+- **TSC1 message counter and checksum** (SPN 4206/4207, J1939-71; open-crank v0.3.1, step 3b).
+  - `portable/j1939`: `j1939_tsc1_checksum()`. `J1939Tsc1` gains `message_counter` (encode and decode) and `checksum_valid` (decode). The encoder writes byte 7, which was `0xFF`.
+  - `portable/machine_ctrl`: the controller counts its TSC1 (`McCtx.tsc1_counter`).
+  - The simulated engine refuses a TSC1 with a wrong checksum or a repeated counter, as if it were lost (`OcBench.tsc1_rejected`).
+- **Scenario `speed_command_corrupt`**: byte 3 of the controller's frames flipped for 6 s. The engine refuses them and the controller releases (K1-K3).
+- **Observable `tsc1_intact` and criterion G3 in every scenario**: every TSC1 carries a valid checksum and a counter that moves by one. Requirement **SR-10** in `docs/safety.md`.
+- Mutations: two acceptance mutants (checksum not written, counter frozen: 12 killed in all) and five unit-test mutations (codec, simulated engine, oracle: 24 in all).
 - **Board reference times for the four link-fault scenarios** in `tools/board/bench_reference.csv` (open-crank v0.3.1, step 3a), from a run on the reference bench on `18060be`: `bench.sh` checks every reaction of the eleven scenarios.
 - `tools/board/bench.sh` prints a progress line before each scenario: its name, its number and how long it plays.
 - **Transport faults in the simulated machine** (open-crank v0.3, step 2). The bench has two of open-tick's links: `mc`, what the controller sends to the machine (TSC1, OC_PUMP_CMD), and `engine`, what the engine sends to the controller (EEC1, ET1, EFL/P1). Their signals are `fault.link.mc.*` and `fault.link.engine.*`: drop, drop one in N, delay, jitter, corrupt and bus-off. Fixed seeds, no filters. The same bench runs in memory, on `vcan` and against a board. See `docs/acceptance.md`, "Link faults".
@@ -19,6 +26,10 @@ All notable changes to this project. The project is pre-alpha; nothing here is a
 - The `accept_*` tests write their verdict files. `accept_verdicts_hoist_step` compares hoist_step's with `tests/data/hoist_step.verdicts.csv` (19 tests).
 
 ### Changed
+
+- **Bus contract:** a device under test must send TSC1 byte 7 with the counter and the checksum (`docs/bus-interface.md`). One that sends `0xFF`, as before v0.3.1, is refused by the engine and fails G3.
+- Every criteria file gains G3, so every report and verdict file has one more row. `tests/data/hoist_step.verdicts.csv` is updated (one row). The traces are the same, byte for byte.
+- Worst-case stack of `mc_step`: 68 to 76 bytes (Cortex-M4F MinSizeRel, Arm GNU Toolchain 14.2.rel1).
 
 - `external/open-tick` at the tag `v0.2.1` (verdict files).
 - `external/open-tick` at the tag `v0.3.0` (links and transport faults).

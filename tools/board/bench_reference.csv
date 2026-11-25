@@ -3,7 +3,8 @@
 # platforms/stm32g4/README.md. Reaction times of the v0.2.1 board run
 # (2026-11-23, docs/acceptance.md "Results"); the four link-fault scenarios
 # from the run of 2026-11-25 on open-crank 18060be (open-crank v0.3.1, step
-# 3a). A bench matches when every reaction is within one 10 ms controller step
+# 3a); speed_command_corrupt from the run of 2026-11-25 with the TSC1
+# checksum (v0.3.1, step 3b). A bench matches when every reaction is within one 10 ms controller step
 # of these.
 scenario,criterion,reaction_ms
 cold_start,S2,990
@@ -31,3 +32,6 @@ mc_bus_off,B1,710
 mc_bus_off,B2,540
 speed_command_intermittent,S2,1000
 speed_command_intermittent,I2,20
+speed_command_corrupt,S2,1000
+speed_command_corrupt,K1,720
+speed_command_corrupt,K2,540

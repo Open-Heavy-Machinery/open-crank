@@ -90,6 +90,7 @@ typedef struct {
     float target_rpm;     /**< operator target after clamping */
     float requested_rpm;  /**< slew-limited request sent in TSC1 */
     float pump_cmd_pct;   /**< displacement command sent to the pump */
+    uint8_t tsc1_counter; /**< message counter of the next TSC1 (SPN 4206), 0..15 */
 } McCtx;
 
 void mc_init(McCtx *c, const McParams *p);

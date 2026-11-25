@@ -187,7 +187,9 @@ Addresses: engine `0x00`, machine controller `0x27`, bench `0xFC`. The first sli
 
 **Why bench messages.** In Level 1 the device under test only sees the bus. If operator inputs came from a command line or a file, a controller on a real board (v0.2) would have no way to receive them. Over CAN, the same controller works unchanged on a laptop, in Renode and on hardware. They are named `OC_*` and documented as project-specific so nobody mistakes them for J1939.
 
-**Not yet implemented, on purpose.** TSC1 message counter and checksum (SPN 4206/4207, sent as "not available"), DM1 diagnostics, transport protocol: see the roadmap, v0.3.
+**TSC1 message counter and checksum** (SPN 4206/4207, since v0.3.1): `j1939_tsc1_checksum()` implements J1939-71's formula. The encoder writes byte 7 from `J1939Tsc1.message_counter`, and the decoder fills `message_counter` and `checksum_valid`. The controller counts; the simulated engine checks.
+
+**Not yet implemented, on purpose.** DM1 diagnostics and the transport protocol: see the roadmap, v0.3.1 step 3d.
 
 ### 4.5 Machine-controller core (`portable/machine_ctrl`)
 
@@ -322,7 +324,7 @@ The oracle and the criteria format are open-tick's (`opentick/oracle.h`, since v
 | MISRA-oriented check | `portable/` against the rules the cppcheck MISRA addon covers; fails on a finding beyond the baseline (counts per rule and file), which goes down as findings are fixed or documented as deviations. Does not imply compliance | `tools/check_misra.sh`, `tools/misra-baseline.txt`, `docs/misra_deviations.md`, CI `misra` job |
 | Stack usage | stack per function in the Cortex-M4F MinSizeRel build (`-fstack-usage`), printed largest first, and the worst-case stack of each public controller function along the call graph (`-fcallgraph-info=su`, `tools/stack_budget.py`); fails if a function's stack is not `static`, on recursion, on an indirect call, or above 1024 bytes | `tools/check_portable.sh`, `tools/stack_budget.py`, CI `portable-cortex-m4f` job |
 | Board vs SIL | `hoist_step` with the board in the loop vs the wall-clock-paced SIL, within tolerances written down before comparing | v0.2 |
-| Acceptance over the bus | any device under test graded by its CAN frames alone, pass/fail per scenario, eleven scenarios with four of transport faults; deliberately broken controllers must fail it | `open-crank-accept`, `docs/acceptance.md`, `tools/accept_vcan.sh` (CI `vcan-demo` job), `tools/accept_mutants.sh` (CI `mutation` job) |
+| Acceptance over the bus | any device under test graded by its CAN frames alone, pass/fail per scenario, twelve scenarios with five of transport faults (one corrupts TSC1, refused by its checksum); deliberately broken controllers must fail it | `open-crank-accept`, `docs/acceptance.md`, `tools/accept_vcan.sh` (CI `vcan-demo` job), `tools/accept_mutants.sh` (CI `mutation` job) |
 | Safety requirements traced | every `SR-n` of `docs/safety.md` cited by an acceptance criterion or a unit test, and every citation exists | `tools/check_requirements.py`, CI `mutation` job |
 | Emulator vs board | the trace in Renode vs the board's, within the stated tolerance | Track R |
 
@@ -379,7 +381,7 @@ The migration itself is recorded in [ROADMAP.md](ROADMAP.md), section "v0.1".
 - **Generic plant plugin contract.** With one plant, any abstraction would be a guess. Extract it from what the second plant needs (v0.6). The first slice's function-pointer hooks were removed for this reason.
 - **Protocol abstraction.** J1939 is the right protocol for the current plant. The 2-stroke uses a different control scheme; separate it then.
 - **Level 2 signal layer** (crank and cam waveforms, analog I/O), including crank angle. Designing it now would be speculation; it arrives with the HIL backend in v0.4.
-- **TSC1 counter and checksum, DM1, transport protocol.** With fault injection on real hardware (v0.3).
+- **DM1, transport protocol.** With fault injection on real hardware (v0.3.1).
 - **Smarter reference controller** (power limiting, anti-stall). The interface allows it; the reference stays minimal until the basics are proven.
 - **YAML profiles.** When added, they load in `sim/` only. `portable/` never reads files.
 - **FMI/FMU export.** Attractive for interoperability; revisit once the plant interface has settled.

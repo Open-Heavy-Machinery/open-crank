@@ -38,7 +38,7 @@ static void test_identifiers(void) {
 }
 
 static void test_tsc1_known_vector(void) {
-    const J1939Tsc1 m = { J1939_OVERRIDE_SPEED, 0, 3, true, 1500.0f, false, 0.0f };
+    const J1939Tsc1 m = { J1939_OVERRIDE_SPEED, 0, 3, true, 1500.0f, false, 0.0f, 0U, false };
     J1939Frame f;
     j1939_encode_tsc1(&m, 0x27, 0x00, &f);
     CHECK(f.id == 0x0C000027UL);
@@ -46,7 +46,10 @@ static void test_tsc1_known_vector(void) {
     CHECK(f.data[0] == 0xF1U); /* mode 01, conditions 00, priority 11, bits 6-7 not defined (1) */
     CHECK(f.data[1] == 0xE0U && f.data[2] == 0x2EU); /* 1500 / 0.125 = 12000 = 0x2EE0 */
     CHECK(f.data[3] == 0xFFU);                      /* torque not available */
-    CHECK(all_ff(&f, 4, 7));                         /* counter / checksum not available */
+    CHECK(all_ff(&f, 4, 6));
+    /* Checksum by hand: F1+E0+2E+4*FF + counter 0 + id bytes 27+00+00+0C =
+     * 1582 = 0x62E; 0x62 + 0x62E = 0x690; & 0x0F = 0. Byte 7 = 0 << 4 | 0. */
+    CHECK(f.data[7] == 0x00U);
 
     J1939Tsc1 d;
     CHECK(j1939_decode_tsc1(&f, &d));
@@ -55,10 +58,50 @@ static void test_tsc1_known_vector(void) {
     CHECK(d.requested_speed_valid);
     CHECK_NEAR(d.requested_speed_rpm, 1500.0, 0.0);
     CHECK(!d.requested_torque_valid);
+    CHECK(d.message_counter == 0U);
+    CHECK(d.checksum_valid);
+}
+
+/* SR-10 */
+static void test_tsc1_counter_and_checksum(void) {
+    const J1939Tsc1 off = { J1939_OVERRIDE_DISABLED, 0, 3, false, 0.0f, false, 0.0f, 15U, false };
+    J1939Frame f;
+    J1939Tsc1 d;
+    j1939_encode_tsc1(&off, 0x27, 0x00, &f);
+    /* By hand: F0+6*FF + counter 15 + 27+0C = 1836 = 0x72C; 0x72 + 0x72C =
+     * 0x79E; & 0x0F = 0xE. Byte 7 = 0xE << 4 | 0xF. */
+    CHECK(f.data[7] == 0xEFU);
+    CHECK(j1939_decode_tsc1(&f, &d));
+    CHECK(d.message_counter == 15U && d.checksum_valid);
+
+    /* Every counter value round-trips with a valid checksum; only bits 0-3 count. */
+    for (uint8_t c = 0U; c < 32U; c++) {
+        J1939Tsc1 m = off;
+        m.message_counter = c;
+        j1939_encode_tsc1(&m, 0x27, 0x00, &f);
+        CHECK(j1939_decode_tsc1(&f, &d));
+        CHECK(d.message_counter == (uint8_t)(c & 0x0FU));
+        CHECK(d.checksum_valid);
+    }
+
+    /* Any flipped data byte, a different counter or a different sender is caught. */
+    const J1939Tsc1 m = { J1939_OVERRIDE_SPEED, 0, 3, true, 1500.0f, false, 0.0f, 5U, false };
+    for (size_t i = 0U; i < 7U; i++) {
+        j1939_encode_tsc1(&m, 0x27, 0x00, &f);
+        f.data[i] ^= 0xFFU;
+        CHECK(j1939_decode_tsc1(&f, &d));
+        CHECK(!d.checksum_valid);
+    }
+    j1939_encode_tsc1(&m, 0x27, 0x00, &f);
+    f.data[7] = (uint8_t)((f.data[7] & 0xF0U) | 6U);
+    CHECK(j1939_decode_tsc1(&f, &d) && !d.checksum_valid);
+    j1939_encode_tsc1(&m, 0x27, 0x00, &f);
+    f.id = j1939_make_id(3, J1939_PGN_TSC1, 0x00, 0x28);
+    CHECK(j1939_decode_tsc1(&f, &d) && !d.checksum_valid);
 }
 
 static void test_tsc1_round_trip_and_disabled(void) {
-    const J1939Tsc1 m = { J1939_OVERRIDE_TORQUE, 2, 1, true, 987.375f, true, 50.0f };
+    const J1939Tsc1 m = { J1939_OVERRIDE_TORQUE, 2, 1, true, 987.375f, true, 50.0f, 7U, false };
     J1939Frame f;
     J1939Tsc1 d;
     j1939_encode_tsc1(&m, 0x27, 0x00, &f);
@@ -70,15 +113,15 @@ static void test_tsc1_round_trip_and_disabled(void) {
     CHECK_NEAR(d.requested_speed_rpm, 987.375, 0.0);
     CHECK_NEAR(d.requested_torque_pct, 50.0, 0.0);
 
-    const J1939Tsc1 off = { J1939_OVERRIDE_DISABLED, 0, 3, false, 0.0f, false, 0.0f };
+    const J1939Tsc1 off = { J1939_OVERRIDE_DISABLED, 0, 3, false, 0.0f, false, 0.0f, 15U, false };
     j1939_encode_tsc1(&off, 0x27, 0x00, &f);
     CHECK(f.data[0] == 0xF0U);
-    CHECK(all_ff(&f, 1, 7));
+    CHECK(all_ff(&f, 1, 6));
     CHECK(j1939_decode_tsc1(&f, &d));
     CHECK(d.override_mode == J1939_OVERRIDE_DISABLED);
     CHECK(!d.requested_speed_valid);
 
-    const J1939Tsc1 s = { J1939_OVERRIDE_SPEED_TORQUE_LIMIT, 2, 1, true, 987.375f, true, 50.0f };
+    const J1939Tsc1 s = { J1939_OVERRIDE_SPEED_TORQUE_LIMIT, 2, 1, true, 987.375f, true, 50.0f, 3U, false };
     j1939_encode_tsc1(&s, 0x27, 0x00, &f);
     CHECK((f.data[0] & 0x03U) == 0x03U);
     CHECK(j1939_decode_tsc1(&f, &d));
@@ -251,6 +294,7 @@ static void test_bench_messages(void) {
 int main(void) {
     RUN_TEST(test_identifiers);
     RUN_TEST(test_tsc1_known_vector);
+    RUN_TEST(test_tsc1_counter_and_checksum);
     RUN_TEST(test_tsc1_round_trip_and_disabled);
     RUN_TEST(test_eec1_known_vector);
     RUN_TEST(test_saturation);

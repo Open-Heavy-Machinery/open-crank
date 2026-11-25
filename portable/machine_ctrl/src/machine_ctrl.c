@@ -173,8 +173,11 @@ size_t mc_step(McCtx *c, uint32_t now_ms, J1939Frame *out, size_t cap) {
             .requested_speed_rpm = c->requested_rpm,
             .requested_torque_valid = false,
             .requested_torque_pct = 0.0f,
+            .message_counter = c->tsc1_counter,
+            .checksum_valid = false, /* decode only */
         };
         j1939_encode_tsc1(&tsc1, p->source_address, p->engine_address, &out[n]);
+        c->tsc1_counter = (uint8_t)((uint8_t)(c->tsc1_counter + 1U) & 0x0FU); /* SPN 4206: 15 wraps to 0 */
         n++;
     }
     if (n < cap) {

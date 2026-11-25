@@ -71,6 +71,16 @@ static void apply_rx(OcBench *b, const J1939Frame *f) {
         if (!b->sig.key_on) {
             return; /* an unpowered ECU hears nothing */
         }
+        /* SPN 4206/4207: a TSC1 whose checksum is wrong, or whose counter has
+         * not moved since the last one accepted, is not a request. To the ECU
+         * it is a lost frame: the last good request ages towards its timeout. */
+        const bool repeated = b->tsc1_counter_seen && tsc1.message_counter == b->tsc1_counter;
+        if (!tsc1.checksum_valid || repeated) {
+            b->tsc1_rejected++;
+            return;
+        }
+        b->tsc1_counter_seen = true;
+        b->tsc1_counter = tsc1.message_counter;
         const EngineEcuRequest req = {
             .mode = (EngineEcuOverride)tsc1.override_mode,
             .speed_valid = tsc1.requested_speed_valid,

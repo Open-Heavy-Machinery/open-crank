@@ -16,7 +16,7 @@ It does not grade:
 
 ## Observables
 
-The oracle reads four observables from the DUT's frames. Only frames whose source address is the DUT's count (`--dut`, `0x27` by default); a TSC1 counts only if it is addressed to the engine (`0x00`). Engine frames are never looked at.
+The oracle reads five observables from the DUT's frames. Only frames whose source address is the DUT's count (`--dut`, `0x27` by default); a TSC1 counts only if it is addressed to the engine (`0x00`). Engine frames are never looked at.
 
 | Observable | Value | Holds for | Default |
 |---|---|---|---|
@@ -24,6 +24,7 @@ The oracle reads four observables from the DUT's frames. Only frames whose sourc
 | `tsc1_speed_rpm` | the requested speed of that TSC1 while `tsc1_speed_control` is 1; a gap otherwise | 200 ms | gap |
 | `pump_cmd_pct` | the OC_PUMP_CMD displacement; 0 if "not available" | 200 ms | 0 |
 | `tsc1_override` | 1 if the TSC1 has an override mode other than `00` (speed, torque or limit); 0 if it is `00` | 200 ms | 0 |
+| `tsc1_intact` | 1 if the TSC1's checksum (SPN 4207) is right and its counter (SPN 4206) is the previous TSC1's + 1, with 15 wrapping to 0; 0 otherwise. The first TSC1 needs only the checksum (since v0.3.1) | 200 ms | 1: silence is not a broken frame |
 
 **Silence counts as releasing.** An observable falls back to its default when no frame has updated it for more than 200 ms, because that is what the simulated machine does: the engine drops a TSC1 older than 200 ms and returns to its own idle governor, and the pump takes a command older than 200 ms as zero (and "not available" as zero). "Released" therefore means: TSC1 with override mode `00`, or no TSC1 for more than 200 ms; and the pump at 0, or no OC_PUMP_CMD for more than 200 ms. A TSC1 that keeps any other override mode is not a release, even without a valid requested speed: the simulated engine then falls back to low idle, but the bus contract does not say what a real engine does with a speed-control request that carries no speed, and a release in mode `00` is unambiguous.
 
@@ -67,7 +68,7 @@ FAIL  E2  override released and pump at 0 within 300 ms of losing EEC1, and kept
 
 ## The criteria
 
-Four criteria are common to the eleven scenarios (the requirement each checks is in [safety.md](safety.md)):
+Five criteria are common to the twelve scenarios (the requirement each checks is in [safety.md](safety.md)):
 
 | Id | Window | Condition | Why |
 |---|---|---|---|
@@ -75,6 +76,7 @@ Four criteria are common to the eleven scenarios (the requirement each checks is
 | S2 | from 2 s after the starter is pressed to `end`, or to 10 ms before the scenario's fault (in `target_above_high_idle`, before the request above high idle) | speed control | 2 s covers cranking and the reference's 500 ms wait for a running engine (EEC1 above 600 rpm), with margin. Not in `override_ignored`, where the engine never honours the request |
 | G1 | the whole run | speed control implies a requested speed of at most 2100 rpm | the engine's high idle; above it the request means nothing |
 | G2 | the whole run, 20 ms tolerance | pump above 0 implies speed control | the pump loads the engine only while the DUT holds its speed; 20 ms because TSC1 and OC_PUMP_CMD are two frames that need not change in the same step |
+| G3 | the whole run | `tsc1_intact == 1` | every TSC1 must carry a valid checksum and a counter that moves by one, so that the engine can refuse a corrupted or repeated request (SR-10); the engine refuses one that does not |
 
 And per scenario:
 
@@ -103,6 +105,9 @@ And per scenario:
 | `mc_bus_off` | B1 | 1 s after the controller's direction goes bus-off, until 10 ms before the fault reset | no override and pump at 0 | as L1: the same loss, through the link's bus-off |
 | | B2 | 1 s after the fault reset | speed control, kept | as L2 |
 | | B3 | 18.0 s | requested speed 1500 ± 1 rpm | as L3 |
+| `speed_command_corrupt` | K1 | 1 s after the controller's frames start arriving with byte 3 flipped, until 10 ms before the fault reset | no override and pump at 0 | as L1: the engine refuses every corrupted TSC1 by its checksum, as if it were lost |
+| | K2 | 1 s after the fault reset | speed control, kept | as L2 |
+| | K3 | 18.0 s | requested speed 1500 ± 1 rpm | as L3 |
 
 ## Running it
 
@@ -176,7 +181,7 @@ open-crank-accept-loop <scenario.csv> [--criteria <file>] [--verdicts <out.csv>]
 ./build/open-crank-accept-loop scenarios/engine_status_loss.csv
 ```
 
-`ctest` runs it on every scenario that has criteria, eleven, as the tests `accept_<scenario>` (`accept_cold_start`, `accept_engine_status_delay`, …). Each writes its verdict file into the build tree, and `accept_verdicts_hoist_step` compares hoist_step's with [tests/data/hoist_step.verdicts.csv](../tests/data/hoist_step.verdicts.csv), byte for byte.
+`ctest` runs it on every scenario that has criteria, twelve, as the tests `accept_<scenario>` (`accept_cold_start`, `accept_engine_status_delay`, …). Each writes its verdict file into the build tree, and `accept_verdicts_hoist_step` compares hoist_step's with [tests/data/hoist_step.verdicts.csv](../tests/data/hoist_step.verdicts.csv), byte for byte.
 
 ## Link faults
 
@@ -193,16 +198,17 @@ The four scenarios added in v0.3 inject transport faults with open-tick's links 
 - **A full link breaks the run.** A link holds up to 64 frames in flight; a frame pushed into a full one is lost although no fault asked for it. Both acceptance runners then give no verdict and exit with code 2. 300 ms of delay on the engine's 10 ms EEC1 needs about 32 places.
 - With no link fault set, the links are transparent: the traces, reports and verdict files of the seven scenarios that existed before them are the same, byte for byte, except for the `SR-n: ` prefixes in the criteria's text.
 - `fault.mc_tx_lost` and `fault.engine_tx_lost` are kept as they were, so the older scenarios do not change. New scenarios use the links.
-- `corrupt` has no scenario yet *(planned, v0.3.1)*: without the TSC1 checksum (SPN 4207) nothing could detect it.
+- `corrupt` is used by `speed_command_corrupt` (v0.3.1): byte 3 of every frame the DUT sends, the high byte of TSC1's requested speed, is XORed with `0xFF` for 6 s. 1500 rpm would read as about 6716 rpm. The engine refuses the frames by their checksum (SPN 4207); the oracle still sees the DUT's frames as sent, before the link. In OC_PUMP_CMD byte 3 is unused.
 
-Reaction times of the reference controller in memory (`open-crank-accept-loop`):
+Reaction times of the reference controller in memory (`open-crank-accept-loop`; the criteria count includes G3 since v0.3.1):
 
 | Scenario | Criteria | Reactions |
 |---|---|---|
-| `engine_status_delay` | 8 | S2 990 ms, E1 20 ms, D1 210 ms, D2 530 ms |
-| `engine_status_jitter` | 6 | S2 990 ms, J2 20 ms |
-| `speed_command_intermittent` | 6 | S2 990 ms, I2 20 ms |
-| `mc_bus_off` | 7 | S2 990 ms, B1 710 ms, B2 530 ms |
+| `engine_status_delay` | 9 | S2 990 ms, E1 20 ms, D1 210 ms, D2 530 ms |
+| `engine_status_jitter` | 7 | S2 990 ms, J2 20 ms |
+| `speed_command_intermittent` | 7 | S2 990 ms, I2 20 ms |
+| `mc_bus_off` | 8 | S2 990 ms, B1 710 ms, B2 530 ms |
+| `speed_command_corrupt` (v0.3.1) | 8 | S2 990 ms, K1 710 ms, K2 530 ms |
 
 On the reference board (`tools/board/bench.sh`, 2026-11-25, open-crank `18060be`) all four pass with 0 late steps, and every reaction is within one 10 ms step of the times in memory:
 
@@ -212,6 +218,8 @@ On the reference board (`tools/board/bench.sh`, 2026-11-25, open-crank `18060be`
 | `engine_status_jitter` | S2 990 ms, J2 30 ms |
 | `speed_command_intermittent` | S2 1000 ms, I2 20 ms |
 | `mc_bus_off` | S2 1000 ms, B1 710 ms, B2 540 ms |
+
+`speed_command_corrupt` (v0.3.1, step 3b) on the board: S2 1000 ms, K1 720 ms, K2 540 ms, with G3 holding in all twelve scenarios: the board's firmware sends the counter and the checksum.
 
 These are the board's reference times in `tools/board/bench_reference.csv` (v0.3.1, step 3a), so `bench.sh` now checks every reaction of the eleven scenarios against the reference bench.
 
@@ -242,7 +250,7 @@ What this does not show: one run per scenario on the board, on a two-node bench,
 
 Exit criterion 2 of v0.2.1 is that a deliberately broken controller fails. A suite that always passes says nothing: an oracle that sees no frame at all would pass the reference too. So each mutation of the reference controller that `tools/mutation_check.sh` applies is also built and graded by the suite, and it must fail the criteria that belong to it.
 
-`tools/accept_mutants.sh` copies the tree to a scratch directory, grades the unmutated reference on every scenario with `open-crank-accept-loop` (and stops if it already fails), then applies each mutation, rebuilds, and grades the mutant on **all** scenarios (eleven), without stopping at the first failure: the full list shows which criteria have teeth. It prints one line per mutation (`killed`, `accepted`, or a problem: `SURVIVED`, `WRONG`, `UNEXPECTED`, `ERROR`, `STALE`, `NO BUILD`) and exits with 0 only if there is no problem. CI runs it in the `mutation` job.
+`tools/accept_mutants.sh` copies the tree to a scratch directory, grades the unmutated reference on every scenario with `open-crank-accept-loop` (and stops if it already fails), then applies each mutation, rebuilds, and grades the mutant on **all** scenarios (twelve), without stopping at the first failure: the full list shows which criteria have teeth. It prints one line per mutation (`killed`, `accepted`, or a problem: `SURVIVED`, `WRONG`, `UNEXPECTED`, `ERROR`, `STALE`, `NO BUILD`) and exits with 0 only if there is no problem. CI runs it in the `mutation` job.
 
 It runs in memory, not on `vcan`, on purpose: the loop is deterministic, so no timing jitter can kill a mutant for the wrong reason; it takes a few seconds instead of about 13 minutes; and it does not depend on the CI runner providing `vcan`. The path over the bus is covered by the reference's runs on `vcan` and on a board.
 
@@ -261,8 +269,10 @@ All mutations are in `portable/machine_ctrl/src/machine_ctrl.c`:
 | controller: faults on the first late EEC1 (EEC1 timeout cut to 20 ms) | J1 |
 | controller: sends only every 150 ms (no margin for a lost frame) | I2 |
 | controller: waits 5 s for the engine to honour the override | B1 (and O1, L1) |
+| controller: TSC1 checksum not written | G3 |
+| controller: TSC1 counter frozen | G3 (and S2 in every scenario: the engine refuses every repeated counter) |
 
-The last four are one per link-fault scenario (v0.3). In total: 10 mutants killed, 1 accepted survivor.
+Four are one per link-fault scenario (v0.3); the last two check the TSC1 counter and checksum (v0.3.1). The checksum mutant is in `portable/j1939/src/j1939.c`, the codec the controller uses. In total: 12 mutants killed, 1 accepted survivor.
 
 **Why the mutant of `speed_command_intermittent` is killed by I2 and not by I1.** Losing one frame in three is invisible to a controller that sends every 10 ms: the engine's 200 ms request timeout never expires, so its EEC1 keeps showing the controller in control, and the controller has nothing to react to. No one-line change to the reference makes it fail I1, which is a robustness check: it fails a controller that would react where it should not. The defect the loss exposes is a controller that sends too seldom. The mutant that sends every 150 ms fails I2, because its pump command lags the lever by more than 100 ms. It fails the same check in every scenario with the hoist, with or without frame loss.
 

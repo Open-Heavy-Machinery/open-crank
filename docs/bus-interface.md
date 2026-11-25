@@ -37,7 +37,7 @@ Byte numbers are **0-based** (J1939 documents count from 1). Unused bytes and bi
 | 0, bits 4-5 | Override control mode priority (SPN 897), `00` highest .. `11` lowest | ignored by the simulated engine |
 | 1-2 | Requested speed (SPN 898), little-endian | 0.125 rpm/bit |
 | 3 | Requested torque (SPN 518) | 1 %/bit, offset −125 % |
-| 7 | Message counter and checksum (SPN 4206/4207) | `0xFF` in v0.1: not available |
+| 7 | Message counter (SPN 4206) in bits 0-3, message checksum (SPN 4207) in bits 4-7 | **required since v0.3.1.** The counter goes up by 1 on every TSC1 you send, and 15 wraps to 0. The checksum is `((sum >> 4) + sum) & 0x0F`, where `sum` adds data bytes 0-6, the counter and the four bytes of the 29-bit identifier (`id & 0xFF`, `(id >> 8) & 0xFF`, `(id >> 16) & 0xFF`, `id >> 24`), as J1939-71 defines it. See `j1939_tsc1_checksum()` |
 
 Identifier example: priority 3, from `0x27` to `0x00` → `0x0C000027`.
 
@@ -89,6 +89,7 @@ Percent torque is relative to the engine reference torque, 1600 Nm for `d936la6`
 - **Speed control.** A TSC1 in speed-control mode with a valid requested speed moves the governor setpoint, clamped to 750–2100 rpm. The engine then reports your address in EEC1 byte 5.
 - **Other override modes** (torque control, limits) are treated as "override disabled" in v0.1: the engine returns to low idle.
 - **Stale requests.** If no TSC1 arrives for 200 ms the engine drops the request and returns to low idle on its own governor.
+- **Integrity (since v0.3.1).** The engine refuses a TSC1 whose checksum (SPN 4207) is wrong, or whose counter (SPN 4206) is the same as that of the last TSC1 it accepted. A refused TSC1 counts as a lost one. A counter that jumps (frames lost on the way) is accepted. A device under test written before v0.3.1 sends byte 7 as `0xFF`: its counter never moves, so the engine refuses every TSC1 after the first. It never gets speed control and fails criterion G3.
 - **Overspeed.** Above 2400 rpm the engine cuts fuel and stays tripped until the shaft has stopped. It does not restart by itself.
 - **Pump.** A displacement command older than 200 ms counts as zero.
 

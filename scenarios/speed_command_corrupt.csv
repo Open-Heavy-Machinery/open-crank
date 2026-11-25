@@ -1,0 +1,18 @@
+# Corrupted speed command.
+# For 6 s every frame the controller sends reaches the machine with byte 3
+# flipped (XOR 0xFF): in TSC1 that is the high byte of the requested speed, so
+# 1500 rpm would read as about 6716 rpm. The CAN CRC passed; only the TSC1
+# checksum (SPN 4207) shows that the content is wrong. The engine must refuse
+# every corrupted TSC1, as if it were lost, and return to idle; the controller
+# must notice that it lost control (EEC1 SPN 1483) and wait for the operator's
+# fault reset. Used by tests/test_closed_loop.c.
+time_s,signal,value
+0.0,key_on,1
+0.0,target_rpm,1500
+0.5,start,1
+3.0,start,0
+8.0,fault.link.mc.corrupt,3
+14.0,fault.link.mc.corrupt,0
+14.5,fault_reset,1
+15.0,fault_reset,0
+25.0,end,0
