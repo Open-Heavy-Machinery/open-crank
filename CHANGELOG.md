@@ -6,6 +6,7 @@ All notable changes to this project. The project is pre-alpha; nothing here is a
 
 ### Added
 
+- `tools/accept_vcan.sh` runs a scenario once more if its run is INVALID (late steps, no verdict). The first attempt is kept in `<scenario>.attempt1.log`, and only the second counts. A FAIL is never rerun. On 2026-11-25 a single late step on the GitHub runner turned `main`'s CI red (run 45607945454, `mc_bus_off`; every criterion passed).
 - **Watchdog on the reference board** (open-crank v0.3.1, step 3c).
   - `platforms/stm32g4/board/watchdog.c`: IWDG, 100 ms, kicked every control period. At start-up the firmware reads the reset cause and clears the reset flags (`RMVF`).
   - `portable/machine_ctrl`: `mc_init_after_watchdog()` and `MC_FAULT_WATCHDOG_RESET`. After a watchdog reset the controller starts in FAULT until a new press of the fault reset. Requirement **SR-11**.
