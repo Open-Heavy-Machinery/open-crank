@@ -16,11 +16,11 @@ Silence counts as releasing because that is what the machine does with a stale c
 **When the controller is in it.** In every state except RUN:
 
 - **WAIT_ENGINE**, after power-up and after a fault reset, until the engine is confirmed running: valid EEC1 with engine speed at or above `running_rpm` (600 rpm) for `run_confirm_ms` (500 ms);
-- **FAULT**, entered from RUN when it loses the engine status, when the engine does not honour the override, on overspeed or on stall.
+- **FAULT**, entered from RUN when it loses the engine status, when the engine does not honour the override, on overspeed or on stall; and, on the reference board, at start-up after a watchdog reset (SR-11).
 
 **How it leaves it.** From FAULT only through a **fault reset**, a new press of the operator's button (holding it does not count), which takes the controller to WAIT_ENGINE. From there it enters RUN only when the engine is confirmed running again. There is no automatic recovery: frames flowing again after a loss do not clear a fault.
 
-*(planned, v0.3.1)* The same state after a watchdog reset of the board: the controller starts in WAIT_ENGINE, so it already sends the safe state until the engine is confirmed, but the board has no watchdog yet.
+**After a watchdog reset** (reference board, since v0.3.1): the controller starts in FAULT, not in WAIT_ENGINE, and waits for the operator's fault reset like after any other fault. Every other start (power-on, NRST, a software reset such as the bench's) starts in WAIT_ENGINE.
 
 ## Requirements
 
@@ -106,8 +106,16 @@ Every TSC1 the controller sends carries a message counter that goes up by one pe
 
 Checked by: criterion G3 in every scenario, through the observable `tsc1_intact` (checksum right, and counter = previous + 1); criterion K1 (`speed_command_corrupt`), through SR-5; unit tests `test_tsc1_counter_and_checksum` (codec), `test_tsc1_integrity_checked` (the simulated engine refuses) and `test_accept_tsc1_intact` (the observable); closed-loop test `test_speed_command_corrupt` (the engine stays below 1600 rpm while every TSC1 is corrupted).
 
+### SR-11: After a watchdog reset, the safe state until a fault reset
+
+On the reference board, an independent watchdog (IWDG, 100 ms) restarts the controller if its control loop stops. After such a restart the controller starts in FAULT: override released (TSC1 mode `00`), pump at 0, until a new press of the operator's fault reset. A button already held during the restart does not count.
+
+**Why.** A hung controller keeps its last outputs on the bus until something notices. The watchdog bounds that to 100 ms, and the engine's 200 ms request timeout does the rest. A restart caused by a hang is a fault like any other (SR-7). Resuming on its own once the engine is confirmed would hide the hang from the operator, and the same hang could repeat.
+
+Checked by: criterion W1 (`scenarios/board/watchdog_reset.csv`, on the board only, with `tools/board/watchdog_check.sh`); unit test `test_starts_in_fault_after_watchdog`. On the board, the controller variant that starts in WAIT_ENGINE after the watchdog fails W1 (2026-11-25).
+
 ## What is not specified yet
 
 - **Stall**: the controller enters FAULT below `stall_rpm` (unit test `test_overspeed_and_stall`), but no scenario drives the engine into a stall under control, so there is no acceptance criterion and no requirement for it.
 - **Engine diagnostics (DM1) and limp-home** *(planned, v0.3.1)*.
-- **Watchdog** *(planned, v0.3.1)*: see the safe state above.
+- **The watchdog in the CubeIDE path** (`demo/main_user_code.c`): only the CMake build has it (SR-11).

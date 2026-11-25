@@ -28,6 +28,10 @@ sudo slcand -o -c -s5 /dev/serial/by-id/<your-adapter> can0 && sudo ip link set 
 
 Byte numbers are **0-based** (J1939 documents count from 1). Unused bytes and bits are `0xFF` / `1`. One-byte values `0xFB`–`0xFF` and two-byte values above `0xFAFF` mean "error" or "not available" and must not be read as numbers.
 
+### Bench test frame (bench → board, test only)
+
+`0x18FF2DFC` (PGN `0xFF2D`, from the bench, `0xFC`), 8 bytes of `0xFF`. The bench sends it every step while the scenario signal `test.dut_hang` is 1. Only the hang-test build `oc-stm32g4-demo-hangtest` reacts: it stops its control loop, so that the watchdog can be tested (`tools/board/watchdog_check.sh`). The reference controller and any other device under test ignore it.
+
 ### TSC1, Torque/Speed Control 1 (PGN 0, to the engine), every 10 ms while overriding
 
 | Byte | Content | Scaling |

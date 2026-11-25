@@ -24,7 +24,7 @@ set(OC_SCENARIO_DIR ${PROJECT_SOURCE_DIR}/scenarios)
 target_compile_definitions(test_closed_loop PRIVATE OC_SCENARIO_DIR="${OC_SCENARIO_DIR}")
 
 # Every shipped scenario must parse, so a broken demo file fails the build.
-file(GLOB OC_SCENARIO_FILES CONFIGURE_DEPENDS ${OC_SCENARIO_DIR}/*.csv)
+file(GLOB OC_SCENARIO_FILES CONFIGURE_DEPENDS ${OC_SCENARIO_DIR}/*.csv ${OC_SCENARIO_DIR}/board/*.csv)
 list(FILTER OC_SCENARIO_FILES EXCLUDE REGEX "\\.accept\\.csv$") # acceptance criteria, not scenarios
 if(NOT OC_SCENARIO_FILES)
     message(FATAL_ERROR "no scenario files found in ${OC_SCENARIO_DIR}")

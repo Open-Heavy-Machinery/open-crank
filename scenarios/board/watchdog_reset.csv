@@ -1,0 +1,16 @@
+# Watchdog reset (board only: tools/board/watchdog_check.sh, with the
+# oc-stm32g4-demo-hangtest firmware). At 8 s the bench sends the test frame
+# that makes the hang-test build stop its control loop. The IWDG (100 ms)
+# resets the board, and the controller must start in FAULT: safe state,
+# not taken again until the operator's fault reset (SR-11). In SIL nothing
+# hangs and the scenario does not apply.
+time_s,signal,value
+0.0,key_on,1
+0.0,target_rpm,1500
+0.5,start,1
+3.0,start,0
+8.0,test.dut_hang,1
+8.1,test.dut_hang,0
+12.0,fault_reset,1
+12.5,fault_reset,0
+18.0,end,0

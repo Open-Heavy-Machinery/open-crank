@@ -5,9 +5,12 @@
 # NUCLEO-G431KB through its ST-LINK: program, verify, reset. No CubeIDE and no
 # button.
 #
-# Usage: tools/board/flash.sh [demo|echo] [--no-build]
+# Usage: tools/board/flash.sh [demo|echo|demo-hangtest] [--no-build]
 #   demo        the reference controller (default)
 #   echo        the round-trip echo for tools/can_rtt.py
+#   demo-hangtest  test build only: the demo plus an intentional hang on the
+#               bench's test frame (tools/board/watchdog_check.sh). Never leave
+#               it on the board: program demo afterwards.
 #   --no-build  program what is already in build-stm32g4/
 #
 # Exit 0 programmed and verified, 1 build or programming failed, 2 usage or a
@@ -19,7 +22,7 @@ app=demo
 build=1
 for arg in "$@"; do
     case $arg in
-        demo|echo)  app=$arg ;;
+        demo|echo|demo-hangtest)  app=$arg ;;
         --no-build) build=0 ;;
         -h|--help)  sed -n '4,15p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         *)          echo "flash.sh: unknown argument '$arg'" >&2; exit 2 ;;

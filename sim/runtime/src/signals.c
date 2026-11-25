@@ -18,6 +18,7 @@ static const char *const NAMES[OC_SIG_END] = {
     [OC_SIG_FAULT_ENGINE_TX_LOST] = "fault.engine_tx_lost",
     [OC_SIG_FAULT_ECU_IGNORES_TSC1] = "fault.ecu_ignores_tsc1",
     [OC_SIG_FAULT_OVERRUN_TORQUE_NM] = "fault.overrun_torque_nm",
+    [OC_SIG_TEST_DUT_HANG] = "test.dut_hang",
     [OC_SIG_LINK_MC] = OTK_LINK_SIGNAL_NAMES("mc"),
     [OC_SIG_LINK_ENGINE] = OTK_LINK_SIGNAL_NAMES("engine"),
 };
@@ -76,6 +77,9 @@ void oc_signals_set(OcSignals *s, OcSignalId id, double value) {
         break;
     case OC_SIG_FAULT_OVERRUN_TORQUE_NM:
         s->fault_overrun_torque_nm = value;
+        break;
+    case OC_SIG_TEST_DUT_HANG:
+        s->test_dut_hang = on;
         break;
     case OC_SIG_END:
     case OC_SIG_COUNT:

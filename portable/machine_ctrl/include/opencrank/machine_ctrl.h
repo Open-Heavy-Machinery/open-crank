@@ -41,7 +41,8 @@ typedef enum {
     MC_FAULT_ENGINE_STATUS_LOST,  /**< no valid EEC1 within eec1_timeout_ms */
     MC_FAULT_OVERSPEED,           /**< engine speed above overspeed_rpm */
     MC_FAULT_STALL,               /**< engine speed fell below stall_rpm while in RUN */
-    MC_FAULT_OVERRIDE_REJECTED    /**< EEC1 SPN 1483 does not show this controller in control */
+    MC_FAULT_OVERRIDE_REJECTED,   /**< EEC1 SPN 1483 does not show this controller in control */
+    MC_FAULT_WATCHDOG_RESET       /**< the platform restarted after its watchdog fired (mc_init_after_watchdog) */
 } McFault;
 
 /** @brief Controller configuration. Provenance: docs/parameters.md. */
@@ -94,6 +95,17 @@ typedef struct {
 } McCtx;
 
 void mc_init(McCtx *c, const McParams *p);
+
+/**
+ * @brief As mc_init(), but for a restart caused by the platform's watchdog:
+ *        the controller starts in FAULT (MC_FAULT_WATCHDOG_RESET) instead of
+ *        WAIT_ENGINE, so it sends the safe state (TSC1 mode 00, pump at 0)
+ *        and waits for the operator's fault reset (docs/safety.md, SR-7 and
+ *        SR-11). A fault reset button already held when the controller
+ *        starts does not count: it must be released and pressed again.
+ *        The platform decides when to call it (for example, on IWDGRSTF).
+ */
+void mc_init_after_watchdog(McCtx *c, const McParams *p);
 
 /** @brief Feeds one received frame. Frames the controller does not use are ignored. */
 void mc_handle_frame(McCtx *c, const J1939Frame *f, uint32_t now_ms);

@@ -6,6 +6,12 @@ All notable changes to this project. The project is pre-alpha; nothing here is a
 
 ### Added
 
+- **Watchdog on the reference board** (open-crank v0.3.1, step 3c).
+  - `platforms/stm32g4/board/watchdog.c`: IWDG, 100 ms, kicked every control period. At start-up the firmware reads the reset cause and clears the reset flags (`RMVF`).
+  - `portable/machine_ctrl`: `mc_init_after_watchdog()` and `MC_FAULT_WATCHDOG_RESET`. After a watchdog reset the controller starts in FAULT until a new press of the fault reset. Requirement **SR-11**.
+  - Test build `oc-stm32g4-demo-hangtest` (`OC_WDG_HANG_TEST`): it hangs on the bench's test frame (signal `test.dut_hang`). CI checks that the reference firmware has no hang.
+  - `tools/board/watchdog_check.sh` with `scenarios/board/watchdog_reset.csv` (board only; not in ctest or on `vcan`). PASS on the reference board; the variant that starts in WAIT_ENGINE fails W1.
+  - Two unit-test mutations (26 in all). `tools/stack_budget.py` adds `mc_init_after_watchdog` (24 bytes).
 - **TSC1 message counter and checksum** (SPN 4206/4207, J1939-71; open-crank v0.3.1, step 3b).
   - `portable/j1939`: `j1939_tsc1_checksum()`. `J1939Tsc1` gains `message_counter` (encode and decode) and `checksum_valid` (decode). The encoder writes byte 7, which was `0xFF`.
   - `portable/machine_ctrl`: the controller counts its TSC1 (`McCtx.tsc1_counter`).

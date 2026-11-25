@@ -126,6 +126,14 @@ jobs:
             fi
           done
           echo "no MX_* or SystemClock_Config symbols"
+      - name: The intentional hang exists only in the test build
+        run: |
+          if arm-none-eabi-nm build-stm32g4/oc-stm32g4-demo.elf | grep -w oc_test_hang; then
+            echo "FAIL: the reference firmware has the test hang"; exit 1
+          fi
+          arm-none-eabi-nm build-stm32g4/oc-stm32g4-demo-hangtest.elf | grep -qw oc_test_hang || {
+            echo "FAIL: the hang test build lost its hang, so the check above proves nothing"; exit 1; }
+          echo "oc_test_hang only in oc-stm32g4-demo-hangtest.elf"
       - uses: actions/upload-artifact@v4
         with:
           name: stm32g4-firmware

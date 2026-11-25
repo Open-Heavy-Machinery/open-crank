@@ -190,11 +190,25 @@ Worst observed: 2287 cycles (13.5 µs), about 0.13 % of the 10 ms period. Anothe
 | Function | Worst-case stack |
 |---|---|
 | `mc_init` | 16 bytes |
+| `mc_init_after_watchdog` | 24 bytes |
 | `mc_handle_frame` | 96 bytes |
 | `mc_step` | 76 bytes |
 | `mc_clear_fault` | 0 bytes |
 
 `memcpy`, `memmove`, `memset` and `memcmp` are not counted. This is the controller's stack only: the demo's own code, the HAL and the interrupt handlers come on top, and the demo's build (CubeIDE, `-O0`) is not the build measured here. Other GCC versions give other figures (GCC 10.3.1: `mc_step` 84 bytes). `mc_step` grew from 68 to 76 bytes in v0.3.1 with the TSC1 counter and checksum.
+
+### The watchdog check
+
+The reference firmware runs the independent watchdog (`board/watchdog.c`, IWDG, 100 ms, register level, no HAL module), kicked once per 10 ms control period. At start-up it reads the reset cause and then clears the reset flags (`RCC->CSR |= RCC_CSR_RMVF`), so that a later reset of another kind is not taken for a watchdog one. After a watchdog reset the controller starts in FAULT (`mc_init_after_watchdog`, docs/safety.md SR-11); after any other reset, in WAIT_ENGINE. While a debugger halts the core, the watchdog stops (`DBG_IWDG_STOP`).
+
+`tools/board/watchdog_check.sh [--iface can0] [--out DIR]` tests it on the bus, in about 30 s:
+- it programs `oc-stm32g4-demo-hangtest`. This build exists only for the test: it is the demo compiled with `OC_WDG_HANG_TEST`, which stops the control loop when the bench sends the test frame `0x18FF2DFC` (signal `test.dut_hang`). CI fails if the reference firmware contains the hang (`oc_test_hang`);
+- it plays `scenarios/board/watchdog_reset.csv`;
+- whatever happens, it programs the reference controller back.
+
+On the reference bench (2026-11-25): PASS. W1 reacts in 120 ms, before the 200 ms after which silence alone would count as a release, so the board did restart and send mode `00` from FAULT. W2 takes control again 530 ms after the fault reset.
+
+The watchdog is in the CMake build only; `demo/main_user_code.c` (CubeIDE) does not have it yet.
 
 ## Status
 

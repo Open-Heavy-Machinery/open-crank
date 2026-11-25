@@ -12,6 +12,12 @@
 #include <opencrank/oc_msgs.h>
 #include <opencrank/plants/d936la6.h>
 
+/* Bench test frame, from the bench (0xFC), PGN 0xFF2D, sent every step while
+ * test.dut_hang is 1. Only a hang-test build of the board firmware reacts to
+ * it (platforms/stm32g4/demo/main.c, OC_WDG_HANG_TEST): it stops kicking its
+ * watchdog. Every other device under test ignores it. */
+#define OC_TEST_HANG_ID 0x18FF2DFCUL
+
 const OcBenchConfig OC_BENCH_D936LA6 = {
     .plant = &PLANT_D936LA6,
     .ecu = &ENGINE_ECU_D936LA6,
@@ -198,6 +204,16 @@ static size_t transmit(OcBench *b, J1939Frame *tx, size_t cap) {
             .fault_reset_pressed = b->sig.fault_reset,
         };
         oc_encode_operator(&op, OC_ADDR_BENCH, &f);
+        n = push(tx, n, cap, &f);
+    }
+
+    /* The watchdog test frame (test.dut_hang). */
+    if (b->sig.test_dut_hang) {
+        f.id = OC_TEST_HANG_ID;
+        f.dlc = 8U;
+        for (size_t i = 0U; i < 8U; i++) {
+            f.data[i] = 0xFFU;
+        }
         n = push(tx, n, cap, &f);
     }
     return n;

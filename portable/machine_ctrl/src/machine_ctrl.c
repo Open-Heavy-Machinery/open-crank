@@ -48,6 +48,13 @@ void mc_init(McCtx *c, const McParams *p) {
     c->requested_rpm = p->request_min_rpm;
 }
 
+void mc_init_after_watchdog(McCtx *c, const McParams *p) {
+    mc_init(c, p);
+    c->state = MC_STATE_FAULT;
+    c->fault = MC_FAULT_WATCHDOG_RESET;
+    c->reset_was_pressed = true; /* a button held through the restart is not a new press */
+}
+
 void mc_handle_frame(McCtx *c, const J1939Frame *f, uint32_t now_ms) {
     const uint8_t src = j1939_id_source(f->id);
     J1939Eec1 eec1;
@@ -223,6 +230,9 @@ const char *mc_fault_name(McFault f) {
         break;
     case MC_FAULT_OVERRIDE_REJECTED:
         name = "override rejected";
+        break;
+    case MC_FAULT_WATCHDOG_RESET:
+        name = "watchdog reset";
         break;
     default:
         break;
