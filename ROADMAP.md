@@ -11,7 +11,7 @@ Scope is deliberately narrow. Each milestone is small enough to finish and usefu
 | **v0.2** (done) | Reference board on the bus | 1 |
 | **v0.2.1** (done) | Acceptance suite over the bus | 1 |
 | **v0.2.2** (done) | Board automation | 1 |
-| **v0.3** | Robustness on the board | 1 |
+| **v0.3** (done, released as `v0.3.1`) | Robustness on the board | 1 |
 | **v0.4** | Level 2: your firmware as the engine ECU | 2 |
 | **v0.5** | Two engines on one machine | 1 |
 | **v0.6** | Marine 2-stroke plant | 1 |
@@ -193,21 +193,25 @@ Fault injection pulls in protocol work that v0.1 left out on purpose:
 - TSC1 message counter and checksum (SPN 4206/4207), so that corrupted and replayed frames can be rejected.
 - DM1 (active diagnostic trouble codes) for faults reported by the engine; with more than one active code, DM1 needs the J1939-21 transport protocol (BAM) on the sending side.
 
-**Status: in progress, in three steps.**
+**Status: done** (2026-11-25, released as `v0.3.1`; there is no open-crank `v0.3.0`). It took three steps:
 
 1. **Done (open-tick v0.3, step 1):** links and transport faults in open-tick's core.
 2. **Done in SIL and on `vcan` (step 2, #33):**
    - the bench has two links, `mc` and `engine`;
    - four fault scenarios: `engine_status_delay`, `engine_status_jitter`, `speed_command_intermittent`, `mc_bus_off`;
    - the safe state and the requirements `SR-1`…`SR-9` in [`docs/safety.md`](docs/safety.md), checked in CI by `tools/check_requirements.py`.
-3. **In progress, v0.3.1, on the board** (steps 3a to 3d):
+3. **Done, v0.3.1, on the board** (steps 3a to 3d, #34 to #38):
    - *done (step 3a):* the fault scenarios in `tools/board/bench.sh`, with board reference times;
    - *done (step 3b):* the TSC1 counter and checksum (SPN 4206/4207), with the `speed_command_corrupt` scenario, criterion G3 in every scenario and `SR-10`;
    - *done (step 3c):* the watchdog (IWDG, 100 ms), after whose reset the controller starts in FAULT and waits for the operator's fault reset (`SR-11`, `tools/board/watchdog_check.sh`);
    - *done (step 3d):* DM1 from the engine (read with BAM when more than one code is active): the red stop lamp faults (`SR-12`); the amber lamp means limp-home, requested speed at most 1200 rpm and pump at most 50 %, reached and left smoothly (`SR-13`).
    - The controller's own DM1 is left for after v0.3.1.
 
-**Exit criteria**
+**Exit criteria.** Met on 2026-11-25, on the release commit's code (`7a8dccb`):
+- `tools/board/bench.sh` gave BENCH OK: fifteen PASS, 0 late steps, every reaction within one step of the reference, round trip p99 1.900 ms;
+- `tools/board/watchdog_check.sh` gave PASS (W1 120 ms).
+
+The reports and traces are attached to the GitHub release of v0.3.1.
 
 1. Each injected fault has a test that verifies the reaction.
    - *Met in SIL and on `vcan`* for the faults injected so far: lost frames (`fault.mc_tx_lost`, `fault.engine_tx_lost`, the links' `drop_one_in`), delay, jitter and bus-off ([`docs/acceptance.md`](docs/acceptance.md), "Link faults").

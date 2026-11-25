@@ -2,12 +2,41 @@
 
 All notable changes to this project. The project is pre-alpha; nothing here is a stable API yet.
 
-## Unreleased
+## v0.3.1: Robustness on the board (2026-11-25)
+
+Every injected fault now has a test of the controller's reaction, and every safety requirement is traced to its tests. The milestone v0.3 is done, in three steps:
+- open-tick's links (open-tick v0.3.0);
+- the fault scenarios in SIL and on `vcan` (#33);
+- the board (#34 to #38).
+
+There is no open-crank `v0.3.0`: step 2 was not released on its own.
+
+**What changes for a user**
+- **Fifteen acceptance scenarios** grade any controller by its frames:
+  - transport faults: delay, jitter, lost frames, bus-off, corruption;
+  - the engine's diagnostics (DM1, also as a BAM).
+  
+  On the reference board, `tools/board/bench.sh` runs all fifteen against board reference times.
+- **`docs/safety.md`** has the safe state and thirteen numbered requirements, SR-1 to SR-13. `tools/check_requirements.py` keeps every one of them cited by a criterion or a test.
+- **The bus contract changes:**
+  - a controller must send the TSC1 message counter and checksum;
+  - the engine sends DM1, and its red stop lamp means "release".
+- **The reference board runs a watchdog.** After a watchdog reset the controller starts in FAULT. `tools/board/watchdog_check.sh` proves it on the bus.
+
+### Known limitations
+
+- **The watchdog test runs by hand on a board,** not in CI. The CubeIDE path (`main_user_code.c`) has no watchdog.
+- **The TSC1 checksum follows J1939-71** as specified for this project; it has not been checked against a real engine ECU.
+- **The DM1 lamps are held** until the next DM1. A DM1 that stops arriving is not detected by itself; a silent engine is caught by the EEC1 timeout.
+- **Not yet:** the controller's own DM1, and RTS/CTS transport.
+- **Limp-home smoothness** is graded by a unit test, not by the acceptance oracle, which has no rates.
+- **One reference bench,** and board reference times from single runs. In repeated runs, reactions moved by at most one 10 ms step.
+- **`accept_vcan.sh` retries an INVALID run once.** `bench.sh` does not.
 
 ### Added
 
 - **The engine's DM1, and limp-home** (open-crank v0.3.1, step 3d).
-  - `portable/j1939`: new `opencrank/j1939_diag.h` with DM1 encode and decode (lamps and DTCs, J1939-73) and BAM (J1939-21): the encoder and a receiver that checks the sequence and T1.
+  - `portable/j1939`: new `opencrank/j1939_diag.h`, receiving side: DM1 decode (lamps and DTCs, J1939-73) and a BAM receiver that checks the sequence and T1 (J1939-21). The encoders, which only the simulated engine uses, are in `sim/engine_ecu` (`opencrank/j1939_diag_tx.h`).
   - `portable/machine_ctrl`: the controller reads the engine's DM1, in one frame or as a BAM. Red stop lamp: FAULT (`MC_FAULT_ENGINE_RED_STOP`), and no new RUN while the lamp is on (**SR-12**). Amber lamp: limp-home, requested speed at most `limp_rpm` (1200 rpm) and pump at most `limp_pump_pct` (50 %), the pump limit ramped at 100 %/s, back on its own when the lamp goes off (**SR-13**).
   - The simulated engine sends DM1 every second and on change. New signals `fault.engine_dtc_red` and `fault.engine_dtc_amber`; both at once give a BAM.
   - Scenarios `engine_dtc_red`, `engine_dtc_amber` and `engine_dtc_red_and_amber` (fifteen in all). Three acceptance mutants (15 killed) and six unit-test mutations (32 in all).
