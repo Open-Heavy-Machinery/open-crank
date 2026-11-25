@@ -116,8 +116,12 @@ fi
 step "4/5 reference controller, ${#scenarios[@]} scenarios (watch the bus: candump $iface)"
 "$OC_ROOT/tools/board/flash.sh" demo --no-build >"$out/flash-demo.log" 2>&1 || {
     echo "bench.sh: programming the demo failed; see $out/flash-demo.log" >&2; exit 1; }
+i=0
 for s in "${scenarios[@]}"; do
-    printf '\n-- %s\n' "$s"
+    i=$((i + 1))
+    # Progress: which scenario, of how many, and how long it plays (its end event).
+    dur=$(awk -F, '$2 == "end" { print $1 }' "$OC_ROOT/scenarios/$s.csv")
+    printf '\n-- %s (%d of %d, %s s)\n' "$s" "$i" "${#scenarios[@]}" "${dur:-?}"
     "$OC_ROOT/tools/board/reset.sh" >/dev/null || { echo "bench: reset failed" > "$out/$s.txt"; continue; }
     # Alive: the controller sends TSC1 (0x0C000027) every 10 ms from boot.
     if ! timeout 2 candump -n 1 "$iface,0C000027:1FFFFFFF" >/dev/null 2>&1; then

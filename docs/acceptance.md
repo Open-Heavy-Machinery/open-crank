@@ -204,7 +204,16 @@ Reaction times of the reference controller in memory (`open-crank-accept-loop`):
 | `speed_command_intermittent` | 6 | S2 990 ms, I2 20 ms |
 | `mc_bus_off` | 7 | S2 990 ms, B1 710 ms, B2 530 ms |
 
-On 2026-11-25 a first run of the four with `tools/board/bench.sh` on the reference board passed, with 0 late steps and reactions within one 10 ms step of these (D1 200 ms, B1 710 ms). The board's reference times and the evidence for a release are v0.3.1's *(planned)*.
+On the reference board (`tools/board/bench.sh`, 2026-11-25, open-crank `18060be`) all four pass with 0 late steps, and every reaction is within one 10 ms step of the times in memory:
+
+| Scenario | Reactions on the board |
+|---|---|
+| `engine_status_delay` | S2 1000 ms, E1 20 ms, D1 200 ms, D2 540 ms |
+| `engine_status_jitter` | S2 990 ms, J2 30 ms |
+| `speed_command_intermittent` | S2 1000 ms, I2 20 ms |
+| `mc_bus_off` | S2 1000 ms, B1 710 ms, B2 540 ms |
+
+These are the board's reference times in `tools/board/bench_reference.csv` (v0.3.1, step 3a), so `bench.sh` now checks every reaction of the eleven scenarios against the reference bench.
 
 ## Results
 
