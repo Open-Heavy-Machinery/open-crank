@@ -4,7 +4,7 @@
 
 Part of [Open Heavy Machinery](https://open-heavy-machinery.github.io) ([open-crank's page](https://open-heavy-machinery.github.io/open-crank/)): open tools to practise and develop embedded control for machines you cannot keep at home, starting with heavy machinery.
 
-**Status: pre-alpha. v0.2.2 is done and on `main`: an acceptance suite grades any controller by the CAN frames it sends. The reference controller passes it on `vcan` and on an STM32G431 board, which is built, programmed and tested from the PC with one command ([Run the demo on a real board](#run-the-demo-on-a-real-board)).** Anything marked *(planned)* does not exist yet. The honest list of what works, what is verified and what is not is in [ROADMAP.md](ROADMAP.md).
+**Status: pre-alpha. v0.3.1 is done and on `main`: an acceptance suite of fifteen scenarios grades any controller by the CAN frames it sends, including transport faults and the engine's diagnostics, and every safety requirement ([docs/safety.md](docs/safety.md)) is traced to its tests. The reference controller passes it on `vcan` and on an STM32G431 board with a watchdog, built, programmed and tested from the PC with one command ([Run the demo on a real board](#run-the-demo-on-a-real-board)).** Anything marked *(planned)* does not exist yet. The honest list of what works, what is verified and what is not is in [ROADMAP.md](ROADMAP.md).
 
 `open-crank` is a simulated heavy-duty diesel engine that behaves enough like the real one to develop, test and break control software against it, on a laptop, in CI, on a real microcontroller board, and later on an FPGA rig. It speaks SAE J1939 over CAN, the same way a real engine does.
 
@@ -163,7 +163,7 @@ The reference controller on an STM32G431 board, against the simulated engine, ov
 ```sh
 tools/board/setup.sh      # checks the PC and installs what is missing (it asks first)
 sudo slcand -o -c -s5 /dev/serial/by-id/<your-adapter> can0 && sudo ip link set can0 up
-tools/board/bench.sh      # about 4 minutes
+tools/board/bench.sh      # about 5 minutes
 ```
 
 `bench.sh` is the standard bench check:
