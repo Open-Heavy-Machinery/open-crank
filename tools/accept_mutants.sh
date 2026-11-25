@@ -182,6 +182,17 @@ mutate "controller: TSC1 counter frozen" $MC \
     "c->tsc1_counter = (uint8_t)((uint8_t)(c->tsc1_counter + 1U) & 0x0FU);" "(void)0;" \
     "G3"
 
+# The engine's DM1 and limp-home (open-crank v0.3.1, step 3d).
+mutate "controller: the engine's red stop lamp ignored" $MC \
+    "} else if (c->engine_red_stop) {" "} else if (false) {" \
+    "R1 M1"
+mutate "controller: the engine's amber lamp ignored (no limp-home)" $MC \
+    "c->engine_amber = dm1.amber_warning == J1939_LAMP_ON;" "c->engine_amber = false;" \
+    "A1"
+mutate "controller: a DM1 that comes as a BAM is ignored" portable/j1939/src/j1939_diag.c \
+    "done = bam_data(rx, f, now_ms);" "done = false; (void)bam_data;" \
+    "M1"
+
 echo
 echo "$killed mutants killed, $accepted accepted survivors, $problems problems"
 [[ $problems -eq 0 ]]

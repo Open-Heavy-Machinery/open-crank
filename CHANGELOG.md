@@ -6,6 +6,11 @@ All notable changes to this project. The project is pre-alpha; nothing here is a
 
 ### Added
 
+- **The engine's DM1, and limp-home** (open-crank v0.3.1, step 3d).
+  - `portable/j1939`: new `opencrank/j1939_diag.h` with DM1 encode and decode (lamps and DTCs, J1939-73) and BAM (J1939-21): the encoder and a receiver that checks the sequence and T1.
+  - `portable/machine_ctrl`: the controller reads the engine's DM1, in one frame or as a BAM. Red stop lamp: FAULT (`MC_FAULT_ENGINE_RED_STOP`), and no new RUN while the lamp is on (**SR-12**). Amber lamp: limp-home, requested speed at most `limp_rpm` (1200 rpm) and pump at most `limp_pump_pct` (50 %), the pump limit ramped at 100 %/s, back on its own when the lamp goes off (**SR-13**).
+  - The simulated engine sends DM1 every second and on change. New signals `fault.engine_dtc_red` and `fault.engine_dtc_amber`; both at once give a BAM.
+  - Scenarios `engine_dtc_red`, `engine_dtc_amber` and `engine_dtc_red_and_amber` (fifteen in all). Three acceptance mutants (15 killed) and six unit-test mutations (32 in all).
 - `tools/accept_vcan.sh` runs a scenario once more if its run is INVALID (late steps, no verdict). The first attempt is kept in `<scenario>.attempt1.log`, and only the second counts. A FAIL is never rerun. On 2026-11-25 a single late step on the GitHub runner turned `main`'s CI red (run 45607945454, `mc_bus_off`; every criterion passed).
 - **Watchdog on the reference board** (open-crank v0.3.1, step 3c).
   - `platforms/stm32g4/board/watchdog.c`: IWDG, 100 ms, kicked every control period. At start-up the firmware reads the reset cause and clears the reset flags (`RMVF`).
@@ -34,6 +39,7 @@ All notable changes to this project. The project is pre-alpha; nothing here is a
 
 ### Changed
 
+- Worst-case stack of `mc_handle_frame`: 96 to 152 bytes (the engine's DM1 is decoded on its stack). MISRA: `j1939_id_dest` is now used inside `portable/` (by the BAM receiver), so DEV-001 covers 15 functions and the baseline goes down by one.
 - **Bus contract:** a device under test must send TSC1 byte 7 with the counter and the checksum (`docs/bus-interface.md`). One that sends `0xFF`, as before v0.3.1, is refused by the engine and fails G3.
 - Every criteria file gains G3, so every report and verdict file has one more row. `tests/data/hoist_step.verdicts.csv` is updated (one row). The traces are the same, byte for byte.
 - Worst-case stack of `mc_step`: 68 to 76 bytes (Cortex-M4F MinSizeRel, Arm GNU Toolchain 14.2.rel1).

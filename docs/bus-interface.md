@@ -69,6 +69,24 @@ Percent torque is relative to the engine reference torque, 1600 Nm for `d936la6`
 |---|---|---|
 | 3 | Engine oil pressure (SPN 100) | 4 kPa/bit |
 
+### DM1, active diagnostic trouble codes (PGN 65226, broadcast from the engine), every 1000 ms and at once on a change (since v0.3.1)
+
+| Byte | Content | Values |
+|---|---|---|
+| 0 | Lamps, 2 bits each: MIL (bits 7-6), red stop (5-4), amber warning (3-2), protect (1-0) | `00` off, `01` on |
+| 1 | Lamp flash status | `0xFF` |
+| 2 + 4k … 5 + 4k | DTC k: SPN bits 0-7; SPN bits 8-15; SPN bits 16-18 in bits 7-5 and FMI in bits 4-0; conversion method in bit 7 (0) and occurrence count in bits 6-0 | no active code: one DTC of all zeros |
+
+The simulated engine reports two codes:
+- `fault.engine_dtc_red`: SPN 100 (oil pressure) FMI 1, with the red stop lamp. A controller must release, as for any fault.
+- `fault.engine_dtc_amber`: SPN 110 (coolant temperature) FMI 16, with the amber lamp. A controller should limp home.
+
+With one code or none, DM1 is one 8-byte frame, padded with `0xFF`. With two, it is 10 bytes and travels as a **BAM** (J1939-21):
+- a TP.CM to global, `0x18ECFF00`: control byte 32, size, number of packets, `0xFF`, PGN `0x00FECA` low byte first;
+- then TP.DT frames, `0x18EBFF00`, 50 ms apart, each with its sequence number and 7 bytes, the last one padded with `0xFF`.
+
+The reference controller drops a BAM whose packet is out of sequence or later than 750 ms (T1). The engine itself keeps running: the codes are reports, not shutdowns.
+
 ### OC_OPERATOR, operator controls (open-crank, PGN 65312 / `0xFF20`, from `0xFC`), every 20 ms
 
 **Not part of J1939.** Proprietary B range. Stands in for a CAN joystick or operator panel.

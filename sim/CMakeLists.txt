@@ -14,6 +14,7 @@ add_library(opencrank_sim STATIC
     plants/d936la6/src/d936la6_ecu.c
     loads/src/hydraulic_pump.c
     engine_ecu/src/engine_ecu.c
+    engine_ecu/src/j1939_diag_tx.c
     runtime/src/bench.c
     runtime/src/signals.c
     runtime/src/scenario.c

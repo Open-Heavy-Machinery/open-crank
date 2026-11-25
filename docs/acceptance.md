@@ -68,7 +68,7 @@ FAIL  E2  override released and pump at 0 within 300 ms of losing EEC1, and kept
 
 ## The criteria
 
-Five criteria are common to the twelve scenarios (the requirement each checks is in [safety.md](safety.md)):
+Five criteria are common to the fifteen scenarios (the requirement each checks is in [safety.md](safety.md)):
 
 | Id | Window | Condition | Why |
 |---|---|---|---|
@@ -108,6 +108,15 @@ And per scenario:
 | `speed_command_corrupt` | K1 | 1 s after the controller's frames start arriving with byte 3 flipped, until 10 ms before the fault reset | no override and pump at 0 | as L1: the engine refuses every corrupted TSC1 by its checksum, as if it were lost |
 | | K2 | 1 s after the fault reset | speed control, kept | as L2 |
 | | K3 | 18.0 s | requested speed 1500 ± 1 rpm | as L3 |
+| `engine_dtc_red` | E1 | 100 ms after the lever goes to 50 % | pump at 50 ± 0.4 % until the lamp | as H2 |
+| | R1 | 300 ms after the engine's red stop lamp, until 10 ms before the fault reset | no override and pump at 0 | the engine sends DM1 at once when it changes; the reference reacts in 10 ms. Kept after the lamp goes off (SR-7) |
+| | R2 | 1 s after the fault reset | speed control, kept | as L2 |
+| | R3 | 18.0 s | requested speed 1500 ± 1 rpm | as L3 |
+| `engine_dtc_amber` | E1 | 100 ms after the lever goes to 85 % | pump at 85 ± 0.4 % until the lamp | as H2 |
+| | A1 | 1 s after the amber lamp, until 10 ms before it goes off | requested speed 1200 ± 1 rpm and pump 50 ± 0.4 % | limp-home (SR-13). 1 s: the slew limit takes 0.6 s from 1500 to 1200 rpm. S2 runs to `end`: limp-home is not a fault |
+| | A2 | from the amber lamp, for 1 s | requested speed ≥ 1199 rpm and pump ≥ 49.6 % | into limp-home without falling through it. The smoothness itself (rates) is checked by the unit test `test_limp_home`: the oracle has no rates |
+| | A3 | 1.5 s after the lamp goes off, to `end` | requested speed 1500 ± 1 rpm and pump 85 ± 0.4 % | back to the operator's values on its own |
+| `engine_dtc_red_and_amber` | M1 | 300 ms after both lamps, to `end` | no override and pump at 0 | two codes make the DM1 10 bytes long, so it comes as a BAM (TP.CM and two TP.DT, 50 ms apart): the reference reacts in 110 ms |
 
 ## Running it
 
@@ -183,7 +192,7 @@ open-crank-accept-loop <scenario.csv> [--criteria <file>] [--verdicts <out.csv>]
 ./build/open-crank-accept-loop scenarios/engine_status_loss.csv
 ```
 
-`ctest` runs it on every scenario that has criteria, twelve, as the tests `accept_<scenario>` (`accept_cold_start`, `accept_engine_status_delay`, …). Each writes its verdict file into the build tree, and `accept_verdicts_hoist_step` compares hoist_step's with [tests/data/hoist_step.verdicts.csv](../tests/data/hoist_step.verdicts.csv), byte for byte.
+`ctest` runs it on every scenario that has criteria, fifteen, as the tests `accept_<scenario>` (`accept_cold_start`, `accept_engine_status_delay`, …). Each writes its verdict file into the build tree, and `accept_verdicts_hoist_step` compares hoist_step's with [tests/data/hoist_step.verdicts.csv](../tests/data/hoist_step.verdicts.csv), byte for byte.
 
 ## Link faults
 
@@ -211,6 +220,9 @@ Reaction times of the reference controller in memory (`open-crank-accept-loop`; 
 | `speed_command_intermittent` | 7 | S2 990 ms, I2 20 ms |
 | `mc_bus_off` | 8 | S2 990 ms, B1 710 ms, B2 530 ms |
 | `speed_command_corrupt` (v0.3.1) | 8 | S2 990 ms, K1 710 ms, K2 530 ms |
+| `engine_dtc_red` (v0.3.1) | 9 | S2 990 ms, E1 20 ms, R1 10 ms, R2 530 ms |
+| `engine_dtc_amber` (v0.3.1) | 9 | S2 990 ms, E1 20 ms, A1 600 ms, A3 600 ms |
+| `engine_dtc_red_and_amber` (v0.3.1) | 6 | S2 990 ms, M1 110 ms |
 
 On the reference board (`tools/board/bench.sh`, 2026-11-25, open-crank `18060be`) all four pass with 0 late steps, and every reaction is within one 10 ms step of the times in memory:
 
@@ -222,6 +234,8 @@ On the reference board (`tools/board/bench.sh`, 2026-11-25, open-crank `18060be`
 | `mc_bus_off` | S2 1000 ms, B1 710 ms, B2 540 ms |
 
 `speed_command_corrupt` (v0.3.1, step 3b) on the board: S2 1000 ms, K1 720 ms, K2 540 ms, with G3 holding in all twelve scenarios: the board's firmware sends the counter and the checksum.
+
+The engine's DM1 scenarios (v0.3.1, step 3d) on the board: `engine_dtc_red` R1 10 ms, R2 540 ms; `engine_dtc_amber` A1 600 ms, A3 600 ms; `engine_dtc_red_and_amber` M1 110 ms. The board's firmware reassembles the BAM as the simulator does.
 
 These are the board's reference times in `tools/board/bench_reference.csv` (v0.3.1, step 3a), so `bench.sh` now checks every reaction of the eleven scenarios against the reference bench.
 
@@ -273,8 +287,11 @@ All mutations are in `portable/machine_ctrl/src/machine_ctrl.c`:
 | controller: waits 5 s for the engine to honour the override | B1 (and O1, L1) |
 | controller: TSC1 checksum not written | G3 |
 | controller: TSC1 counter frozen | G3 (and S2 in every scenario: the engine refuses every repeated counter) |
+| controller: the engine's red stop lamp ignored | R1, M1 |
+| controller: the engine's amber lamp ignored (no limp-home) | A1 |
+| controller: a DM1 that comes as a BAM is ignored | M1 |
 
-Four are one per link-fault scenario (v0.3); the last two check the TSC1 counter and checksum (v0.3.1). The checksum mutant is in `portable/j1939/src/j1939.c`, the codec the controller uses. In total: 12 mutants killed, 1 accepted survivor.
+Four are one per link-fault scenario (v0.3); the last two check the TSC1 counter and checksum (v0.3.1). The checksum mutant is in `portable/j1939/src/j1939.c`, the codec the controller uses. The last three check the engine's DM1 (v0.3.1, step 3d); the BAM mutant is in `portable/j1939/src/j1939_diag.c`. In total: 15 mutants killed, 1 accepted survivor.
 
 **Why the mutant of `speed_command_intermittent` is killed by I2 and not by I1.** Losing one frame in three is invisible to a controller that sends every 10 ms: the engine's 200 ms request timeout never expires, so its EEC1 keeps showing the controller in control, and the controller has nothing to react to. No one-line change to the reference makes it fail I1, which is a robustness check: it fails a controller that would react where it should not. The defect the loss exposes is a controller that sends too seldom. The mutant that sends every 150 ms fails I2, because its pump command lags the lever by more than 100 ms. It fails the same check in every scenario with the hoist, with or without frame loss.
 

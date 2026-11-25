@@ -4,7 +4,8 @@
 # (2026-11-23, docs/acceptance.md "Results"); the four link-fault scenarios
 # from the run of 2026-11-25 on open-crank 18060be (open-crank v0.3.1, step
 # 3a); speed_command_corrupt from the run of 2026-11-25 with the TSC1
-# checksum (v0.3.1, step 3b). A bench matches when every reaction is within one 10 ms controller step
+# checksum (v0.3.1, step 3b); the three engine_dtc_* scenarios from the run
+# of 2026-11-25 with the engine's DM1 (v0.3.1, step 3d). A bench matches when every reaction is within one 10 ms controller step
 # of these.
 scenario,criterion,reaction_ms
 cold_start,S2,990
@@ -35,3 +36,13 @@ speed_command_intermittent,I2,20
 speed_command_corrupt,S2,1000
 speed_command_corrupt,K1,720
 speed_command_corrupt,K2,540
+engine_dtc_amber,S2,990
+engine_dtc_amber,E1,30
+engine_dtc_amber,A1,600
+engine_dtc_amber,A3,600
+engine_dtc_red,S2,990
+engine_dtc_red,E1,20
+engine_dtc_red,R1,10
+engine_dtc_red,R2,540
+engine_dtc_red_and_amber,S2,990
+engine_dtc_red_and_amber,M1,110

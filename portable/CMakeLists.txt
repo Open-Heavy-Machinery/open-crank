@@ -15,6 +15,7 @@ endif()
 
 add_library(opencrank_portable STATIC
     j1939/src/j1939.c
+    j1939/src/j1939_diag.c
     j1939/src/oc_msgs.c
     machine_ctrl/src/machine_ctrl.c
 )

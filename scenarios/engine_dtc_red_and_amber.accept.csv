@@ -1,0 +1,8 @@
+# Acceptance criteria for scenarios/engine_dtc_red_and_amber.csv. Format: docs/acceptance.md.
+id,from,until,tolerance_ms,condition,text
+S1,begin,start=1-10ms,0,tsc1_override == 0,SR-1: no override requested before the starter is pressed
+S2,start=1+2000ms,fault.engine_dtc_red=1-10ms,0,tsc1_speed_control == 1,speed control taken within 2 s of start and kept
+G1,begin,end,0,tsc1_speed_control == 1 -> tsc1_speed_rpm <= 2100,SR-2: requested speed never above high idle (2100 rpm)
+G2,begin,end,20,pump_cmd_pct > 0 -> tsc1_speed_control == 1,SR-3: pump commanded only while in speed control
+G3,begin,end,0,tsc1_intact == 1,SR-10: every TSC1 carries a valid checksum and a counter that moves by one
+M1,fault.engine_dtc_red=1+300ms,end,0,tsc1_override == 0 && pump_cmd_pct == 0,SR-12, SR-7: override released and pump at 0 within 300 ms of a two-code DM1 (BAM) with the red stop lamp, and kept

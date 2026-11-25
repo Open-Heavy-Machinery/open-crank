@@ -16,7 +16,7 @@ Silence counts as releasing because that is what the machine does with a stale c
 **When the controller is in it.** In every state except RUN:
 
 - **WAIT_ENGINE**, after power-up and after a fault reset, until the engine is confirmed running: valid EEC1 with engine speed at or above `running_rpm` (600 rpm) for `run_confirm_ms` (500 ms);
-- **FAULT**, entered from RUN when it loses the engine status, when the engine does not honour the override, on overspeed or on stall; and, on the reference board, at start-up after a watchdog reset (SR-11).
+- **FAULT**, entered from RUN when it loses the engine status, when the engine does not honour the override, on overspeed, on stall or on the engine's red stop lamp; and, on the reference board, at start-up after a watchdog reset (SR-11).
 
 **How it leaves it.** From FAULT only through a **fault reset**, a new press of the operator's button (holding it does not count), which takes the controller to WAIT_ENGINE. From there it enters RUN only when the engine is confirmed running again. There is no automatic recovery: frames flowing again after a loss do not clear a fault.
 
@@ -114,8 +114,25 @@ On the reference board, an independent watchdog (IWDG, 100 ms) restarts the cont
 
 Checked by: criterion W1 (`scenarios/board/watchdog_reset.csv`, on the board only, with `tools/board/watchdog_check.sh`); unit test `test_starts_in_fault_after_watchdog`. On the board, the controller variant that starts in WAIT_ENGINE after the watchdog fails W1 (2026-11-25).
 
+### SR-12: Release when the engine reports a severe fault (red stop lamp)
+
+When the engine's DM1 shows its red stop lamp, the controller enters FAULT and the safe state within 300 ms, whether the DM1 comes in one frame or, with more than one active code, as a BAM. It stays there until a fault reset, and it does not enter RUN again while the lamp is on.
+
+**Why.** The red stop lamp is the engine telling the machine to stop: here, oil pressure low (SPN 100, FMI 1). Loading the engine through it can destroy it, and the operator must see that something happened.
+
+Checked by: criteria R1 (`engine_dtc_red`) and M1 (`engine_dtc_red_and_amber`, a two-code DM1 as a BAM); unit tests `test_red_stop_lamp`, `test_red_stop_lamp_over_bam`, `test_dm1_known_vectors` and `test_bam`.
+
+### SR-13: Limp-home on the engine's amber lamp
+
+While the engine's DM1 shows its amber warning lamp, the controller limits the requested speed to `limp_rpm` (1200 rpm) and the pump command to `limp_pump_pct` (50 %), within 1 s of the lamp coming on. It is not a fault: the controller keeps speed control. Both limits move smoothly, the speed at the slew limit (500 rpm/s) and the pump limit at `limp_pump_rate_pct_per_s` (100 %/s), on the way in and on the way out. When the lamp goes off, the controller returns to the operator's values on its own. Releasing the hoist lever is never slowed (SR-8).
+
+**Why.** An amber lamp (here coolant temperature high, SPN 110, FMI 16) means that the engine can run on, but should be spared. Less speed and less load let it cool, and keep the machine working. A step in speed or load would shake the load on the hook.
+
+Checked by: criteria A1, A2 and A3 (`engine_dtc_amber`); unit tests `test_limp_home` (the values, the rate, the lever release, the return) and `test_dm1_known_vectors`.
+
 ## What is not specified yet
 
 - **Stall**: the controller enters FAULT below `stall_rpm` (unit test `test_overspeed_and_stall`), but no scenario drives the engine into a stall under control, so there is no acceptance criterion and no requirement for it.
-- **Engine diagnostics (DM1) and limp-home** *(planned, v0.3.1)*.
+- **The controller's own DM1** (its own faults, sent as DM1): after v0.3.1.
+- **A DM1 that stops arriving.** The controller keeps the lamps of the last DM1 it received. An engine that stops sending altogether is caught by the EEC1 timeout (SR-4).
 - **The watchdog in the CubeIDE path** (`demo/main_user_code.c`): only the CMake build has it (SR-11).

@@ -114,6 +114,18 @@ mutate "controller: after a watchdog restart it starts in WAIT_ENGINE" $MC \
     c->fault = MC_FAULT_WATCHDOG_RESET;" "    c->fault = MC_FAULT_NONE;"
 mutate "controller: a button held through a watchdog restart counts as a press" $MC \
     "c->reset_was_pressed = true; /* a button held through the restart is not a new press */" "(void)0;"
+mutate "codec: DM1 drops the SPN's high bits" portable/j1939/src/j1939_diag.c \
+    "((uint32_t)((p[2] >> 5U) & 0x07U) << 16U)" "0U"
+mutate "codec: BAM accepts a packet out of sequence" portable/j1939/src/j1939_diag.c \
+    "if (late || (seq != rx->next_seq)) {" "if (late) {"
+mutate "codec: BAM ignores the T1 timeout" portable/j1939/src/j1939_diag.c \
+    "if (late || (seq != rx->next_seq)) {" "if (seq != rx->next_seq) {"
+mutate "controller: limp-home pump limit steps instead of ramping" $MC \
+    "c->pump_limit_pct += clampf(limit_target - c->pump_limit_pct, -limit_step, limit_step);" "c->pump_limit_pct = limit_target; (void)limit_step;"
+mutate "controller: limp-home does not cap the requested speed" $MC \
+    "c->target_rpm = p->limp_rpm; /* limp-home; the slew limit makes the change smooth */" "(void)0;"
+mutate "controller: the red stop lamp does not block a new RUN" $MC \
+    "if (status_fresh && (c->engine_rpm >= p->running_rpm) && !c->engine_red_stop) {" "if (status_fresh && (c->engine_rpm >= p->running_rpm)) {"
 mutate "codec: TSC1 checksum not written" portable/j1939/src/j1939.c \
     "f->data[7] = (uint8_t)((uint8_t)(j1939_tsc1_checksum(f, counter) << 4U) | counter);" "f->data[7] = counter;"
 mutate "codec: TSC1 checksum leaves out the identifier" portable/j1939/src/j1939.c \

@@ -28,6 +28,7 @@
 #include <stdint.h>
 
 #include <opencrank/j1939.h>
+#include <opencrank/j1939_diag.h>
 #include <opencrank/oc_msgs.h>
 
 typedef enum {
@@ -42,7 +43,8 @@ typedef enum {
     MC_FAULT_OVERSPEED,           /**< engine speed above overspeed_rpm */
     MC_FAULT_STALL,               /**< engine speed fell below stall_rpm while in RUN */
     MC_FAULT_OVERRIDE_REJECTED,   /**< EEC1 SPN 1483 does not show this controller in control */
-    MC_FAULT_WATCHDOG_RESET       /**< the platform restarted after its watchdog fired (mc_init_after_watchdog) */
+    MC_FAULT_WATCHDOG_RESET,      /**< the platform restarted after its watchdog fired (mc_init_after_watchdog) */
+    MC_FAULT_ENGINE_RED_STOP      /**< the engine's DM1 shows its red stop lamp */
 } McFault;
 
 /** @brief Controller configuration. Provenance: docs/parameters.md. */
@@ -59,6 +61,9 @@ typedef struct {
     float request_min_rpm;
     float request_max_rpm;
     float slew_rpm_per_s;
+    float limp_rpm;                 /**< limp-home: requested speed at most this while the engine's amber lamp is on */
+    float limp_pump_pct;            /**< limp-home: pump command at most this */
+    float limp_pump_rate_pct_per_s; /**< how fast the pump limit moves in and out of limp-home */
 } McParams;
 
 extern const McParams MC_DEFAULT_PARAMS;
@@ -92,6 +97,11 @@ typedef struct {
     float requested_rpm;  /**< slew-limited request sent in TSC1 */
     float pump_cmd_pct;   /**< displacement command sent to the pump */
     uint8_t tsc1_counter; /**< message counter of the next TSC1 (SPN 4206), 0..15 */
+
+    J1939BamRx engine_bam;  /**< the engine's multi-packet DM1 (BAM) */
+    bool engine_red_stop;   /**< the engine's last DM1 shows the red stop lamp */
+    bool engine_amber;      /**< the engine's last DM1 shows the amber warning lamp: limp-home */
+    float pump_limit_pct;   /**< pump command limit: 100, or moving towards limp_pump_pct */
 } McCtx;
 
 void mc_init(McCtx *c, const McParams *p);

@@ -1,0 +1,11 @@
+# Acceptance criteria for scenarios/engine_dtc_amber.csv. Format: docs/acceptance.md.
+id,from,until,tolerance_ms,condition,text
+S1,begin,start=1-10ms,0,tsc1_override == 0,SR-1: no override requested before the starter is pressed
+S2,start=1+2000ms,end,0,tsc1_speed_control == 1,speed control taken within 2 s of start and kept: limp-home is not a fault
+G1,begin,end,0,tsc1_speed_control == 1 -> tsc1_speed_rpm <= 2100,SR-2: requested speed never above high idle (2100 rpm)
+G2,begin,end,20,pump_cmd_pct > 0 -> tsc1_speed_control == 1,SR-3: pump commanded only while in speed control
+G3,begin,end,0,tsc1_intact == 1,SR-10: every TSC1 carries a valid checksum and a counter that moves by one
+E1,hoist_demand_pct=85+100ms,fault.engine_dtc_amber=1-10ms,0,pump_cmd_pct >= 84.6 && pump_cmd_pct <= 85.4,pump follows the hoist lever (85 %) within 100 ms
+A1,fault.engine_dtc_amber=1+1000ms,fault.engine_dtc_amber=0-10ms,0,tsc1_speed_rpm >= 1199 && tsc1_speed_rpm <= 1201 && pump_cmd_pct >= 49.6 && pump_cmd_pct <= 50.4,SR-13: limp-home within 1 s of the amber lamp: requested speed 1200 rpm and pump 50 %, while the lamp is on
+A2,fault.engine_dtc_amber=1,fault.engine_dtc_amber=1+1000ms,0,tsc1_speed_rpm >= 1199 && pump_cmd_pct >= 49.6,SR-13: into limp-home without dropping below it: speed and pump stay at or above the limp-home values
+A3,fault.engine_dtc_amber=0+1500ms,end,0,tsc1_speed_rpm >= 1499 && tsc1_speed_rpm <= 1501 && pump_cmd_pct >= 84.6 && pump_cmd_pct <= 85.4,SR-13: back at the operator's 1500 rpm and 85 % within 1.5 s of the lamp going off
