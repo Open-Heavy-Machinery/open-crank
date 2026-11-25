@@ -193,10 +193,26 @@ Fault injection pulls in protocol work that v0.1 left out on purpose:
 - TSC1 message counter and checksum (SPN 4206/4207), so that corrupted and replayed frames can be rejected.
 - DM1 (active diagnostic trouble codes) for faults reported by the engine; with more than one active code, DM1 needs the J1939-21 transport protocol (BAM) on the sending side.
 
+**Status: in progress, in three steps.**
+
+1. **Done (open-tick v0.3, step 1):** links and transport faults in open-tick's core.
+2. **Done in SIL and on `vcan` (this step):**
+   - the bench has two links, `mc` and `engine`;
+   - four fault scenarios: `engine_status_delay`, `engine_status_jitter`, `speed_command_intermittent`, `mc_bus_off`;
+   - the safe state and the requirements `SR-1`…`SR-9` in [`docs/safety.md`](docs/safety.md), checked in CI by `tools/check_requirements.py`.
+3. **Planned, v0.3.1, on the board:**
+   - the fault scenarios in `tools/board/bench.sh`, with board reference times;
+   - the watchdog with a defined state after reset;
+   - DM1 from the engine with limp-home, and the controller's own DM1 (BAM with more than one code);
+   - the TSC1 counter and checksum (SPN 4206/4207), with a `corrupt` scenario.
+
 **Exit criteria**
 
 1. Each injected fault has a test that verifies the reaction.
+   - *Met in SIL and on `vcan`* for the faults injected so far: lost frames (`fault.mc_tx_lost`, `fault.engine_tx_lost`, the links' `drop_one_in`), delay, jitter and bus-off ([`docs/acceptance.md`](docs/acceptance.md), "Link faults").
+   - *Open:* `corrupt` and the DM1 faults (v0.3.1), and the board (v0.3.1).
 2. Each safety requirement is linked to at least one test.
+   - *Met:* `SR-1`…`SR-9`, each cited by an acceptance criterion or a unit test ([`docs/safety.md`](docs/safety.md)); `tools/check_requirements.py` fails CI otherwise. Requirements added in v0.3.1 must keep it so.
 
 ---
 

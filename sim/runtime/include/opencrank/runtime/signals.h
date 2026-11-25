@@ -10,6 +10,7 @@
 
 #include <stdbool.h>
 
+#include <opentick/link.h>
 #include <opentick/signals.h>
 
 /** @brief Every signal a scenario can set. Names are listed in signals.c. */
@@ -24,7 +25,9 @@ typedef enum {
     OC_SIG_FAULT_ENGINE_TX_LOST,   /**< fault.engine_tx_lost: the engine stops transmitting, 0/1 */
     OC_SIG_FAULT_ECU_IGNORES_TSC1, /**< fault.ecu_ignores_tsc1: engine ECU ignores speed requests, 0/1 */
     OC_SIG_FAULT_OVERRUN_TORQUE_NM,/**< fault.overrun_torque_nm: external torque driving the crankshaft [Nm] */
-    OC_SIG_END,                    /**< end: marks the end of the scenario (value ignored) */
+    OC_SIG_LINK_MC,                /**< fault.link.mc.*: the six faults of the link controller -> machine */
+    OC_SIG_LINK_ENGINE = OC_SIG_LINK_MC + (int)OTK_LINK_SIGNAL_COUNT, /**< fault.link.engine.*: engine -> controller */
+    OC_SIG_END = OC_SIG_LINK_ENGINE + (int)OTK_LINK_SIGNAL_COUNT,     /**< end: marks the end of the scenario (value ignored) */
     OC_SIG_COUNT
 } OcSignalId;
 
@@ -41,6 +44,9 @@ typedef struct {
     bool fault_engine_tx_lost;
     bool fault_ecu_ignores_tsc1;
     double fault_overrun_torque_nm;
+
+    OtkLinkFaults link_mc;       /**< fault.link.mc.*: what the controller sends to the machine */
+    OtkLinkFaults link_engine;   /**< fault.link.engine.*: what the engine sends to the controller */
 } OcSignals;
 
 /** @brief The signals above, registered with open-tick (`end` excluded: open-tick reserves it). */

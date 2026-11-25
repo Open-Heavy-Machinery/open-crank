@@ -1,6 +1,6 @@
 # Acceptance criteria for scenarios/target_above_high_idle.csv. Format: docs/acceptance.md.
 id,from,until,tolerance_ms,condition,text
-S1,begin,start=1-10ms,0,tsc1_override == 0,no override requested before the starter is pressed
+S1,begin,start=1-10ms,0,tsc1_override == 0,SR-1: no override requested before the starter is pressed
 S2,start=1+2000ms,target_rpm=2500-10ms,0,tsc1_speed_control == 1,speed control taken within 2 s of start and kept
-G1,begin,end,0,tsc1_speed_control == 1 -> tsc1_speed_rpm <= 2100,requested speed never above high idle (2100 rpm)
-G2,begin,end,20,pump_cmd_pct > 0 -> tsc1_speed_control == 1,pump commanded only while in speed control
+G1,begin,end,0,tsc1_speed_control == 1 -> tsc1_speed_rpm <= 2100,SR-2: requested speed never above high idle (2100 rpm)
+G2,begin,end,20,pump_cmd_pct > 0 -> tsc1_speed_control == 1,SR-3: pump commanded only while in speed control

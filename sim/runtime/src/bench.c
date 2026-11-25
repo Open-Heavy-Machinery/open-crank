@@ -8,6 +8,7 @@
 
 #include <string.h>
 
+#include <opencrank/can_otk.h>
 #include <opencrank/oc_msgs.h>
 #include <opencrank/plants/d936la6.h>
 
@@ -29,6 +30,8 @@ void oc_bench_init(OcBench *b, const OcBenchConfig *cfg) {
     plant_init(&b->plant, cfg->plant);
     engine_ecu_init(&b->ecu, cfg->ecu);
     hydraulic_pump_init(&b->pump, cfg->pump);
+    otk_link_init(&b->mc_link, OTK_CAN_QUEUE_MAX, OC_BENCH_LINK_MC_SEED);
+    otk_link_init(&b->engine_link, OTK_CAN_QUEUE_MAX, OC_BENCH_LINK_ENGINE_SEED);
 }
 
 static void apply_signal(void *ctx, OtkSignalId signal, double value) {
@@ -45,18 +48,20 @@ bool oc_bench_scenario_done(const OcBench *b) {
 
 static void apply_due_events(OcBench *b) {
     otk_player_advance(&b->player, otk_ns_from_ms(b->t_ms));
+    otk_link_set_faults(&b->mc_link, &b->sig.link_mc);
+    otk_link_set_faults(&b->engine_link, &b->sig.link_engine);
+}
+
+uint32_t oc_bench_link_overflows(const OcBench *b) {
+    return b->mc_link.overflows + b->engine_link.overflows;
 }
 
 double oc_bench_time_s(const OcBench *b) {
     return (double)b->t_ms / 1000.0;
 }
 
-void oc_bench_rx(OcBench *b, const J1939Frame *f) {
-    if (b->sig.fault_mc_tx_lost) {
-        b->rx_dropped++;
-        return;
-    }
-
+/* A frame from the device under test, as the machine receives it. */
+static void apply_rx(OcBench *b, const J1939Frame *f) {
     J1939Tsc1 tsc1;
     OcPumpCmd pump;
     const uint8_t dest = j1939_id_dest(f->id);
@@ -84,6 +89,28 @@ void oc_bench_rx(OcBench *b, const J1939Frame *f) {
     }
 }
 
+/* Applies the frames of the mc link that are due now. */
+static void deliver_mc(OcBench *b) {
+    OtkCanFrame o;
+    J1939Frame f;
+    while (otk_link_pop(&b->mc_link, otk_ns_from_ms(b->t_ms), &o)) {
+        if (oc_frame_from_otk(&o, &f)) {
+            apply_rx(b, &f);
+        }
+    }
+}
+
+void oc_bench_rx(OcBench *b, const J1939Frame *f) {
+    if (b->sig.fault_mc_tx_lost) {
+        b->rx_dropped++;
+        return;
+    }
+    OtkCanFrame o;
+    oc_frame_to_otk(f, &o);
+    (void)otk_link_push(&b->mc_link, &o, otk_ns_from_ms(b->t_ms)); /* a lost frame is counted by the link */
+    deliver_mc(b);
+}
+
 static bool due(uint32_t t_ms, uint32_t period_ms) {
     return period_ms != 0U && (t_ms % period_ms) == 0U;
 }
@@ -96,7 +123,14 @@ static size_t push(J1939Frame *tx, size_t n, size_t cap, const J1939Frame *f) {
     return n;
 }
 
-static size_t transmit(const OcBench *b, J1939Frame *tx, size_t cap) {
+/* The engine's frame enters the engine link at the current time. */
+static void send_engine(OcBench *b, const J1939Frame *f) {
+    OtkCanFrame o;
+    oc_frame_to_otk(f, &o);
+    (void)otk_link_push(&b->engine_link, &o, otk_ns_from_ms(b->t_ms)); /* a lost frame is counted by the link */
+}
+
+static size_t transmit(OcBench *b, J1939Frame *tx, size_t cap) {
     const OcBenchConfig *cfg = b->cfg;
     const uint8_t ecu_addr = cfg->ecu->source_address;
     const uint32_t t = b->t_ms;
@@ -122,16 +156,24 @@ static size_t transmit(const OcBench *b, J1939Frame *tx, size_t cap) {
                 .controlling_address = b->ecu.controlling_address,
             };
             j1939_encode_eec1(&eec1, ecu_addr, &f);
-            n = push(tx, n, cap, &f);
+            send_engine(b, &f);
         }
         if (due(t, cfg->eflp1_period_ms)) {
             const J1939Eflp1 m = { .oil_pressure_valid = true, .oil_pressure_kpa = (float)b->plant.oil_pressure_kpa };
             j1939_encode_eflp1(&m, ecu_addr, &f);
-            n = push(tx, n, cap, &f);
+            send_engine(b, &f);
         }
         if (due(t, cfg->et1_period_ms)) {
             const J1939Et1 m = { .coolant_temp_valid = true, .coolant_temp_c = (float)b->plant.coolant_temp_c };
             j1939_encode_et1(&m, ecu_addr, &f);
+            send_engine(b, &f);
+        }
+    }
+
+    /* What the engine link delivers now: with no fault, the frames just sent. */
+    OtkCanFrame o;
+    while (otk_link_pop(&b->engine_link, otk_ns_from_ms(t), &o)) {
+        if (oc_frame_from_otk(&o, &f)) {
             n = push(tx, n, cap, &f);
         }
     }
@@ -155,8 +197,10 @@ size_t oc_bench_step(OcBench *b, J1939Frame *tx, size_t cap) {
     const OcBenchConfig *cfg = b->cfg;
     const double dt = (double)cfg->step_ms / 1000.0;
 
-    /* 0. Scenario events due at the start of this step. */
+    /* 0. Scenario events due at the start of this step, then the controller's
+     *    frames that the mc link delivers now (delayed ones). */
     apply_due_events(b);
+    deliver_mc(b);
 
     /* 1. The engine ECU decides fuel and starter. */
     b->ecu.ignore_requests = b->sig.fault_ecu_ignores_tsc1;

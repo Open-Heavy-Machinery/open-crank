@@ -4,11 +4,11 @@
 # Deliberately broken controllers must fail the acceptance suite (exit
 # criterion 2 of v0.2.1; docs/acceptance.md). Each mutation below breaks one
 # behaviour of the reference controller, in a scratch copy of the tree, as
-# tools/mutation_check.sh does; the mutant is then graded on the seven
-# scenarios with open-crank-accept-loop (the in-memory loop: deterministic,
+# tools/mutation_check.sh does; the mutant is then graded on every
+# scenario with open-crank-accept-loop (the in-memory loop: deterministic,
 # fast, no vcan) and must fail the criteria listed with it.
 #
-# Every mutant runs all seven scenarios, without stopping at the first failure:
+# Every mutant runs all the scenarios, without stopping at the first failure:
 # the full list says which criteria have teeth.
 #
 #   killed      every expected criterion failed (other failures are listed too)
@@ -159,6 +159,20 @@ mutate "controller: speed request not slew-limited" $MC \
     "c->requested_rpm += clampf(c->target_rpm - c->requested_rpm, -max_delta, max_delta);" \
     "c->requested_rpm = c->target_rpm; (void)max_delta;" \
     accepted
+
+# One per link-fault scenario (open-crank v0.3).
+mutate "controller: EEC1 timeout multiplied by 5" $MC \
+    "!elapsed(now_ms, c->eec1_ms, p->eec1_timeout_ms + 1U)" "!elapsed(now_ms, c->eec1_ms, (5U * p->eec1_timeout_ms) + 1U)" \
+    "D1"
+mutate "controller: faults on the first late EEC1 (EEC1 timeout cut to 20 ms)" $MC \
+    "!elapsed(now_ms, c->eec1_ms, p->eec1_timeout_ms + 1U)" "!elapsed(now_ms, c->eec1_ms, (p->eec1_timeout_ms / 10U) + 1U)" \
+    "J1"
+mutate "controller: sends only every 150 ms (no margin for a lost frame)" $MC \
+    "size_t n = 0U;" "size_t n = 0U; if ((now_ms % 150U) != 0U) { return 0U; }" \
+    "I2"
+mutate "controller: waits 5 s for the engine to honour the override" $MC \
+    ".override_confirm_ms = 500U," ".override_confirm_ms = 5000U," \
+    "B1"
 
 echo
 echo "$killed mutants killed, $accepted accepted survivors, $problems problems"
