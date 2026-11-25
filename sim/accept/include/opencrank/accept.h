@@ -17,11 +17,13 @@
  * | `tsc1_speed_rpm`     | that requested speed while `tsc1_speed_control` is 1, else a gap | gap     |
  * | `pump_cmd_pct`       | OC_PUMP_CMD displacement; 0 if "not available"                    | 0       |
  * | `tsc1_override`      | 1 if TSC1 has an override mode other than 00 (speed, torque, limit), 0 if 00 | 0 |
+ * | `tsc1_intact`        | 1 if the TSC1's checksum is right and its counter is the previous TSC1's + 1 (SPN 4207/4206), else 0 | 1 |
  */
 
 #ifndef OPEN_CRANK_ACCEPT_H
 #define OPEN_CRANK_ACCEPT_H
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -39,15 +41,18 @@ typedef enum {
     OC_ACCEPT_TSC1_SPEED_RPM,
     OC_ACCEPT_PUMP_CMD_PCT,
     OC_ACCEPT_TSC1_OVERRIDE,
+    OC_ACCEPT_TSC1_INTACT,
     OC_ACCEPT_OBSERVABLE_COUNT
 } OcAcceptObservable;
 
 /** @brief The observables above, in that order. */
 extern const OtkOracleObservable OC_ACCEPT_OBSERVABLES[OC_ACCEPT_OBSERVABLE_COUNT];
 
-/** @brief Decoder state: whose frames count. */
+/** @brief Decoder state: whose frames count, and the DUT's last TSC1 counter. */
 typedef struct {
-    uint8_t dut; /**< source address of the device under test */
+    uint8_t dut;          /**< source address of the device under test */
+    bool tsc1_seen;       /**< a TSC1 from the DUT has been decoded */
+    uint8_t tsc1_counter; /**< its message counter (SPN 4206) */
 } OcAccept;
 
 /** @brief Sets up @p a for the device under test at @p dut and fills @p table to use it. */

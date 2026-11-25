@@ -59,9 +59,10 @@ typedef enum {
 /**
  * @brief TSC1, PGN 0, destination-specific. Byte 0: SPN 695 (bits 0-1),
  *        SPN 696 (bits 2-3), SPN 897 (bits 4-5). Bytes 1-2: SPN 898,
- *        0.125 rpm/bit. Byte 3: SPN 518, 1 %/bit, offset -125. Bytes 4-7
- *        sent as 0xFF (byte 7: message counter and checksum, SPN 4206/4207,
- *        "not available"; planned for v0.3).
+ *        0.125 rpm/bit. Byte 3: SPN 518, 1 %/bit, offset -125. Bytes 4-6
+ *        sent as 0xFF. Byte 7: message counter (SPN 4206) in bits 0-3 and
+ *        message checksum (SPN 4207) in bits 4-7, as J1939-71 defines them;
+ *        see j1939_tsc1_checksum().
  */
 typedef struct {
     J1939OverrideMode override_mode;
@@ -71,7 +72,18 @@ typedef struct {
     float requested_speed_rpm;    /**< SPN 898 */
     bool requested_torque_valid;
     float requested_torque_pct;   /**< SPN 518 */
+    uint8_t message_counter;      /**< SPN 4206, 0..15: the sender adds 1 per frame, 15 wraps to 0 */
+    bool checksum_valid;          /**< decode only: SPN 4207 matches the frame; ignored by the encoder */
 } J1939Tsc1;
+
+/**
+ * @brief TSC1 message checksum, SPN 4207 (J1939-71): the sum of data bytes
+ *        0-6, the message counter and the four bytes of the 29-bit identifier,
+ *        folded to 4 bits as ((sum >> 4) + sum) & 0x0F.
+ * @param f       the frame; its identifier and data bytes 0-6 are read
+ * @param counter the message counter, SPN 4206 (only bits 0-3 count)
+ */
+uint8_t j1939_tsc1_checksum(const J1939Frame *f, uint8_t counter);
 
 /**
  * @brief EEC1, PGN 61444, broadcast. Byte 0 bits 0-3: SPN 899. Byte 1: SPN 512.

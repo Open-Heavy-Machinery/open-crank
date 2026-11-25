@@ -27,6 +27,7 @@
 #define ENGINE_STATUS_LOSS "engine_status_loss.csv"
 #define OVERSPEED "overspeed.csv"
 #define OVERRIDE_IGNORED "override_ignored.csv"
+#define SPEED_COMMAND_CORRUPT "speed_command_corrupt.csv"
 
 /* What happened during a stretch of simulated time. */
 typedef struct {
@@ -161,6 +162,28 @@ static void test_speed_command_loss(void) {
 
 /* The engine goes silent: the controller faults and releases the override;
  * the pump command drops to zero; the engine returns to idle. */
+/* The controller's frames arrive with the high byte of the requested speed
+ * flipped (1500 rpm would read as about 6716): the engine must refuse them
+ * by their checksum, never speed up, and the controller must release. */
+/* SR-10 */
+static void test_speed_command_corrupt(void) {
+    Window w;
+    start(SPEED_COMMAND_CORRUPT);
+    run_to(8.0, NULL);
+    CHECK(loop.bench.ecu.source == ECU_SPEED_SOURCE_REQUEST);
+    CHECK(loop.bench.tsc1_rejected == 0U);
+
+    run_to(14.0, &w);
+    CHECK(w.max_rpm < 1600.0); /* without the checksum: about 2100, the governed ceiling */
+    CHECK(loop.bench.tsc1_rejected > 500U); /* every TSC1 for 6 s */
+    CHECK(w.mc_fault_seen && w.first_fault == MC_FAULT_OVERRIDE_REJECTED);
+    CHECK_NEAR(rpm(), 750.0, 10.0);
+
+    run_to(25.0, &w);
+    CHECK(loop.mc.state == MC_STATE_RUN);
+    CHECK_NEAR(rpm(), 1500.0, 5.0);
+}
+
 /* SR-4 */
 static void test_engine_status_loss(void) {
     Window w;
@@ -231,6 +254,7 @@ int main(void) {
     RUN_TEST(test_cold_start);
     RUN_TEST(test_load_step_and_release);
     RUN_TEST(test_speed_command_loss);
+    RUN_TEST(test_speed_command_corrupt);
     RUN_TEST(test_engine_status_loss);
     RUN_TEST(test_overspeed_protection);
     RUN_TEST(test_override_ignored);

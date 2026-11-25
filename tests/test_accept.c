@@ -40,11 +40,12 @@ static J1939Frame tsc1_frame(J1939OverrideMode mode, bool speed_valid, float rpm
 
 static void test_accept_table(void) {
     oc_accept_init(&accept, OC_ACCEPT_DUT_DEFAULT, &accept_table);
-    CHECK(accept_table.count == 4U);
+    CHECK(accept_table.count == 5U);
     CHECK(strcmp(OC_ACCEPT_OBSERVABLES[OC_ACCEPT_TSC1_SPEED_CONTROL].name, "tsc1_speed_control") == 0);
     CHECK(strcmp(OC_ACCEPT_OBSERVABLES[OC_ACCEPT_TSC1_SPEED_RPM].name, "tsc1_speed_rpm") == 0);
     CHECK(strcmp(OC_ACCEPT_OBSERVABLES[OC_ACCEPT_PUMP_CMD_PCT].name, "pump_cmd_pct") == 0);
     CHECK(strcmp(OC_ACCEPT_OBSERVABLES[OC_ACCEPT_TSC1_OVERRIDE].name, "tsc1_override") == 0);
+    CHECK(strcmp(OC_ACCEPT_OBSERVABLES[OC_ACCEPT_TSC1_INTACT].name, "tsc1_intact") == 0);
     for (size_t i = 0; i < accept_table.count; i++) {
         CHECK(OC_ACCEPT_OBSERVABLES[i].stale == 200U * OTK_NS_PER_MS);
     }
@@ -55,6 +56,30 @@ static void test_accept_table(void) {
           OC_ACCEPT_OBSERVABLES[OC_ACCEPT_PUMP_CMD_PCT].fallback.value == 0.0);
     CHECK(!OC_ACCEPT_OBSERVABLES[OC_ACCEPT_TSC1_OVERRIDE].fallback.gap &&
           OC_ACCEPT_OBSERVABLES[OC_ACCEPT_TSC1_OVERRIDE].fallback.value == 0.0);
+    CHECK(!OC_ACCEPT_OBSERVABLES[OC_ACCEPT_TSC1_INTACT].fallback.gap &&
+          OC_ACCEPT_OBSERVABLES[OC_ACCEPT_TSC1_INTACT].fallback.value == 1.0); /* silence is not a broken frame */
+}
+
+/* SR-10: intact = checksum right and counter = previous + 1. */
+static void test_accept_tsc1_intact(void) {
+    oc_accept_init(&accept, OC_ACCEPT_DUT_DEFAULT, &accept_table);
+    OtkOracleUpdate up[OTK_ORACLE_MAX_OBSERVABLES];
+    J1939Tsc1 m = { J1939_OVERRIDE_SPEED, 0, 3, true, 1500.0f, false, 0.0f, 14U, false };
+    J1939Frame f;
+    for (int i = 0; i < 4; i++) { /* 14, 15, 0, 1: the wrap is a step of one */
+        j1939_encode_tsc1(&m, OC_ACCEPT_DUT_DEFAULT, J1939_ADDR_ENGINE_1, &f);
+        CHECK(decode_j1939(&f, up) == 4U);
+        CHECK(up[3].observable == OC_ACCEPT_TSC1_INTACT && up[3].value.value == 1.0);
+        m.message_counter = (uint8_t)((m.message_counter + 1U) & 0x0FU);
+    }
+    j1939_encode_tsc1(&m, OC_ACCEPT_DUT_DEFAULT, J1939_ADDR_ENGINE_1, &f);
+    f.data[1] ^= 0x01U; /* wrong checksum */
+    CHECK(decode_j1939(&f, up) == 4U && up[3].value.value == 0.0);
+    m.message_counter = (uint8_t)((m.message_counter + 1U) & 0x0FU);
+    j1939_encode_tsc1(&m, OC_ACCEPT_DUT_DEFAULT, J1939_ADDR_ENGINE_1, &f);
+    CHECK(decode_j1939(&f, up) == 4U && up[3].value.value == 1.0);
+    j1939_encode_tsc1(&m, OC_ACCEPT_DUT_DEFAULT, J1939_ADDR_ENGINE_1, &f);
+    CHECK(decode_j1939(&f, up) == 4U && up[3].value.value == 0.0); /* counter repeated */
 }
 
 static void test_accept_tsc1_speed_control(void) {
@@ -64,7 +89,7 @@ static void test_accept_tsc1_speed_control(void) {
     /* Byte 0 = 0xF1: speed control, with a speed. */
     J1939Frame f = tsc1_frame(J1939_OVERRIDE_SPEED, true, 1500.0f, 0x27U, 0x00U);
     CHECK(f.data[0] == 0xF1U);
-    CHECK(decode_j1939(&f, up) == 3U);
+    CHECK(decode_j1939(&f, up) == 4U);
     CHECK(up[0].observable == OC_ACCEPT_TSC1_SPEED_CONTROL && !up[0].value.gap && up[0].value.value == 1.0);
     CHECK(up[1].observable == OC_ACCEPT_TSC1_SPEED_RPM && !up[1].value.gap && up[1].value.value == 1500.0);
     CHECK(up[2].observable == OC_ACCEPT_TSC1_OVERRIDE && !up[2].value.gap && up[2].value.value == 1.0);
@@ -72,7 +97,7 @@ static void test_accept_tsc1_speed_control(void) {
     /* Speed control without a valid speed is not speed control, but it is still an override. */
     f = tsc1_frame(J1939_OVERRIDE_SPEED, false, 0.0f, 0x27U, 0x00U);
     CHECK(f.data[0] == 0xF1U && f.data[1] == 0xFFU && f.data[2] == 0xFFU);
-    CHECK(decode_j1939(&f, up) == 3U);
+    CHECK(decode_j1939(&f, up) == 4U);
     CHECK(up[0].value.value == 0.0 && up[1].value.gap);
     CHECK(up[2].observable == OC_ACCEPT_TSC1_OVERRIDE && !up[2].value.gap && up[2].value.value == 1.0);
 }
@@ -84,20 +109,20 @@ static void test_accept_tsc1_released(void) {
     /* Byte 0 = 0xF0: override disabled. The speed bytes do not matter. */
     J1939Frame f = tsc1_frame(J1939_OVERRIDE_DISABLED, true, 1500.0f, 0x27U, 0x00U);
     CHECK(f.data[0] == 0xF0U);
-    CHECK(decode_j1939(&f, up) == 3U);
+    CHECK(decode_j1939(&f, up) == 4U);
     CHECK(up[0].observable == OC_ACCEPT_TSC1_SPEED_CONTROL && !up[0].value.gap && up[0].value.value == 0.0);
     CHECK(up[1].observable == OC_ACCEPT_TSC1_SPEED_RPM && up[1].value.gap);
     CHECK(up[2].observable == OC_ACCEPT_TSC1_OVERRIDE && !up[2].value.gap && up[2].value.value == 0.0);
 
     /* Torque control is not speed control either, but it is an override. */
     f = tsc1_frame(J1939_OVERRIDE_TORQUE, true, 1500.0f, 0x27U, 0x00U);
-    CHECK(decode_j1939(&f, up) == 3U);
+    CHECK(decode_j1939(&f, up) == 4U);
     CHECK(up[0].value.value == 0.0 && up[1].value.gap);
     CHECK(up[2].observable == OC_ACCEPT_TSC1_OVERRIDE && up[2].value.value == 1.0);
 
     /* So is a speed/torque limit. */
     f = tsc1_frame(J1939_OVERRIDE_SPEED_TORQUE_LIMIT, true, 1500.0f, 0x27U, 0x00U);
-    CHECK(decode_j1939(&f, up) == 3U);
+    CHECK(decode_j1939(&f, up) == 4U);
     CHECK(up[2].observable == OC_ACCEPT_TSC1_OVERRIDE && up[2].value.value == 1.0);
 }
 
@@ -150,6 +175,7 @@ static void test_accept_pump_cmd(void) {
 int main(void) {
     RUN_TEST(test_accept_table);
     RUN_TEST(test_accept_tsc1_speed_control);
+    RUN_TEST(test_accept_tsc1_intact);
     RUN_TEST(test_accept_tsc1_released);
     RUN_TEST(test_accept_ignores_other_nodes);
     RUN_TEST(test_accept_pump_cmd);

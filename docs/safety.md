@@ -64,7 +64,7 @@ When EEC1 (SPN 1483, source address of the controlling device) has not shown thi
 
 **Why.** If the engine ignores the speed request, the controller's view of the machine is wrong: commanding load on a speed it does not control is unsafe. This is also how the controller learns that its own frames are not arriving, whatever the cause: a lost path, a bus-off, a broken ECU.
 
-Checked by: criteria O1 (`override_ignored`), L1 (`speed_command_loss`) and B1 (`mc_bus_off`); unit test `test_override_must_be_honoured`; closed-loop tests `test_speed_command_loss`, `test_override_ignored`.
+Checked by: criteria O1 (`override_ignored`), L1 (`speed_command_loss`), B1 (`mc_bus_off`) and K1 (`speed_command_corrupt`); unit test `test_override_must_be_honoured`; closed-loop tests `test_speed_command_loss`, `test_override_ignored`.
 
 ### SR-6: Release on overspeed
 
@@ -80,7 +80,7 @@ Once in FAULT, the controller stays in the safe state until a new press of the f
 
 **Why.** A cause that comes and goes (an intermittent connector, a delay that clears) must not make the machine resume on its own: the operator must see that something happened and decide to continue.
 
-Checked by: criteria E2, D1, O1, L1, B1 and V1, which require the safe state until the fault reset or the end of the scenario, including after the cause is gone in `engine_status_delay`, `speed_command_loss` and `mc_bus_off`; unit test `test_reset_on_press_only`.
+Checked by: criteria E2, D1, O1, L1, B1, K1 and V1, which require the safe state until the fault reset or the end of the scenario, including after the cause is gone in `engine_status_delay`, `speed_command_loss` and `mc_bus_off`; unit test `test_reset_on_press_only`.
 
 ### SR-8: Releasing the hoist lever stops the pump
 
@@ -98,9 +98,16 @@ Engine status that arrives up to 150 ms late with jitter, or the loss of one in 
 
 Checked by: criteria J1 (`engine_status_jitter`) and I1 (`speed_command_intermittent`).
 
+### SR-10: Every TSC1 carries a valid counter and checksum
+
+Every TSC1 the controller sends carries a message counter that goes up by one per frame (SPN 4206, 15 wraps to 0) and a message checksum (SPN 4207), as J1939-71 defines them ([`bus-interface.md`](bus-interface.md)).
+
+**Why.** A frame can pass the CAN CRC with the wrong content: a faulty gateway, a sender's memory or a bit flipped after the CRC check. Without the checksum, an engine reads a speed request whose high byte is flipped as about 6700 rpm, and goes to its 2100 rpm ceiling. With it, the engine refuses the frame as if it were lost, and SR-5 releases. The counter lets the engine refuse a frozen sender or a repeated frame.
+
+Checked by: criterion G3 in every scenario, through the observable `tsc1_intact` (checksum right, and counter = previous + 1); criterion K1 (`speed_command_corrupt`), through SR-5; unit tests `test_tsc1_counter_and_checksum` (codec), `test_tsc1_integrity_checked` (the simulated engine refuses) and `test_accept_tsc1_intact` (the observable); closed-loop test `test_speed_command_corrupt` (the engine stays below 1600 rpm while every TSC1 is corrupted).
+
 ## What is not specified yet
 
-- **Corrupted frames** *(planned, v0.3.1)*: rejecting a TSC1 whose content is wrong needs the TSC1 counter and checksum (SPN 4206/4207), which the codec does not have yet. Without them a corrupted frame cannot be detected, so no requirement can ask for it.
 - **Stall**: the controller enters FAULT below `stall_rpm` (unit test `test_overspeed_and_stall`), but no scenario drives the engine into a stall under control, so there is no acceptance criterion and no requirement for it.
 - **Engine diagnostics (DM1) and limp-home** *(planned, v0.3.1)*.
 - **Watchdog** *(planned, v0.3.1)*: see the safe state above.

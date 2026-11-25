@@ -71,6 +71,9 @@ typedef struct {
 
     uint32_t rx_frames;          /**< frames accepted from the device under test */
     uint32_t rx_dropped;         /**< frames dropped by fault.mc_tx_lost */
+    uint32_t tsc1_rejected;      /**< TSC1 refused by the ECU: wrong checksum or repeated counter (SPN 4207/4206) */
+    bool tsc1_counter_seen;
+    uint8_t tsc1_counter;        /**< message counter of the last TSC1 accepted */
 
     /**
      * Transport faults (opentick/link.h), driven by the fault.link.* signals.

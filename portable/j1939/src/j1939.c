@@ -47,6 +47,18 @@ uint8_t j1939_id_priority(uint32_t id) {
 
 /* ---------------------------------------------------------------- TSC1 */
 
+uint8_t j1939_tsc1_checksum(const J1939Frame *f, uint8_t counter) {
+    uint32_t sum = (uint32_t)counter & 0x0FU;
+    for (uint32_t i = 0U; i < 7U; i++) {
+        sum += (uint32_t)f->data[i];
+    }
+    sum += f->id & 0xFFU;
+    sum += (f->id >> 8U) & 0xFFU;
+    sum += (f->id >> 16U) & 0xFFU;
+    sum += (f->id >> 24U) & 0xFFU;
+    return (uint8_t)(((sum >> 4U) + sum) & 0x0FU);
+}
+
 void j1939_encode_tsc1(const J1939Tsc1 *m, uint8_t src, uint8_t dest, J1939Frame *f) {
     j1939_frame_init(f, j1939_make_id(J1939_PRIORITY_CONTROL, J1939_PGN_TSC1, dest, src));
     f->data[0] = (uint8_t)(((uint8_t)m->override_mode & 0x03U) | (uint8_t)((m->speed_conditions & 0x03U) << 2) |
@@ -57,6 +69,8 @@ void j1939_encode_tsc1(const J1939Tsc1 *m, uint8_t src, uint8_t dest, J1939Frame
     if (m->requested_torque_valid) {
         f->data[3] = j1939_to_u8(m->requested_torque_pct, 1.0f, -125.0f);
     }
+    const uint8_t counter = (uint8_t)(m->message_counter & 0x0FU);
+    f->data[7] = (uint8_t)((uint8_t)(j1939_tsc1_checksum(f, counter) << 4U) | counter);
 }
 
 bool j1939_decode_tsc1(const J1939Frame *f, J1939Tsc1 *m) {
@@ -84,6 +98,8 @@ bool j1939_decode_tsc1(const J1939Frame *f, J1939Tsc1 *m) {
     m->mode_priority = (uint8_t)((f->data[0] >> 4) & 0x03U);
     m->requested_speed_valid = j1939_from_u16(j1939_get_u16(&f->data[1]), 0.125f, 0.0f, &m->requested_speed_rpm);
     m->requested_torque_valid = j1939_from_u8(f->data[3], 1.0f, -125.0f, &m->requested_torque_pct);
+    m->message_counter = (uint8_t)(f->data[7] & 0x0FU);
+    m->checksum_valid = (uint8_t)((f->data[7] >> 4U) & 0x0FU) == j1939_tsc1_checksum(f, m->message_counter);
     return true;
 }
 

@@ -174,6 +174,14 @@ mutate "controller: waits 5 s for the engine to honour the override" $MC \
     ".override_confirm_ms = 500U," ".override_confirm_ms = 5000U," \
     "B1"
 
+# TSC1 counter and checksum (open-crank v0.3.1, step 3b).
+mutate "controller: TSC1 checksum not written" portable/j1939/src/j1939.c \
+    "f->data[7] = (uint8_t)((uint8_t)(j1939_tsc1_checksum(f, counter) << 4U) | counter);" "f->data[7] = counter;" \
+    "G3"
+mutate "controller: TSC1 counter frozen" $MC \
+    "c->tsc1_counter = (uint8_t)((uint8_t)(c->tsc1_counter + 1U) & 0x0FU);" "(void)0;" \
+    "G3"
+
 echo
 echo "$killed mutants killed, $accepted accepted survivors, $problems problems"
 [[ $problems -eq 0 ]]

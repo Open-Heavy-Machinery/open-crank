@@ -161,7 +161,7 @@ Once proven here, the oracle moves to open-tick (its v0.2), as the runtime did i
 
 **Met on 2026-11-24.**
 
-1. CI's `firmware` job builds `oc-stm32g4-demo` and `oc-stm32g4-echo` with the pinned Arm GNU Toolchain 14.2.rel1 and checks that no CubeMX-generated function is in them. The `portable-cortex-m4f` job gives the stack figures with the same toolchain (`mc_handle_frame` 96 B, `mc_step` 68 B). See [platforms/stm32g4/README.md](platforms/stm32g4/README.md#build-and-program-without-cubeide).
+1. CI's `firmware` job builds `oc-stm32g4-demo` and `oc-stm32g4-echo` with the pinned Arm GNU Toolchain 14.2.rel1 and checks that no CubeMX-generated function is in them. The `portable-cortex-m4f` job gives the stack figures with the same toolchain (`mc_handle_frame` 96 B, `mc_step` 68 B at v0.2.2; 76 B since the TSC1 checksum, v0.3.1). See [platforms/stm32g4/README.md](platforms/stm32g4/README.md#build-and-program-without-cubeide).
 2. `tools/board/bench.sh` on the reference bench, on this release's commit, gave BENCH OK:
    - round trip 1000 of 1000, p99 1.895 ms;
    - seven PASS, 0 late steps;
@@ -202,7 +202,7 @@ Fault injection pulls in protocol work that v0.1 left out on purpose:
    - the safe state and the requirements `SR-1`…`SR-9` in [`docs/safety.md`](docs/safety.md), checked in CI by `tools/check_requirements.py`.
 3. **In progress, v0.3.1, on the board** (steps 3a to 3d):
    - *done (step 3a):* the fault scenarios in `tools/board/bench.sh`, with board reference times;
-   - 3b: the TSC1 counter and checksum (SPN 4206/4207), with a `corrupt` scenario;
+   - *done (step 3b):* the TSC1 counter and checksum (SPN 4206/4207), with the `speed_command_corrupt` scenario, criterion G3 in every scenario and `SR-10`;
    - 3c: the watchdog, after whose reset the controller starts in FAULT and waits for the operator's fault reset;
    - 3d: DM1 from the engine (read with BAM when more than one code is active), and limp-home: requested speed at most 1200 rpm and pump at most 50 %, reached smoothly, while the amber lamp is on.
    - The controller's own DM1 is left for after v0.3.1.
@@ -211,7 +211,8 @@ Fault injection pulls in protocol work that v0.1 left out on purpose:
 
 1. Each injected fault has a test that verifies the reaction.
    - *Met in SIL and on `vcan`* for the faults injected so far: lost frames (`fault.mc_tx_lost`, `fault.engine_tx_lost`, the links' `drop_one_in`), delay, jitter and bus-off ([`docs/acceptance.md`](docs/acceptance.md), "Link faults").
-   - *Open:* `corrupt` and the DM1 faults (v0.3.1), and the board (v0.3.1).
+   - `corrupt`: *met* since v0.3.1 step 3b (`speed_command_corrupt`, SR-10).
+   - *Open:* the DM1 faults and the watchdog (v0.3.1).
 2. Each safety requirement is linked to at least one test.
    - *Met:* `SR-1`…`SR-9`, each cited by an acceptance criterion or a unit test ([`docs/safety.md`](docs/safety.md)); `tools/check_requirements.py` fails CI otherwise. Requirements added in v0.3.1 must keep it so.
 

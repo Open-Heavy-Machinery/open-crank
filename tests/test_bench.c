@@ -32,8 +32,11 @@ static Counts run(OcBench *b, uint32_t ms) {
     return c;
 }
 
+static uint8_t tsc1_counter; /* SPN 4206: the bench refuses a repeated counter */
+
 static void send_tsc1(OcBench *b, J1939OverrideMode mode, float rpm) {
-    const J1939Tsc1 m = { mode, 0, 3, mode == J1939_OVERRIDE_SPEED, rpm, false, 0.0f };
+    const J1939Tsc1 m = { mode, 0, 3, mode == J1939_OVERRIDE_SPEED, rpm, false, 0.0f, tsc1_counter, false };
+    tsc1_counter = (uint8_t)((tsc1_counter + 1U) & 0x0FU);
     J1939Frame f;
     j1939_encode_tsc1(&m, OC_ADDR_MACHINE_CTRL, J1939_ADDR_ENGINE_1, &f);
     oc_bench_rx(b, &f);
@@ -88,7 +91,7 @@ static void test_tsc1_reaches_engine_ecu(void) {
     OcBench c;
     oc_bench_init(&c, &OC_BENCH_D936LA6);
     start_engine(&c);
-    const J1939Tsc1 m = { J1939_OVERRIDE_SPEED, 0, 3, true, 1500.0f, false, 0.0f };
+    const J1939Tsc1 m = { J1939_OVERRIDE_SPEED, 0, 3, true, 1500.0f, false, 0.0f, 0U, false };
     J1939Frame f;
     j1939_encode_tsc1(&m, OC_ADDR_MACHINE_CTRL, 0x01, &f);
     oc_bench_rx(&c, &f);
@@ -150,6 +153,30 @@ static void test_mc_link_bus_off(void) {
     CHECK(b.rx_frames == 0U);
 }
 
+/* SR-10: the ECU acts only on a TSC1 whose checksum is right and whose counter moved. */
+static void test_tsc1_integrity_checked(void) {
+    OcBench b;
+    oc_bench_init(&b, &OC_BENCH_D936LA6);
+    start_engine(&b);
+    J1939Frame f;
+    const J1939Tsc1 m = { J1939_OVERRIDE_SPEED, 0, 3, true, 1500.0f, false, 0.0f, 4U, false };
+
+    j1939_encode_tsc1(&m, OC_ADDR_MACHINE_CTRL, J1939_ADDR_ENGINE_1, &f);
+    f.data[2] ^= 0xFFU; /* the speed's high byte: 1500 rpm would read as 6716 */
+    oc_bench_rx(&b, &f);
+    (void)run(&b, 10U);
+    CHECK(b.tsc1_rejected == 1U);
+    CHECK(b.ecu.source == ECU_SPEED_SOURCE_LOW_IDLE);
+
+    j1939_encode_tsc1(&m, OC_ADDR_MACHINE_CTRL, J1939_ADDR_ENGINE_1, &f);
+    oc_bench_rx(&b, &f); /* intact: accepted */
+    oc_bench_rx(&b, &f); /* same counter again: refused */
+    (void)run(&b, 10U);
+    CHECK(b.tsc1_rejected == 2U);
+    CHECK(b.rx_frames == 1U);
+    CHECK(b.ecu.source == ECU_SPEED_SOURCE_REQUEST);
+}
+
 static void test_pump_command_times_out(void) {
     OcBench b;
     oc_bench_init(&b, &OC_BENCH_D936LA6);
@@ -170,6 +197,7 @@ int main(void) {
     RUN_TEST(test_tsc1_reaches_engine_ecu);
     RUN_TEST(test_mc_frames_lost);
     RUN_TEST(test_pump_command_times_out);
+    RUN_TEST(test_tsc1_integrity_checked);
     RUN_TEST(test_engine_link_delay);
     RUN_TEST(test_mc_link_delay);
     RUN_TEST(test_mc_link_bus_off);
