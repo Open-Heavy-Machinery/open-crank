@@ -169,7 +169,7 @@ tools/board/bench.sh      # about 4 minutes
 `bench.sh` is the standard bench check:
 
 1. It builds the firmware from this commit and measures the bus round trip with an echo firmware. This checks the wiring, the termination, the adapter and the bit rate.
-2. It programs the reference controller and plays every scenario (twelve). It resets the board before each one and prints each pass/fail report as it goes. Run `candump can0` in another terminal to watch the frames.
+2. It programs the reference controller and plays every scenario (fifteen). It resets the board before each one and prints each pass/fail report as it goes. Run `candump can0` in another terminal to watch the frames.
 3. It ends with `report.md`: your setup, the round trip, every verdict and every reaction time next to the reference bench's.
 
 **BENCH OK** means your bench behaves like the reference one, and is ready for your own firmware. The traces it leaves can be opened in [open-rig](https://github.com/Open-Heavy-Machinery/open-rig). Details are in [platforms/stm32g4/README.md](platforms/stm32g4/README.md#the-bench-check).

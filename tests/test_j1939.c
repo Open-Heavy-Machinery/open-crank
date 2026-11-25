@@ -5,10 +5,13 @@
  *        trips, saturation, "not available", short and foreign frames.
  */
 
+#include <string.h>
 #include <math.h>
 
 #include "check.h"
 #include <opencrank/j1939.h>
+#include <opencrank/j1939_diag.h>
+#include <opencrank/j1939_diag_tx.h>
 #include <opencrank/oc_msgs.h>
 
 static int all_ff(const J1939Frame *f, int from, int to) {
@@ -291,6 +294,101 @@ static void test_bench_messages(void) {
     CHECK(!oc_decode_operator(&f, &d));
 }
 
+/* SR-12, SR-13 */
+/* The engine's lamps and codes are read exactly. */
+static void test_dm1_known_vectors(void) {
+    /* One code, red stop lamp: SPN 100 FMI 1, count 1. By hand: lamps
+     * 0b00010000; SPN 100 = 0x64 0x00, high bits 0 << 5 | FMI 1; count 1. */
+    J1939Dm1 m = { 0 };
+    m.red_stop = J1939_LAMP_ON;
+    m.n_dtc = 1U;
+    m.dtc[0] = (J1939Dtc){ 100U, 1U, 1U };
+    uint8_t d[J1939_DM1_MAX_LEN];
+    CHECK(j1939_encode_dm1(&m, d, sizeof(d)) == 8U);
+    const uint8_t want[8] = { 0x10U, 0xFFU, 0x64U, 0x00U, 0x01U, 0x01U, 0xFFU, 0xFFU };
+    CHECK(memcmp(d, want, 8) == 0);
+    J1939Dm1 r;
+    CHECK(j1939_decode_dm1(d, 8U, &r));
+    CHECK(r.red_stop == J1939_LAMP_ON && r.amber_warning == J1939_LAMP_OFF && r.mil == J1939_LAMP_OFF);
+    CHECK(r.n_dtc == 1U && r.dtc[0].spn == 100U && r.dtc[0].fmi == 1U && r.dtc[0].oc == 1U);
+
+    /* No active code: SPN 0 FMI 0 is no DTC. */
+    J1939Dm1 none = { 0 };
+    CHECK(j1939_encode_dm1(&none, d, sizeof(d)) == 8U);
+    CHECK(d[0] == 0x00U && d[2] == 0U && d[3] == 0U && d[4] == 0U && d[5] == 0U);
+    CHECK(j1939_decode_dm1(d, 8U, &r) && r.n_dtc == 0U && r.red_stop == J1939_LAMP_OFF);
+
+    /* The SPN's three high bits: SPN 0x5A5A5, FMI 9 -> A5 A5, 101 << 5 | 01001 = 0xA9. */
+    m.dtc[0] = (J1939Dtc){ 0x5A5A5U, 9U, 3U };
+    m.red_stop = J1939_LAMP_OFF;
+    m.amber_warning = J1939_LAMP_ON;
+    CHECK(j1939_encode_dm1(&m, d, sizeof(d)) == 8U);
+    CHECK(d[0] == 0x04U && d[2] == 0xA5U && d[3] == 0xA5U && d[4] == 0xA9U && d[5] == 0x03U);
+    CHECK(j1939_decode_dm1(d, 8U, &r) && r.dtc[0].spn == 0x5A5A5U && r.dtc[0].fmi == 9U);
+    CHECK(r.amber_warning == J1939_LAMP_ON && r.red_stop == J1939_LAMP_OFF);
+
+    /* Two codes: 10 bytes, no padding. Too short to decode: false. */
+    m.n_dtc = 2U;
+    m.dtc[1] = (J1939Dtc){ 110U, 16U, 1U };
+    CHECK(j1939_encode_dm1(&m, d, sizeof(d)) == 10U);
+    CHECK(j1939_decode_dm1(d, 10U, &r) && r.n_dtc == 2U && r.dtc[1].spn == 110U && r.dtc[1].fmi == 16U);
+    CHECK(!j1939_decode_dm1(d, 5U, &r));
+    CHECK(j1939_encode_dm1(&m, d, 9U) == 0U); /* no room */
+}
+
+/* SR-12 */
+/* A two-code DM1 crosses as a BAM, and a broken BAM is dropped. */
+static void test_bam(void) {
+    uint8_t msg[10];
+    for (uint8_t i = 0U; i < 10U; i++) {
+        msg[i] = (uint8_t)(0x10U + i);
+    }
+    J1939Frame fr[J1939_TP_MAX_PACKETS + 1U];
+    CHECK(j1939_bam_encode(J1939_PGN_DM1, msg, 10U, 0x00U, fr, 8U) == 3U);
+    /* TP.CM: priority 6, PGN 0xEC00 to 0xFF, from 0x00; BAM, 10 bytes, 2 packets, PGN 0x00FECA. */
+    CHECK(fr[0].id == 0x18ECFF00UL);
+    CHECK(fr[0].data[0] == 32U && fr[0].data[1] == 10U && fr[0].data[2] == 0U && fr[0].data[3] == 2U);
+    CHECK(fr[0].data[4] == 0xFFU && fr[0].data[5] == 0xCAU && fr[0].data[6] == 0xFEU && fr[0].data[7] == 0x00U);
+    CHECK(fr[1].id == 0x18EBFF00UL && fr[1].data[0] == 1U && fr[1].data[1] == 0x10U && fr[1].data[7] == 0x16U);
+    CHECK(fr[2].data[0] == 2U && fr[2].data[1] == 0x17U && fr[2].data[3] == 0x19U && fr[2].data[4] == 0xFFU);
+    CHECK(j1939_bam_encode(J1939_PGN_DM1, msg, 8U, 0x00U, fr, 8U) == 0U); /* fits in one frame */
+    CHECK(j1939_bam_encode(J1939_PGN_DM1, msg, 10U, 0x00U, fr, 2U) == 0U); /* no room */
+
+    J1939BamRx rx;
+    uint32_t pgn = 0U;
+    j1939_bam_rx_init(&rx);
+    CHECK(!j1939_bam_rx_frame(&rx, &fr[0], 1000U, &pgn));
+    CHECK(!j1939_bam_rx_frame(&rx, &fr[1], 1050U, &pgn));
+    CHECK(j1939_bam_rx_frame(&rx, &fr[2], 1100U, &pgn));
+    CHECK(pgn == J1939_PGN_DM1 && rx.size == 10U && memcmp(rx.buf, msg, 10) == 0);
+
+    /* Out of sequence: dropped, and the rest of it is ignored. */
+    (void)j1939_bam_rx_frame(&rx, &fr[0], 2000U, &pgn);
+    CHECK(!j1939_bam_rx_frame(&rx, &fr[2], 2050U, &pgn));
+    CHECK(!rx.active);
+    CHECK(!j1939_bam_rx_frame(&rx, &fr[1], 2100U, &pgn));
+
+    /* A packet later than T1 (750 ms): dropped. */
+    (void)j1939_bam_rx_frame(&rx, &fr[0], 3000U, &pgn);
+    (void)j1939_bam_rx_frame(&rx, &fr[1], 3050U, &pgn);
+    CHECK(!j1939_bam_rx_frame(&rx, &fr[2], 3050U + J1939_TP_T1_MS + 1U, &pgn));
+    CHECK(!rx.active);
+
+    /* A new TP.CM restarts: the message completes from the new one. */
+    (void)j1939_bam_rx_frame(&rx, &fr[0], 4000U, &pgn);
+    (void)j1939_bam_rx_frame(&rx, &fr[1], 4050U, &pgn);
+    (void)j1939_bam_rx_frame(&rx, &fr[0], 4100U, &pgn);
+    CHECK(!j1939_bam_rx_frame(&rx, &fr[2], 4150U, &pgn)); /* expects packet 1 again */
+    (void)j1939_bam_rx_frame(&rx, &fr[0], 4200U, &pgn);
+    (void)j1939_bam_rx_frame(&rx, &fr[1], 4250U, &pgn);
+    CHECK(j1939_bam_rx_frame(&rx, &fr[2], 4300U, &pgn));
+
+    /* An announcement that does not add up (3 packets for 10 bytes) is ignored. */
+    fr[0].data[3] = 3U;
+    (void)j1939_bam_rx_frame(&rx, &fr[0], 5000U, &pgn);
+    CHECK(!rx.active);
+}
+
 int main(void) {
     RUN_TEST(test_identifiers);
     RUN_TEST(test_tsc1_known_vector);
@@ -303,5 +401,7 @@ int main(void) {
     RUN_TEST(test_rejects_short_and_foreign_frames);
     RUN_TEST(test_et1_eflp1_vectors);
     RUN_TEST(test_bench_messages);
+    RUN_TEST(test_dm1_known_vectors);
+    RUN_TEST(test_bam);
     return check_report();
 }

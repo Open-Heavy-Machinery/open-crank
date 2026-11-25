@@ -28,7 +28,14 @@ const OcBenchConfig OC_BENCH_D936LA6 = {
     .eflp1_period_ms = 500U,
     .et1_period_ms = 1000U,
     .operator_period_ms = 20U,
+    .dm1_period_ms = 1000U,
 };
+
+/* The engine's diagnostic trouble codes (fault.engine_dtc_*). */
+#define DTC_SPN_OIL_PRESSURE 100U  /* SPN 100, engine oil pressure */
+#define DTC_FMI_LOW_SEVERE 1U      /* FMI 1, below normal, most severe: red stop lamp */
+#define DTC_SPN_COOLANT_TEMP 110U  /* SPN 110, engine coolant temperature */
+#define DTC_FMI_HIGH_MODERATE 16U  /* FMI 16, above normal, moderately severe: amber lamp */
 
 void oc_bench_init(OcBench *b, const OcBenchConfig *cfg) {
     memset(b, 0, sizeof(*b));
@@ -146,6 +153,63 @@ static void send_engine(OcBench *b, const J1939Frame *f) {
     (void)otk_link_push(&b->engine_link, &o, otk_ns_from_ms(b->t_ms)); /* a lost frame is counted by the link */
 }
 
+/* DM1 every dm1_period_ms and at once on a change; with two codes it is a
+ * BAM whose packets go J1939_TP_BAM_GAP_MS apart. One BAM at a time. */
+static void send_dm1(OcBench *b, uint32_t t) {
+    const bool red = b->sig.fault_engine_dtc_red;
+    const bool amber = b->sig.fault_engine_dtc_amber;
+    const bool changed = !b->dm1_sent || red != b->dm1_red || amber != b->dm1_amber;
+    if (changed || (b->cfg->dm1_period_ms != 0U && (t % b->cfg->dm1_period_ms) == 0U)) {
+        b->dm1_pending = true;
+    }
+    if (b->bam_next < b->bam_n) {
+        if (t >= b->bam_next_ms) {
+            send_engine(b, &b->bam[b->bam_next]);
+            b->bam_next++;
+            b->bam_next_ms = t + J1939_TP_BAM_GAP_MS;
+        }
+        return; /* the next DM1 waits for this BAM */
+    }
+    if (!b->dm1_pending) {
+        return;
+    }
+    J1939Dm1 dm1 = { 0 };
+    dm1.mil = J1939_LAMP_OFF;
+    dm1.red_stop = red ? J1939_LAMP_ON : J1939_LAMP_OFF;
+    dm1.amber_warning = amber ? J1939_LAMP_ON : J1939_LAMP_OFF;
+    dm1.protect = J1939_LAMP_OFF;
+    if (red) {
+        dm1.dtc[dm1.n_dtc++] = (J1939Dtc){ DTC_SPN_OIL_PRESSURE, DTC_FMI_LOW_SEVERE, 1U };
+    }
+    if (amber) {
+        dm1.dtc[dm1.n_dtc++] = (J1939Dtc){ DTC_SPN_COOLANT_TEMP, DTC_FMI_HIGH_MODERATE, 1U };
+    }
+    uint8_t data[J1939_DM1_MAX_LEN];
+    const size_t len = j1939_encode_dm1(&dm1, data, sizeof(data));
+    if (len == 8U) {
+        J1939Frame f;
+        f.id = j1939_make_id(J1939_PRIORITY_INFO, J1939_PGN_DM1, J1939_ADDR_GLOBAL, b->cfg->ecu->source_address);
+        f.dlc = 8U;
+        for (size_t i = 0U; i < 8U; i++) {
+            f.data[i] = data[i];
+        }
+        send_engine(b, &f);
+    } else {
+        b->bam_n = (uint8_t)j1939_bam_encode(J1939_PGN_DM1, data, len, b->cfg->ecu->source_address, b->bam,
+                                             sizeof(b->bam) / sizeof(b->bam[0]));
+        b->bam_next = 0U;
+        if (b->bam_n > 0U) {
+            send_engine(b, &b->bam[0]); /* TP.CM now, TP.DT later */
+            b->bam_next = 1U;
+            b->bam_next_ms = t + J1939_TP_BAM_GAP_MS;
+        }
+    }
+    b->dm1_sent = true;
+    b->dm1_red = red;
+    b->dm1_amber = amber;
+    b->dm1_pending = false;
+}
+
 static size_t transmit(OcBench *b, J1939Frame *tx, size_t cap) {
     const OcBenchConfig *cfg = b->cfg;
     const uint8_t ecu_addr = cfg->ecu->source_address;
@@ -184,6 +248,7 @@ static size_t transmit(OcBench *b, J1939Frame *tx, size_t cap) {
             j1939_encode_et1(&m, ecu_addr, &f);
             send_engine(b, &f);
         }
+        send_dm1(b, t);
     }
 
     /* What the engine link delivers now: with no fault, the frames just sent. */

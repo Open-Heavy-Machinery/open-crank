@@ -19,6 +19,9 @@ const McParams MC_DEFAULT_PARAMS = {
     .request_min_rpm = 750.0f,
     .request_max_rpm = 2100.0f,
     .slew_rpm_per_s = 500.0f,
+    .limp_rpm = 1200.0f,
+    .limp_pump_pct = 50.0f,
+    .limp_pump_rate_pct_per_s = 100.0f,
 };
 
 static float clampf(float v, float lo, float hi) {
@@ -46,6 +49,8 @@ void mc_init(McCtx *c, const McParams *p) {
     c->controlling_address = J1939_ADDR_GLOBAL;
     c->target_rpm = p->request_min_rpm;
     c->requested_rpm = p->request_min_rpm;
+    j1939_bam_rx_init(&c->engine_bam);
+    c->pump_limit_pct = 100.0f;
 }
 
 void mc_init_after_watchdog(McCtx *c, const McParams *p) {
@@ -53,6 +58,27 @@ void mc_init_after_watchdog(McCtx *c, const McParams *p) {
     c->state = MC_STATE_FAULT;
     c->fault = MC_FAULT_WATCHDOG_RESET;
     c->reset_was_pressed = true; /* a button held through the restart is not a new press */
+}
+
+/* The engine's lamps, from a DM1 (one frame or a reassembled BAM). */
+static void take_dm1(McCtx *c, const uint8_t *data, size_t len) {
+    J1939Dm1 dm1;
+    if (j1939_decode_dm1(data, len, &dm1)) {
+        c->engine_red_stop = dm1.red_stop == J1939_LAMP_ON;
+        c->engine_amber = dm1.amber_warning == J1939_LAMP_ON;
+    }
+}
+
+/* Diagnostics from the engine: DM1 in one frame, or DM1 in a BAM. */
+static void handle_engine_diag(McCtx *c, const J1939Frame *f, uint32_t now_ms) {
+    uint32_t pgn = 0U;
+    if ((f->dlc == 8U) && (j1939_id_pgn(f->id) == J1939_PGN_DM1)) {
+        take_dm1(c, f->data, 8U);
+    } else if (j1939_bam_rx_frame(&c->engine_bam, f, now_ms, &pgn) && (pgn == J1939_PGN_DM1)) {
+        take_dm1(c, c->engine_bam.buf, (size_t)c->engine_bam.size);
+    } else {
+        /* another engine message, or a BAM still arriving */
+    }
 }
 
 void mc_handle_frame(McCtx *c, const J1939Frame *f, uint32_t now_ms) {
@@ -67,6 +93,8 @@ void mc_handle_frame(McCtx *c, const J1939Frame *f, uint32_t now_ms) {
             c->engine_rpm = eec1.engine_speed_rpm;
             c->controlling_address = eec1.controlling_address;
         }
+    } else if (src == c->p->engine_address) {
+        handle_engine_diag(c, f, now_ms);
     } else if (oc_decode_operator(f, &op)) {
         c->operator_seen = true;
         c->operator_ms = now_ms;
@@ -121,14 +149,26 @@ size_t mc_step(McCtx *c, uint32_t now_ms, J1939Frame *out, size_t cap) {
     c->target_rpm = (operator_fresh && c->op.target_speed_valid)
                         ? clampf(c->op.target_speed_rpm, p->request_min_rpm, p->request_max_rpm)
                         : p->request_min_rpm;
-    const float hoist_pct =
+    if (c->engine_amber && (c->target_rpm > p->limp_rpm)) {
+        c->target_rpm = p->limp_rpm; /* limp-home; the slew limit makes the change smooth */
+    }
+    /* Limp-home pump limit: it moves at limp_pump_rate_pct_per_s, so entering
+     * and leaving limp-home never steps the pump. Releasing the lever is not
+     * slowed: the limit only caps the lever. */
+    const float limit_target = c->engine_amber ? p->limp_pump_pct : 100.0f;
+    const float limit_step = p->limp_pump_rate_pct_per_s * dt_s;
+    c->pump_limit_pct += clampf(limit_target - c->pump_limit_pct, -limit_step, limit_step);
+    float hoist_pct =
         (operator_fresh && c->op.hoist_demand_valid) ? clampf(c->op.hoist_demand_pct, 0.0f, 100.0f) : 0.0f;
+    if (hoist_pct > c->pump_limit_pct) {
+        hoist_pct = c->pump_limit_pct;
+    }
     const bool reset = c->reset_requested;
     c->reset_requested = false;
 
     switch (c->state) {
     case MC_STATE_WAIT_ENGINE:
-        if (status_fresh && (c->engine_rpm >= p->running_rpm)) {
+        if (status_fresh && (c->engine_rpm >= p->running_rpm) && !c->engine_red_stop) {
             if (!c->running_seen) {
                 c->running_seen = true;
                 c->running_since_ms = now_ms;
@@ -149,6 +189,8 @@ size_t mc_step(McCtx *c, uint32_t now_ms, J1939Frame *out, size_t cap) {
             enter_fault(c, MC_FAULT_OVERSPEED);
         } else if (c->engine_rpm < p->stall_rpm) {
             enter_fault(c, MC_FAULT_STALL);
+        } else if (c->engine_red_stop) {
+            enter_fault(c, MC_FAULT_ENGINE_RED_STOP);
         } else if (override_rejected(c, now_ms)) {
             enter_fault(c, MC_FAULT_OVERRIDE_REJECTED);
         } else {
@@ -233,6 +275,9 @@ const char *mc_fault_name(McFault f) {
         break;
     case MC_FAULT_WATCHDOG_RESET:
         name = "watchdog reset";
+        break;
+    case MC_FAULT_ENGINE_RED_STOP:
+        name = "engine red stop lamp";
         break;
     default:
         break;

@@ -16,7 +16,7 @@ This file documents every finding that `tools/check_misra.sh` still reports and 
 
 | Baseline pair (rule, file) | Count | Deviation |
 |---|---|---|
-| 8.7, `portable/j1939/src/j1939.c` | 8 | DEV-001 |
+| 8.7, `portable/j1939/src/j1939.c` | 7 | DEV-001 |
 | 8.7, `portable/j1939/src/oc_msgs.c` | 2 | DEV-001 |
 | 8.7, `portable/machine_ctrl/src/machine_ctrl.c` | 6 | DEV-001 |
 | 2.5, `portable/j1939/include/opencrank/j1939.h` | 3 | DEV-002 |
@@ -32,8 +32,8 @@ All four rules are advisory.
 ## DEV-001: Public API functions called from outside the analysed code
 
 - **Rule:** MISRA C:2012 Rule 8.7 (Advisory): limiting external linkage to what is referenced from more than one translation unit.
-- **Scope:** the 16 functions declared in the public headers `portable/j1939/include/opencrank/j1939.h`, `oc_msgs.h` and `portable/machine_ctrl/include/opencrank/machine_ctrl.h` that cppcheck reports:
-  - `portable/j1939/src/j1939.c`: `j1939_id_dest`, `j1939_id_priority`, `j1939_decode_tsc1`, `j1939_encode_eec1`, `j1939_encode_et1`, `j1939_decode_et1`, `j1939_encode_eflp1`, `j1939_decode_eflp1`
+- **Scope:** the 15 functions declared in the public headers `portable/j1939/include/opencrank/j1939.h`, `oc_msgs.h` and `portable/machine_ctrl/include/opencrank/machine_ctrl.h` that cppcheck reports:
+  - `portable/j1939/src/j1939.c`: `j1939_id_priority`, `j1939_decode_tsc1`, `j1939_encode_eec1`, `j1939_encode_et1`, `j1939_decode_et1`, `j1939_encode_eflp1`, `j1939_decode_eflp1`
   - `portable/j1939/src/oc_msgs.c`: `oc_encode_operator`, `oc_decode_pump_cmd`
   - `portable/machine_ctrl/src/machine_ctrl.c`: `mc_init`, `mc_handle_frame`, `mc_clear_fault`, `mc_step`, `mc_state_name`, `mc_fault_name`
 - **Justification:** `portable/` is a pair of libraries. Their purpose is to be linked with code that the check does not analyse: the simulator (`sim/runtime/src/bench.c`, `loop.c`, `trace.c`), the platforms (`platforms/host/run_main.c`, `platforms/linux-socketcan/mc_main.c`), the tests, and from v0.2 the board firmware and anyone's own firmware. cppcheck sees only `portable/`, so a function that the library itself does not call looks as if it had a single user. Giving these functions internal linkage would remove the API.

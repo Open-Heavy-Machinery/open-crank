@@ -189,7 +189,7 @@ Addresses: engine `0x00`, machine controller `0x27`, bench `0xFC`. The first sli
 
 **TSC1 message counter and checksum** (SPN 4206/4207, since v0.3.1): `j1939_tsc1_checksum()` implements J1939-71's formula. The encoder writes byte 7 from `J1939Tsc1.message_counter`, and the decoder fills `message_counter` and `checksum_valid`. The controller counts; the simulated engine checks.
 
-**Not yet implemented, on purpose.** DM1 diagnostics and the transport protocol: see the roadmap, v0.3.1 step 3d.
+**DM1 and BAM** (`opencrank/j1939_diag.h`, since v0.3.1): `j1939_encode_dm1()` / `j1939_decode_dm1()` (lamps and DTCs, J1939-73), `j1939_bam_encode()` and the receiver `J1939BamRx` (J1939-21: sequence checked, T1 750 ms, one message per sender at a time). The simulated engine sends DM1; the controller reads it, also as a BAM. Not implemented: the connection-mode transport (RTS/CTS), and the controller sending its own DM1.
 
 ### 4.5 Machine-controller core (`portable/machine_ctrl`)
 
@@ -257,6 +257,7 @@ time_s,signal,value
 | `fault.engine_tx_lost` | the engine stops transmitting |
 | `fault.ecu_ignores_tsc1` | the engine ECU ignores speed requests |
 | `fault.overrun_torque_nm` | external torque driving the crankshaft |
+| `fault.engine_dtc_red`, `fault.engine_dtc_amber` | the engine's DM1 reports low oil pressure (SPN 100, FMI 1, red stop lamp) or high coolant temperature (SPN 110, FMI 16, amber lamp); both at once make a two-code DM1, sent as a BAM |
 | `test.dut_hang` | test only: the bench sends the frame that hangs the board's hang-test build (watchdog test, `tools/board/watchdog_check.sh`) |
 | `fault.link.mc.*`, `fault.link.engine.*` | transport faults of the two links (drop, drop one in N, delay, jitter, corrupt, bus-off): `mc` carries what the device under test sends to the machine, `engine` what the engine sends to it ([docs/acceptance.md](docs/acceptance.md#link-faults)) |
 | `end` | end of the scenario |
@@ -325,7 +326,7 @@ The oracle and the criteria format are open-tick's (`opentick/oracle.h`, since v
 | MISRA-oriented check | `portable/` against the rules the cppcheck MISRA addon covers; fails on a finding beyond the baseline (counts per rule and file), which goes down as findings are fixed or documented as deviations. Does not imply compliance | `tools/check_misra.sh`, `tools/misra-baseline.txt`, `docs/misra_deviations.md`, CI `misra` job |
 | Stack usage | stack per function in the Cortex-M4F MinSizeRel build (`-fstack-usage`), printed largest first, and the worst-case stack of each public controller function along the call graph (`-fcallgraph-info=su`, `tools/stack_budget.py`); fails if a function's stack is not `static`, on recursion, on an indirect call, or above 1024 bytes | `tools/check_portable.sh`, `tools/stack_budget.py`, CI `portable-cortex-m4f` job |
 | Board vs SIL | `hoist_step` with the board in the loop vs the wall-clock-paced SIL, within tolerances written down before comparing | v0.2 |
-| Acceptance over the bus | any device under test graded by its CAN frames alone, pass/fail per scenario, twelve scenarios with five of transport faults (one corrupts TSC1, refused by its checksum); deliberately broken controllers must fail it | `open-crank-accept`, `docs/acceptance.md`, `tools/accept_vcan.sh` (CI `vcan-demo` job), `tools/accept_mutants.sh` (CI `mutation` job) |
+| Acceptance over the bus | any device under test graded by its CAN frames alone, pass/fail per scenario, fifteen scenarios: five of transport faults (one corrupts TSC1, refused by its checksum) and three of engine diagnostics (DM1, one as a BAM); deliberately broken controllers must fail it | `open-crank-accept`, `docs/acceptance.md`, `tools/accept_vcan.sh` (CI `vcan-demo` job), `tools/accept_mutants.sh` (CI `mutation` job) |
 | Watchdog (on a board, run by hand) | after a hang the IWDG restarts the board and the controller starts in FAULT until the fault reset (SR-11); the hang exists only in a test build, which CI checks | `tools/board/watchdog_check.sh`, `scenarios/board/watchdog_reset.csv`, CI `firmware` job |
 | Safety requirements traced | every `SR-n` of `docs/safety.md` cited by an acceptance criterion or a unit test, and every citation exists | `tools/check_requirements.py`, CI `mutation` job |
 | Emulator vs board | the trace in Renode vs the board's, within the stated tolerance | Track R |
@@ -383,7 +384,7 @@ The migration itself is recorded in [ROADMAP.md](ROADMAP.md), section "v0.1".
 - **Generic plant plugin contract.** With one plant, any abstraction would be a guess. Extract it from what the second plant needs (v0.6). The first slice's function-pointer hooks were removed for this reason.
 - **Protocol abstraction.** J1939 is the right protocol for the current plant. The 2-stroke uses a different control scheme; separate it then.
 - **Level 2 signal layer** (crank and cam waveforms, analog I/O), including crank angle. Designing it now would be speculation; it arrives with the HIL backend in v0.4.
-- **DM1, transport protocol.** With fault injection on real hardware (v0.3.1).
+- **The controller's own DM1, and RTS/CTS transport.** After v0.3.1.
 - **Smarter reference controller** (power limiting, anti-stall). The interface allows it; the reference stays minimal until the basics are proven.
 - **YAML profiles.** When added, they load in `sim/` only. `portable/` never reads files.
 - **FMI/FMU export.** Attractive for interoperability; revisit once the plant interface has settled.

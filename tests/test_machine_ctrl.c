@@ -9,6 +9,8 @@
 #include <stdint.h>
 
 #include "check.h"
+#include <opencrank/j1939_diag.h>
+#include <opencrank/j1939_diag_tx.h>
 #include <opencrank/machine_ctrl.h>
 
 static const McParams *const P = &MC_DEFAULT_PARAMS;
@@ -247,6 +249,115 @@ static void test_starts_in_fault_after_watchdog(void) {
     CHECK(strcmp(mc_fault_name(MC_FAULT_WATCHDOG_RESET), "watchdog reset") == 0);
 }
 
+/* The engine's DM1 with these lamps (and one code each), in one frame, or as
+ * a BAM when both are on, delivered at the harness's current time. */
+static void h_dm1(Harness *h, bool red, bool amber) {
+    J1939Dm1 m = { 0 };
+    m.red_stop = red ? J1939_LAMP_ON : J1939_LAMP_OFF;
+    m.amber_warning = amber ? J1939_LAMP_ON : J1939_LAMP_OFF;
+    if (red) {
+        m.dtc[m.n_dtc++] = (J1939Dtc){ 100U, 1U, 1U };
+    }
+    if (amber) {
+        m.dtc[m.n_dtc++] = (J1939Dtc){ 110U, 16U, 1U };
+    }
+    uint8_t d[J1939_DM1_MAX_LEN];
+    const size_t len = j1939_encode_dm1(&m, d, sizeof(d));
+    J1939Frame fr[J1939_TP_MAX_PACKETS + 1U];
+    if (len == 8U) {
+        fr[0].id = j1939_make_id(J1939_PRIORITY_INFO, J1939_PGN_DM1, J1939_ADDR_GLOBAL, J1939_ADDR_ENGINE_1);
+        fr[0].dlc = 8U;
+        memcpy(fr[0].data, d, 8);
+        mc_handle_frame(&h->mc, &fr[0], h->now_ms);
+        return;
+    }
+    const size_t n = j1939_bam_encode(J1939_PGN_DM1, d, len, J1939_ADDR_ENGINE_1, fr, J1939_TP_MAX_PACKETS + 1U);
+    for (size_t i = 0U; i < n; i++) {
+        mc_handle_frame(&h->mc, &fr[i], h->now_ms);
+        if (i + 1U < n) {
+            h_run(h, J1939_TP_BAM_GAP_MS);
+        }
+    }
+}
+
+/* SR-12 */
+static void test_red_stop_lamp(void) {
+    Harness h;
+    h_init(&h, 0U);
+    h_to_run(&h);
+    h.hoist_pct = 50.0f;
+    h_run(&h, 100U);
+    h_dm1(&h, true, false);
+    h_run(&h, 20U);
+    CHECK(h.mc.state == MC_STATE_FAULT && h.mc.fault == MC_FAULT_ENGINE_RED_STOP);
+    CHECK(h.tsc1.override_mode == J1939_OVERRIDE_DISABLED && h.pump.displacement_pct == 0.0f);
+
+    /* A fault reset while the lamp is still on: no RUN. */
+    h.reset_pressed = true;
+    h_run(&h, 20U);
+    h.reset_pressed = false;
+    h_run(&h, 2000U);
+    CHECK(h.mc.state == MC_STATE_WAIT_ENGINE);
+    h_dm1(&h, false, false);
+    h_run(&h, P->run_confirm_ms + 50U);
+    CHECK(h.mc.state == MC_STATE_RUN);
+    CHECK(strcmp(mc_fault_name(MC_FAULT_ENGINE_RED_STOP), "engine red stop lamp") == 0);
+}
+
+/* SR-12: two codes, so a BAM; the red lamp in it still faults. */
+static void test_red_stop_lamp_over_bam(void) {
+    Harness h;
+    h_init(&h, 0U);
+    h_to_run(&h);
+    h_dm1(&h, true, true);
+    h_run(&h, 20U);
+    CHECK(h.mc.state == MC_STATE_FAULT && h.mc.fault == MC_FAULT_ENGINE_RED_STOP);
+    CHECK(h.mc.engine_amber);
+}
+
+/* SR-13: limp-home, reached and left smoothly, and never a fault. */
+static void test_limp_home(void) {
+    Harness h;
+    h_init(&h, 0U);
+    h_to_run(&h);
+    h.hoist_pct = 85.0f;
+    h_run(&h, 3000U); /* at 1500 rpm, pump 85 % */
+    CHECK_NEAR(h.mc.requested_rpm, 1500.0, 0.01);
+    CHECK_NEAR(h.pump.displacement_pct, 85.0, 0.4);
+
+    h_dm1(&h, false, true);
+    float last_rpm = h.mc.requested_rpm;
+    float last_pump = h.pump.displacement_pct;
+    for (int i = 0; i < 100; i++) { /* 1 s, step by step */
+        h_run(&h, 10U);
+        /* smooth: at most 500 rpm/s and 100 %/s (+ one bit of OC_PUMP_CMD) per 10 ms */
+        CHECK(last_rpm - h.mc.requested_rpm <= 5.0f + 0.01f);
+        CHECK(last_pump - h.pump.displacement_pct <= 1.0f + 0.4f);
+        last_rpm = h.mc.requested_rpm;
+        last_pump = h.pump.displacement_pct;
+    }
+    CHECK(h.mc.state == MC_STATE_RUN);
+    CHECK_NEAR(h.mc.requested_rpm, P->limp_rpm, 0.01);
+    CHECK_NEAR(h.pump.displacement_pct, P->limp_pump_pct, 0.4);
+
+    /* Releasing the lever is not slowed by the limit (SR-8). */
+    h.hoist_pct = 0.0f;
+    h_run(&h, 20U);
+    CHECK(h.pump.displacement_pct == 0.0f);
+    h.hoist_pct = 85.0f;
+    h_run(&h, 20U);
+    CHECK_NEAR(h.pump.displacement_pct, P->limp_pump_pct, 0.4);
+
+    /* The lamp goes off: back to the operator's values, ramped, on its own. */
+    h_dm1(&h, false, false);
+    h_run(&h, 100U);
+    CHECK(h.pump.displacement_pct < 62.0f); /* +10 % per 100 ms, not a step */
+    h_run(&h, 1500U);
+    CHECK(h.mc.state == MC_STATE_RUN);
+    CHECK_NEAR(h.mc.requested_rpm, 1500.0, 0.01);
+    CHECK_NEAR(h.pump.displacement_pct, 85.0, 0.4);
+}
+
 /* SR-7 */
 static void test_reset_on_press_only(void) {
     Harness h;
@@ -315,6 +426,9 @@ int main(void) {
     RUN_TEST(test_overspeed_and_stall);
     RUN_TEST(test_override_must_be_honoured);
     RUN_TEST(test_reset_on_press_only);
+    RUN_TEST(test_red_stop_lamp);
+    RUN_TEST(test_red_stop_lamp_over_bam);
+    RUN_TEST(test_limp_home);
     RUN_TEST(test_starts_in_fault_after_watchdog);
     RUN_TEST(test_operator_timeout);
     RUN_TEST(test_time_wraps);

@@ -27,6 +27,7 @@
 #include <opencrank/plant.h>
 #include <opencrank/runtime/scenario.h>
 #include <opencrank/runtime/signals.h>
+#include <opencrank/j1939_diag_tx.h>
 #include <opentick/link.h>
 #include <opentick/player.h>
 
@@ -41,6 +42,7 @@ typedef struct {
     uint32_t eflp1_period_ms;
     uint32_t et1_period_ms;
     uint32_t operator_period_ms;
+    uint32_t dm1_period_ms;         /**< DM1 is sent this often, and at once when it changes */
 } OcBenchConfig;
 
 /**
@@ -85,6 +87,16 @@ typedef struct {
      */
     OtkLink mc_link;
     OtkLink engine_link;
+
+    /* The engine's DM1 (fault.engine_dtc_*): what was last sent, and a BAM in progress. */
+    bool dm1_sent;
+    bool dm1_red;
+    bool dm1_amber;
+    bool dm1_pending;                        /**< a DM1 is due but a BAM is still being sent */
+    J1939Frame bam[J1939_TP_MAX_PACKETS + 1U];
+    uint8_t bam_n;                           /**< frames of the BAM in progress (TP.CM included) */
+    uint8_t bam_next;                        /**< next one to send */
+    uint32_t bam_next_ms;                    /**< when */
 } OcBench;
 
 void oc_bench_init(OcBench *b, const OcBenchConfig *cfg);

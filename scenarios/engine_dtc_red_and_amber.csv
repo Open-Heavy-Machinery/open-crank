@@ -1,0 +1,15 @@
+# Two engine faults at once.
+# The engine's DM1 reports both codes (red stop and amber warning), so the
+# message is 10 bytes long and travels as a BAM: a TP.CM and two TP.DT frames,
+# 50 ms apart (J1939-21). The controller must reassemble it and fault as for
+# the red stop lamp alone.
+time_s,signal,value
+0.0,key_on,1
+0.0,target_rpm,1500
+0.0,hoist_load_bar,250
+0.5,start,1
+3.0,start,0
+6.0,hoist_demand_pct,50
+8.0,fault.engine_dtc_red,1
+8.0,fault.engine_dtc_amber,1
+14.0,end,0

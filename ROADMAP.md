@@ -204,7 +204,7 @@ Fault injection pulls in protocol work that v0.1 left out on purpose:
    - *done (step 3a):* the fault scenarios in `tools/board/bench.sh`, with board reference times;
    - *done (step 3b):* the TSC1 counter and checksum (SPN 4206/4207), with the `speed_command_corrupt` scenario, criterion G3 in every scenario and `SR-10`;
    - *done (step 3c):* the watchdog (IWDG, 100 ms), after whose reset the controller starts in FAULT and waits for the operator's fault reset (`SR-11`, `tools/board/watchdog_check.sh`);
-   - 3d: DM1 from the engine (read with BAM when more than one code is active), and limp-home: requested speed at most 1200 rpm and pump at most 50 %, reached smoothly, while the amber lamp is on.
+   - *done (step 3d):* DM1 from the engine (read with BAM when more than one code is active): the red stop lamp faults (`SR-12`); the amber lamp means limp-home, requested speed at most 1200 rpm and pump at most 50 %, reached and left smoothly (`SR-13`).
    - The controller's own DM1 is left for after v0.3.1.
 
 **Exit criteria**
@@ -213,7 +213,7 @@ Fault injection pulls in protocol work that v0.1 left out on purpose:
    - *Met in SIL and on `vcan`* for the faults injected so far: lost frames (`fault.mc_tx_lost`, `fault.engine_tx_lost`, the links' `drop_one_in`), delay, jitter and bus-off ([`docs/acceptance.md`](docs/acceptance.md), "Link faults").
    - `corrupt`: *met* since v0.3.1 step 3b (`speed_command_corrupt`, SR-10).
    - The watchdog: *met* since v0.3.1 step 3c, on the board (`watchdog_reset`, W1).
-   - *Open:* the DM1 faults (v0.3.1, step 3d).
+   - The DM1 faults: *met* since v0.3.1 step 3d (`engine_dtc_red`, `engine_dtc_amber`, `engine_dtc_red_and_amber`).
 2. Each safety requirement is linked to at least one test.
    - *Met:* `SR-1`…`SR-9`, each cited by an acceptance criterion or a unit test ([`docs/safety.md`](docs/safety.md)); `tools/check_requirements.py` fails CI otherwise. Requirements added in v0.3.1 must keep it so.
 

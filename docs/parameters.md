@@ -75,6 +75,9 @@ Provenance labels:
 | `operator_timeout_ms` | 200 ms | Choice | 10 missed operator messages; then target falls to idle and the hoist command to zero. |
 | `run_confirm_ms` | 500 ms | Choice | Engine speed must stay above `running_rpm` this long before RUN. |
 | `override_confirm_ms` | 500 ms | Choice | Time allowed for EEC1 SPN 1483 to show this controller in control. |
+| `limp_rpm` | 1200 rpm | Choice (David, 2026-11-25) | Limp-home on the engine's amber lamp: requested speed at most this. Reached at the slew limit. |
+| `limp_pump_pct` | 50 % | Choice (David, 2026-11-25) | Limp-home: pump command at most this. |
+| `limp_pump_rate_pct_per_s` | 100 %/s | Choice | How fast the pump limit moves into and out of limp-home: 85 % to 50 % in 0.35 s, no step. |
 | watchdog timeout (`OC_WDG_TIMEOUT_MS`, reference board) | 100 ms | Choice | 10 control periods. Below the engine's 200 ms request timeout, so a hung controller is restarted before its last TSC1 would expire on its own. LSI 32 kHz / 32, reload 99 (`platforms/stm32g4/board/watchdog.c`). |
 | `running_rpm` | 600 rpm | Choice | Between the ECU's running threshold (500) and low idle (750). |
 | `stall_rpm` | 400 rpm | Choice | Above the ECU's own stall threshold (300), so the controller notices first. |
@@ -92,5 +95,6 @@ Provenance labels:
 | `eflp1_period_ms` | 500 ms | J1939 | |
 | `et1_period_ms` | 1000 ms | J1939 | |
 | `operator_period_ms` | 20 ms | Choice | Typical CAN joystick rate. |
+| `dm1_period_ms` | 1000 ms | J1939 | DM1 once a second, and at once when the active codes change (J1939-73). With two codes it is a BAM, packets 50 ms apart (J1939-21: 50 to 200 ms). |
 | `pump_cmd_timeout_ms` | 200 ms | Choice | A stale pump command counts as zero, as a de-energised proportional solenoid would. |
 | bench source address | 0xFC | Choice | Operator panel and environment. Chosen from the top of the address range, away from common preferred addresses; verify it is free on your network. |
