@@ -10,11 +10,17 @@
 # Each run's output is printed and kept in <build dir>/accept/<scenario>.log,
 # the controller's in <scenario>.mc.log.
 #
+# A run that is INVALID (late steps: the wall clock fell behind, so the run
+# has no verdict) is run once more, with a fresh controller, and only the
+# second attempt counts. The first attempt is kept in <scenario>.attempt1.log
+# and <scenario>.attempt1.mc.log, and both are printed. A FAIL is never run
+# again: a failure is a verdict.
+#
 # Needs a CAN interface; set one up as the README says.
 #
 # Usage: tools/accept_vcan.sh <build dir> [interface]
-# Exit:  0 every scenario passes; 1 some scenario fails; 3 some run is
-#        INVALID (late steps) and none fails.
+# Exit:  0 every scenario passes; 1 some scenario fails; 3 some scenario is
+#        INVALID twice in a row (late steps) and none fails.
 set -euo pipefail
 
 if [[ $# -lt 1 ]]; then
@@ -43,23 +49,34 @@ for crit in "${criteria[@]}"; do
     scenario="$ROOT/scenarios/$name.csv"
     echo "=== $name"
 
-    "$BUILD/open-crank-mc" "$IF" >"$OUT/$name.mc.log" &
-    MC=$!
-    sleep 0.5
-    code=0
-    timeout -s INT 120 "$BUILD/open-crank-accept" "$IF" "$scenario" --criteria "$crit" \
-        >"$OUT/$name.log" 2>&1 || code=$?
-    kill -INT "$MC" 2>/dev/null || true
-    wait "$MC" || true
-    MC=
-    cat "$OUT/$name.log"
+    note=""
+    for attempt in 1 2; do
+        "$BUILD/open-crank-mc" "$IF" >"$OUT/$name.mc.log" &
+        MC=$!
+        sleep 0.5
+        code=0
+        timeout -s INT 120 "$BUILD/open-crank-accept" "$IF" "$scenario" --criteria "$crit" \
+            >"$OUT/$name.log" 2>&1 || code=$?
+        kill -INT "$MC" 2>/dev/null || true
+        wait "$MC" || true
+        MC=
+        cat "$OUT/$name.log"
+        if [[ $code -ne 3 || $attempt -eq 2 ]]; then
+            break
+        fi
+        # INVALID: no verdict. Keep this attempt and run the scenario once more.
+        mv "$OUT/$name.log" "$OUT/$name.attempt1.log"
+        mv "$OUT/$name.mc.log" "$OUT/$name.attempt1.mc.log"
+        echo "--- $name: attempt 1 INVALID (late steps; kept in $name.attempt1.log); running it once more"
+        note="  (attempt 1 INVALID, attempt 2 counts)"
+    done
 
     case $code in
     0) verdict=PASS ;;
     3) verdict=INVALID; invalid=1 ;;
     *) verdict=FAIL; failed=1 ;;
     esac
-    summary+=("$(printf '%-8s %s' "$verdict" "$name")")
+    summary+=("$(printf '%-8s %s%s' "$verdict" "$name" "$note")")
 done
 
 echo

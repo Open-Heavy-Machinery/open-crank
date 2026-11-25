@@ -122,6 +122,8 @@ tools/accept_vcan.sh build vcan0
 
 `tools/accept_vcan.sh` runs every `scenarios/*.accept.csv`: for each, it starts a fresh `open-crank-mc` (a new process is a reset), waits 0.5 s, runs `open-crank-accept` with the scenario, and stops the controller. It prints each report, keeps them in `build/accept/`, and ends with one line per scenario (`PASS`, `FAIL` or `INVALID`). It exits with 0 if every scenario passes, 1 if any fails, and 3 if any run is `INVALID` and none fails. CI runs it in the `vcan-demo` job when the runner provides `vcan`.
 
+A scenario whose run is INVALID (late steps, so it has no verdict) is run once more with a fresh controller, and only the second attempt counts. The first attempt stays in `<scenario>.attempt1.log`, both are printed, and the summary line says so. A FAIL is never run again: a failure is a verdict. This keeps a slow CI runner from turning a run without a verdict into a red build, without hiding any failure.
+
 To grade your own controller, start it instead of `open-crank-mc` and run one scenario at a time:
 
 ```sh
