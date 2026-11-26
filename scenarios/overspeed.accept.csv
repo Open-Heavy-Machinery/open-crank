@@ -6,3 +6,4 @@ G1,begin,end,0,tsc1_speed_control == 1 -> tsc1_speed_rpm <= 2100,SR-2: requested
 G2,begin,end,20,pump_cmd_pct > 0 -> tsc1_speed_control == 1,SR-3: pump commanded only while in speed control
 G3,begin,end,0,tsc1_intact == 1,SR-10: every TSC1 carries a valid checksum and a counter that moves by one
 V1,fault.overrun_torque_nm=400+1000ms,end,0,tsc1_override == 0 && pump_cmd_pct == 0,SR-6, SR-7: override released and pump at 0 within 1 s of the overrun that drives the engine into overspeed, and kept
+F1,fault.overrun_torque_nm=400+2100ms,end,0,dm1_red_stop == 1 && dm1_spn == 520194,SR-14: the controller reports its fault (overspeed) as DM1 within 1.1 s of entering FAULT (red stop lamp and SPN 520194 - FMI 31), and kept

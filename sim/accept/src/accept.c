@@ -8,6 +8,7 @@
 
 #include <opencrank/can_otk.h>
 #include <opencrank/j1939.h>
+#include <opencrank/j1939_diag.h>
 #include <opencrank/oc_msgs.h>
 
 const OtkOracleObservable OC_ACCEPT_OBSERVABLES[OC_ACCEPT_OBSERVABLE_COUNT] = {
@@ -16,6 +17,8 @@ const OtkOracleObservable OC_ACCEPT_OBSERVABLES[OC_ACCEPT_OBSERVABLE_COUNT] = {
     [OC_ACCEPT_PUMP_CMD_PCT] = { "pump_cmd_pct", OC_ACCEPT_STALE_MS * OTK_NS_PER_MS, { false, 0.0 } },
     [OC_ACCEPT_TSC1_OVERRIDE] = { "tsc1_override", OC_ACCEPT_STALE_MS * OTK_NS_PER_MS, { false, 0.0 } },
     [OC_ACCEPT_TSC1_INTACT] = { "tsc1_intact", OC_ACCEPT_STALE_MS * OTK_NS_PER_MS, { false, 1.0 } },
+    [OC_ACCEPT_DM1_RED_STOP] = { "dm1_red_stop", OC_ACCEPT_DM1_STALE_MS * OTK_NS_PER_MS, { false, 0.0 } },
+    [OC_ACCEPT_DM1_SPN] = { "dm1_spn", OC_ACCEPT_DM1_STALE_MS * OTK_NS_PER_MS, { true, 0.0 } },
 };
 
 void oc_accept_init(OcAccept *a, uint8_t dut, OtkOracleTable *table) {
@@ -61,6 +64,15 @@ size_t oc_accept_decode(void *ctx, const OtkCanFrame *f, OtkOracleUpdate *out, s
         out[0] = (OtkOracleUpdate){ OC_ACCEPT_PUMP_CMD_PCT,
                                    { false, pump.displacement_valid ? (double)pump.displacement_pct : 0.0 } };
         return 1U;
+    }
+    J1939Dm1 dm1;
+    if (jf.dlc == 8U && j1939_id_pgn(jf.id) == J1939_PGN_DM1 && j1939_decode_dm1(jf.data, 8U, &dm1)) {
+        if (cap < 2U) {
+            return 0U;
+        }
+        out[0] = (OtkOracleUpdate){ OC_ACCEPT_DM1_RED_STOP, { false, dm1.red_stop == J1939_LAMP_ON ? 1.0 : 0.0 } };
+        out[1] = (OtkOracleUpdate){ OC_ACCEPT_DM1_SPN, { dm1.n_dtc == 0U, dm1.n_dtc == 0U ? 0.0 : (double)dm1.dtc[0].spn } };
+        return 2U;
     }
     return 0U;
 }

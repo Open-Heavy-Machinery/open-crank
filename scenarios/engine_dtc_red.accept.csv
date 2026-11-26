@@ -9,3 +9,5 @@ E1,hoist_demand_pct=50+100ms,fault.engine_dtc_red=1-10ms,0,pump_cmd_pct >= 49.6 
 R1,fault.engine_dtc_red=1+300ms,fault_reset=1-10ms,0,tsc1_override == 0 && pump_cmd_pct == 0,SR-12, SR-7: override released and pump at 0 within 300 ms of the engine's red stop lamp, and kept until the fault reset
 R2,fault_reset=1+1000ms,end,0,tsc1_speed_control == 1,speed control taken again within 1 s of the fault reset
 R3,18.0,end,0,tsc1_speed_rpm >= 1499 && tsc1_speed_rpm <= 1501,requested speed back at the operator's 1500 rpm
+F1,fault.engine_dtc_red=1+1400ms,fault_reset=1-10ms,0,dm1_red_stop == 1 && dm1_spn == 520198,SR-14: the controller reports its fault (the engine's red stop lamp) as DM1 within 1.1 s of entering FAULT (red stop lamp and SPN 520198 - FMI 31), until the fault reset
+F2,fault_reset=1+1100ms,end,0,dm1_red_stop == 0,SR-14: the controller's DM1 clears its red stop lamp within 1.1 s of the fault reset

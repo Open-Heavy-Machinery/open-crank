@@ -206,7 +206,7 @@ Fault injection pulls in protocol work that v0.1 left out on purpose:
    - *done (step 3b):* the TSC1 counter and checksum (SPN 4206/4207), with the `speed_command_corrupt` scenario, criterion G3 in every scenario and `SR-10`;
    - *done (step 3c):* the watchdog (IWDG, 100 ms), after whose reset the controller starts in FAULT and waits for the operator's fault reset (`SR-11`, `tools/board/watchdog_check.sh`);
    - *done (step 3d):* DM1 from the engine (read with BAM when more than one code is active): the red stop lamp faults (`SR-12`); the amber lamp means limp-home, requested speed at most 1200 rpm and pump at most 50 %, reached and left smoothly (`SR-13`).
-   - The controller's own DM1 is left for after v0.3.1.
+   - The controller's own DM1 was left for after v0.3.1. *(In review: `SR-14`, the controller's DM1 from `0x27` every 1000 ms.)*
 
 **Exit criteria.** Met on 2026-11-25, on the release commit's code (`7a8dccb`):
 - `tools/board/bench.sh` gave BENCH OK: fifteen PASS, 0 late steps, every reaction within one step of the reference, round trip p99 1.900 ms;

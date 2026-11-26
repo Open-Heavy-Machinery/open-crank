@@ -4,7 +4,7 @@ This is the contract between the simulated machine and a **Level 1 device under 
 
 Everything travels as 29-bit CAN frames with J1939 framing, so the same controller works against the SIL on `vcan`, in an emulator, and (from v0.2) on a real board.
 
-**Machine-readable form: [`open-crank.dbc`](../open-crank.dbc).** Every message below, with its signals, scaling, value tables and period (`GenMsgCycleTime`), as a DBC for cantools, SavvyCAN or Vector tools (`ProtocolType "J1939"`, `VFrameFormat` J1939PG; identifiers with the nominal source addresses). **This page is the contract; the DBC must agree with it**, and CI checks that it agrees with the code that puts the frames on the bus: `tests/dbc_vectors.c` encodes frames with open-crank's encoders and `tools/check_dbc.py` decodes them with the DBC, signal by signal (`tools/check_dbc.sh`, which also checks that seven deliberate errors in the DBC are caught). DBC cannot describe J1939 transport: a DM1 with two codes or more travels as a BAM (TP_CM_BAM, TP_DT), and a reader reassembles it itself.
+**Machine-readable form: [`open-crank.dbc`](../open-crank.dbc).** Every message below, with its signals, scaling, value tables and period (`GenMsgCycleTime`), as a DBC for cantools, SavvyCAN or Vector tools (`ProtocolType "J1939"`, `VFrameFormat` J1939PG; identifiers with the nominal source addresses). **This page is the contract; the DBC must agree with it**, and CI checks that it agrees with the code that puts the frames on the bus: `tests/dbc_vectors.c` encodes frames with open-crank's encoders and `tools/check_dbc.py` decodes them with the DBC, signal by signal (`tools/check_dbc.sh`, which also checks that nine deliberate errors in the DBC are caught). DBC cannot describe J1939 transport: a DM1 with two codes or more travels as a BAM (TP_CM_BAM, TP_DT), and a reader reassembles it itself.
 
 > **Verify against your copy of SAE J1939-71.** The J1939 layouts below are original work from public sources. The repository ships no spec text.
 
@@ -23,7 +23,7 @@ sudo slcand -o -c -s5 /dev/serial/by-id/<your-adapter> can0 && sudo ip link set 
 | Node | Source address | Sends | Notes |
 |---|---|---|---|
 | Engine (simulated engine ECU) | `0x00` | EEC1, ET1, EFL/P1 | Engine #1. Silent while the key is off. |
-| Machine controller (device under test) | `0x27` | TSC1 (to `0x00`), OC_PUMP_CMD | Default of the reference controller; the engine accepts TSC1 from any address. |
+| Machine controller (device under test) | `0x27` | TSC1 (to `0x00`), OC_PUMP_CMD, DM1 | Default of the reference controller; the engine accepts TSC1 from any address. |
 | Bench (operator panel, environment) | `0xFC` | OC_OPERATOR | Always on. |
 
 ## Messages
@@ -89,6 +89,28 @@ With one code or none, DM1 is one 8-byte frame, padded with `0xFF`. With two, it
 
 The reference controller drops a BAM whose packet is out of sequence or later than 750 ms (T1). The engine itself keeps running: the codes are reports, not shutdowns.
 
+### DM1 of the machine controller (PGN 65226, broadcast from the controller), every 1000 ms
+
+The controller reports its own faults with DM1, in the layout above, from its own address: priority 6, `0x18FECA27` from `0x27` (`DM1_MC` in the DBC). The first one goes out with the controller's first step, then one every 1000 ms. It is periodic only: the reference does not send one at once when its state changes, so a new fault reaches the bus within 1 s.
+
+| State | Lamps | DTC |
+|---|---|---|
+| WAIT_ENGINE, RUN | all off | none (one DTC of all zeros) |
+| FAULT | red stop on, the others off | one: SPN 520192 + the fault number, FMI 31 (condition exists), occurrence count 1 |
+
+520192 (`0x7F000`) is the start of J1939's proprietary SPN range. The fault numbers are those of `McFault` (`portable/machine_ctrl/include/opencrank/machine_ctrl.h`):
+
+| SPN | Fault |
+|---|---|
+| 520193 | engine status lost (no valid EEC1 within 200 ms) |
+| 520194 | overspeed |
+| 520195 | stall |
+| 520196 | override rejected (EEC1 does not show the controller in control) |
+| 520197 | watchdog reset (the board restarted after its watchdog fired) |
+| 520198 | the engine's red stop lamp |
+
+The controller keeps one fault, so its DM1 always has at most one code and is always one frame: it never needs a BAM. The simulated machine does not read it.
+
 ### OC_OPERATOR, operator controls (open-crank, PGN 65312 / `0xFF20`, from `0xFC`), every 20 ms
 
 **Not part of J1939.** Proprietary B range. Stands in for a CAN joystick or operator panel.
@@ -125,6 +147,7 @@ The reference controller does the following, and the closed-loop tests check it.
 - Ask for the operator's target speed with a slew limit, through TSC1 every 10 ms.
 - Check that it is actually in control: EEC1 byte 5 must show its address within 500 ms.
 - On loss of EEC1 (200 ms), overspeed (2300 rpm), stall (below 400 rpm) or a rejected override: release the override (TSC1 mode `00`), command zero displacement, and stay in FAULT until the operator presses fault reset.
+- Report its own state as DM1 once a second: in FAULT, the red stop lamp and which fault.
 
 This section describes the reference controller. What any controller must do to pass the acceptance suite, judged only by the frames it sends, is in [acceptance.md](acceptance.md).
 

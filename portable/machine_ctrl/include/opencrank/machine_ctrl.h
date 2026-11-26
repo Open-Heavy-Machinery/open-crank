@@ -18,6 +18,13 @@
  * (speed control, slew-limited) and passes the hoist lever to the pump.
  * Outside RUN it releases the override (TSC1 override disabled, so the
  * engine returns to its own idle governor) and commands zero displacement.
+ *
+ * It reports its own faults as DM1 (PGN 65226) from its source address,
+ * every MC_DM1_PERIOD_MS from the first mc_step(): in FAULT the red stop
+ * lamp is on and the one DTC is SPN MC_DM1_SPN_BASE + the McFault number,
+ * FMI MC_DM1_FMI, occurrence count 1; outside FAULT every lamp is off and
+ * there is no active DTC. The controller keeps one fault, so its DM1 is
+ * always one frame.
  */
 
 #ifndef OPEN_CRANK_MACHINE_CTRL_H
@@ -30,6 +37,10 @@
 #include <opencrank/j1939.h>
 #include <opencrank/j1939_diag.h>
 #include <opencrank/oc_msgs.h>
+
+#define MC_DM1_PERIOD_MS 1000U /**< the controller's DM1 is sent this often */
+#define MC_DM1_SPN_BASE 520192U /**< 0x7F000, start of J1939's proprietary SPN range; SPN = this + McFault */
+#define MC_DM1_FMI 31U          /**< FMI 31: condition exists */
 
 typedef enum {
     MC_STATE_WAIT_ENGINE = 0,
@@ -102,6 +113,9 @@ typedef struct {
     bool engine_red_stop;   /**< the engine's last DM1 shows the red stop lamp */
     bool engine_amber;      /**< the engine's last DM1 shows the amber warning lamp: limp-home */
     float pump_limit_pct;   /**< pump command limit: 100, or moving towards limp_pump_pct */
+
+    bool dm1_sent;   /**< this controller's DM1 has been sent at least once */
+    uint32_t dm1_ms; /**< when it was last sent */
 } McCtx;
 
 void mc_init(McCtx *c, const McParams *p);
@@ -122,7 +136,9 @@ void mc_handle_frame(McCtx *c, const J1939Frame *f, uint32_t now_ms);
 
 /**
  * @brief Runs one control period.
- * @return number of frames written to @p out (TSC1 and OC_PUMP_CMD), at most @p cap.
+ * @return number of frames written to @p out (TSC1, OC_PUMP_CMD and, when
+ *         due, this controller's DM1), at most @p cap. At most three: a
+ *         @p cap of 3 never drops a frame.
  */
 size_t mc_step(McCtx *c, uint32_t now_ms, J1939Frame *out, size_t cap);
 

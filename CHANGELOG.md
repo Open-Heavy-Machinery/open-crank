@@ -2,6 +2,22 @@
 
 All notable changes to this project. The project is pre-alpha; nothing here is a stable API yet.
 
+## Unreleased
+
+### Added
+
+- **The controller's own DM1** (PGN 65226, `0x18FECA27`, every 1000 ms from its first step): in FAULT, the red stop lamp and one DTC, SPN 520192 + the `McFault` number, FMI 31, occurrence count 1; outside FAULT, no lamp and no DTC. It is always one frame ([docs/bus-interface.md](docs/bus-interface.md)).
+  - Requirement **SR-14** in [docs/safety.md](docs/safety.md): in FAULT, the controller reports its fault as DM1 within 1.1 s. Criteria F1 in the nine scenarios that end in FAULT, F2 in the five with a fault reset; observables `dm1_red_stop` and `dm1_spn` (held 3000 ms).
+  - Three new broken controllers in `tools/accept_mutants.sh` (18 killed, 1 accepted survivor).
+  - `DM1_MC` in `open-crank.dbc`, checked against the controller's own frames; two more DBC mutations in `tools/check_dbc.sh` (nine).
+
+### Changed
+
+- **`portable/`:** `j1939_encode_dm1()` moved from `sim/engine_ecu` (`j1939_diag_tx.h`) to `portable/j1939` (`j1939_diag.h`). The BAM sender stays in `sim/`: the controller's DM1 never needs it.
+- **`mc_step()` returns up to three frames** (TSC1, OC_PUMP_CMD and, once a second, DM1). Every platform in the repository already passes a buffer of four; [docs/porting.md](docs/porting.md) asks for a `cap` of at least 3.
+- Worst-case stack of `mc_step`: 76 to 132 bytes (Cortex-M4F MinSizeRel, Arm GNU Toolchain 14.2.rel1; budget 1024 bytes).
+- The traces of the fifteen scenarios are byte-identical to v0.3.2: the simulated machine does not read the controller's DM1. Frame logs and verdict files change (new frames, new criteria).
+
 ## v0.3.2: Frame logs and the bus dictionary (2026-11-26)
 
 Every run can now write its CAN frames to a file, each with two times, and the bus contract is a DBC that CI checks against the encoders. open-rig v0.3 reads both. Nothing changes for a controller:

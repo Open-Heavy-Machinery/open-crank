@@ -18,6 +18,12 @@
  * | `pump_cmd_pct`       | OC_PUMP_CMD displacement; 0 if "not available"                    | 0       |
  * | `tsc1_override`      | 1 if TSC1 has an override mode other than 00 (speed, torque, limit), 0 if 00 | 0 |
  * | `tsc1_intact`        | 1 if the TSC1's checksum is right and its counter is the previous TSC1's + 1 (SPN 4207/4206), else 0 | 1 |
+ * | `dm1_red_stop`       | 1 if the DUT's own DM1 has its red stop lamp on, else 0           | 0       |
+ * | `dm1_spn`            | SPN of the first active DTC of the DUT's own DM1; a gap with none | gap     |
+ *
+ * The DM1 observables hold for OC_ACCEPT_DM1_STALE_MS, not 200 ms: a DM1 is
+ * sent once a second. Only a single-frame DM1 is read (the reference
+ * controller's always is).
  */
 
 #ifndef OPEN_CRANK_ACCEPT_H
@@ -36,12 +42,17 @@
 /** @brief How long a decoded value holds, as the simulated engine and pump allow [ms]. */
 #define OC_ACCEPT_STALE_MS 200U
 
+/** @brief How long the DUT's DM1 holds: three of its 1000 ms periods [ms]. */
+#define OC_ACCEPT_DM1_STALE_MS 3000U
+
 typedef enum {
     OC_ACCEPT_TSC1_SPEED_CONTROL = 0,
     OC_ACCEPT_TSC1_SPEED_RPM,
     OC_ACCEPT_PUMP_CMD_PCT,
     OC_ACCEPT_TSC1_OVERRIDE,
     OC_ACCEPT_TSC1_INTACT,
+    OC_ACCEPT_DM1_RED_STOP,
+    OC_ACCEPT_DM1_SPN,
     OC_ACCEPT_OBSERVABLE_COUNT
 } OcAcceptObservable;
 

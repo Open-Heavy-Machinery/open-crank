@@ -8,3 +8,5 @@ G3,begin,end,0,tsc1_intact == 1,SR-10: every TSC1 carries a valid checksum and a
 K1,fault.link.mc.corrupt=3+1000ms,fault_reset=1-10ms,0,tsc1_override == 0 && pump_cmd_pct == 0,SR-5, SR-7: override released within 1 s of the engine refusing the corrupted requests, and not taken again before the fault reset
 K2,fault_reset=1+1000ms,end,0,tsc1_speed_control == 1,speed control taken again within 1 s of the fault reset
 K3,18.0,end,0,tsc1_speed_rpm >= 1499 && tsc1_speed_rpm <= 1501,requested speed back at the operator's 1500 rpm
+F1,fault.link.mc.corrupt=3+2100ms,fault_reset=1-10ms,0,dm1_red_stop == 1 && dm1_spn == 520196,SR-14: the controller reports its fault (override rejected) as DM1 within 1.1 s of entering FAULT (red stop lamp and SPN 520196 - FMI 31), until the fault reset
+F2,fault_reset=1+1100ms,end,0,dm1_red_stop == 0,SR-14: the controller's DM1 clears its red stop lamp within 1.1 s of the fault reset

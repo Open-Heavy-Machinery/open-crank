@@ -130,9 +130,16 @@ While the engine's DM1 shows its amber warning lamp, the controller limits the r
 
 Checked by: criteria A1, A2 and A3 (`engine_dtc_amber`); unit tests `test_limp_home` (the values, the rate, the lever release, the return) and `test_dm1_known_vectors`.
 
+### SR-14: The controller reports its own fault as DM1
+
+In FAULT, the controller reports its fault as DM1 within 1.1 s: red stop lamp on, and one DTC whose SPN says which fault (520192 + the fault number, FMI 31). Outside FAULT its DM1 has every lamp off and no DTC, so the report ends within 1.1 s of a fault reset.
+
+**Why.** On a machine, the cab display and the service tool learn of a controller's fault from its DM1, as they do from the engine's. Without it, a controller in FAULT is only seen by what it stops doing: the override released and the pump at 0, which also happens when the operator lets go of the controls. 1.1 s is the 1000 ms period of DM1 plus one step.
+
+Checked by: criterion F1 in the nine scenarios that end in FAULT and F2 in the five with a fault reset, through the observables `dm1_red_stop` and `dm1_spn`; unit tests `test_own_dm1` (lamps, SPN, period, the frame budget of `mc_step`) and `test_accept_dm1` (the observables).
+
 ## What is not specified yet
 
 - **Stall**: the controller enters FAULT below `stall_rpm` (unit test `test_overspeed_and_stall`), but no scenario drives the engine into a stall under control, so there is no acceptance criterion and no requirement for it.
-- **The controller's own DM1** (its own faults, sent as DM1): after v0.3.1.
 - **A DM1 that stops arriving.** The controller keeps the lamps of the last DM1 it received. An engine that stops sending altogether is caught by the EEC1 timeout (SR-4).
 - **The watchdog in the CubeIDE path** (`demo/main_user_code.c`): only the CMake build has it (SR-11).

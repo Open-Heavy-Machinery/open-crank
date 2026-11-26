@@ -137,6 +137,26 @@ static bool override_rejected(McCtx *c, uint32_t now_ms) {
     return elapsed(now_ms, c->override_mismatch_since_ms, c->p->override_confirm_ms);
 }
 
+/* This controller's DM1: red stop and one DTC in FAULT, nothing outside it.
+ * It is always one frame (one DTC at most). */
+static void encode_own_dm1(const McCtx *c, J1939Frame *f) {
+    J1939Dm1 dm1 = { 0 };
+    const bool fault = c->state == MC_STATE_FAULT;
+    dm1.mil = J1939_LAMP_OFF;
+    dm1.red_stop = fault ? J1939_LAMP_ON : J1939_LAMP_OFF;
+    dm1.amber_warning = J1939_LAMP_OFF;
+    dm1.protect = J1939_LAMP_OFF;
+    if (fault) {
+        dm1.dtc[0].spn = MC_DM1_SPN_BASE + (uint32_t)c->fault;
+        dm1.dtc[0].fmi = MC_DM1_FMI;
+        dm1.dtc[0].oc = 1U;
+        dm1.n_dtc = 1U;
+    }
+    f->id = j1939_make_id(J1939_PRIORITY_INFO, J1939_PGN_DM1, J1939_ADDR_GLOBAL, c->p->source_address);
+    f->dlc = 8U;
+    (void)j1939_encode_dm1(&dm1, f->data, sizeof(f->data)); /* one DTC: always 8 bytes */
+}
+
 size_t mc_step(McCtx *c, uint32_t now_ms, J1939Frame *out, size_t cap) {
     const McParams *p = c->p;
     const float dt_s = c->stepped ? ((float)(uint32_t)(now_ms - c->last_step_ms) / 1000.0f) : 0.0f;
@@ -232,6 +252,13 @@ size_t mc_step(McCtx *c, uint32_t now_ms, J1939Frame *out, size_t cap) {
     if (n < cap) {
         OcPumpCmd pump = { .displacement_valid = true, .displacement_pct = c->pump_cmd_pct };
         oc_encode_pump_cmd(&pump, p->source_address, &out[n]);
+        n++;
+    }
+    const bool dm1_due = !c->dm1_sent || elapsed(now_ms, c->dm1_ms, MC_DM1_PERIOD_MS);
+    if (dm1_due && (n < cap)) {
+        encode_own_dm1(c, &out[n]);
+        c->dm1_sent = true;
+        c->dm1_ms = now_ms;
         n++;
     }
     return n;

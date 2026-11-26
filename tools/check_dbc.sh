@@ -38,6 +38,8 @@ mutate "TSC1 checksum overlapping the counter" 's/MessageChecksum : 60|4/Message
 mutate "EFL/P1 oil pressure in the wrong byte" 's/EngineOilPressure : 24|8/EngineOilPressure : 16|8/'
 mutate "ET1 coolant with the wrong offset" 's/ (1,-40) / (1,-50) /'
 mutate "EFL/P1 period not the bench's" 's/BA_ "GenMsgCycleTime" BO_ 2566844160 500;/BA_ "GenMsgCycleTime" BO_ 2566844160 100;/'
+mutate "the controller's DM1 period not the controller's" 's/BA_ "GenMsgCycleTime" BO_ 2566834727 1000;/BA_ "GenMsgCycleTime" BO_ 2566834727 500;/'
+mutate "the controller's DM1 missing" '/^BO_ 2566834727 DM1_MC/,/^$/d'
 mutate "OC_OPERATOR loses the hoist lever" '/SG_ HoistLever/d'
 mutate "not marked as J1939" 's/BA_ "ProtocolType" "J1939";//'
 

@@ -193,6 +193,17 @@ mutate "controller: a DM1 that comes as a BAM is ignored" portable/j1939/src/j19
     "done = bam_data(rx, f, now_ms);" "done = false; (void)bam_data;" \
     "M1"
 
+# The controller's own DM1 (SR-14).
+mutate "controller: its own DM1 never shows the red stop lamp" $MC \
+    "dm1.red_stop = fault ? J1939_LAMP_ON : J1939_LAMP_OFF;" "dm1.red_stop = J1939_LAMP_OFF; (void)fault;" \
+    "F1"
+mutate "controller: its own DM1 sent only every 5 s" $MC \
+    "elapsed(now_ms, c->dm1_ms, MC_DM1_PERIOD_MS)" "elapsed(now_ms, c->dm1_ms, 5U * MC_DM1_PERIOD_MS)" \
+    "F1"
+mutate "controller: its own DM1's SPN does not say which fault" $MC \
+    "dm1.dtc[0].spn = MC_DM1_SPN_BASE + (uint32_t)c->fault;" "dm1.dtc[0].spn = MC_DM1_SPN_BASE;" \
+    "F1"
+
 echo
 echo "$killed mutants killed, $accepted accepted survivors, $problems problems"
 [[ $problems -eq 0 ]]
