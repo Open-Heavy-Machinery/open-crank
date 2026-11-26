@@ -168,20 +168,31 @@ Measured on 2026-11-22: NUCLEO-G431KB with the settings above, CANable over slca
 
 ## Execution time of `mc_step`
 
-The demo times every `mc_step` call with the DWT cycle counter and keeps the largest in `mc_step_cycles_max`; read it in a CubeIDE debug session (for example in Live Expressions). It is the worst observed execution time, not a proven bound.
+The demo times every `mc_step` call with the DWT cycle counter and keeps the largest in `mc_step_cycles_max`. It is the worst observed execution time, not a proven bound. [`tools/board/bench.sh`](../../tools/board/bench.sh) reads it after every scenario, before the next reset, with OpenOCD and without halting the core (`init`, `mdw`, `shutdown`, through the ST-LINK's AHB access port; checked: the core stays `running` and the cycle counter keeps counting). It writes `<scenario>.mc_step.txt` and a column of `report.md`. In a CubeIDE debug session it can also be watched in Live Expressions.
 
-Measured on 2026-11-22 at 170 MHz with optimisation `-O0` (CubeIDE's Debug default), one run per scenario, each after a board reset:
+Measured on 2026-11-26 at 170 MHz by `bench.sh` (open-crank `66e291f`, BENCH OK): the CMake build, `CMAKE_BUILD_TYPE` Debug, which compiles with `-g` and no `-O` option, that is GCC's `-O0` ([`CMakeLists.txt`](CMakeLists.txt)); Arm GNU Toolchain 14.2.rel1; one run per scenario, each after a board reset. The controller has the TSC1 counter and checksum, the engine's DM1 with BAM, and its own DM1.
 
 | Scenario | Cycles | µs |
 |---|---|---|
-| `cold_start` | 2224 | 13.1 |
-| `engine_status_loss` | 2248 | 13.2 |
-| `hoist_step` | 2230 | 13.1 |
-| `override_ignored` | 2287 | 13.5 |
-| `overspeed` | 2224 | 13.1 |
-| `speed_command_loss` | 2286 | 13.4 |
+| `cold_start` | 4172 | 24.5 |
+| `engine_dtc_amber` | 4200 | 24.7 |
+| `engine_dtc_red` | 4172 | 24.5 |
+| `engine_dtc_red_and_amber` | 4172 | 24.5 |
+| `engine_status_delay` | 4172 | 24.5 |
+| `engine_status_jitter` | 4172 | 24.5 |
+| `engine_status_loss` | 4172 | 24.5 |
+| `hoist_step` | 4172 | 24.5 |
+| `mc_bus_off` | 4172 | 24.5 |
+| `override_ignored` | 3962 | 23.3 |
+| `overspeed` | 4172 | 24.5 |
+| `speed_command_corrupt` | 4172 | 24.5 |
+| `speed_command_intermittent` | 4172 | 24.5 |
+| `speed_command_loss` | 4172 | 24.5 |
+| `target_above_high_idle` | 4172 | 24.5 |
 
-Worst observed: 2287 cycles (13.5 µs), about 0.13 % of the 10 ms period. Another optimisation level gives other figures.
+Worst observed: 4200 cycles (24.7 µs, `engine_dtc_amber`), about 0.25 % of the 10 ms period. Another optimisation level gives other figures.
+
+History: v0.2 measured 2287 cycles (13.5 µs) on the CubeIDE build at `-O0`, six scenarios, before the TSC1 checksum and DM1.
 
 ## Stack usage of the controller
 

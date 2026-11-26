@@ -3,7 +3,8 @@
 """Bench report for tools/board/bench.sh.
 
 Reads what bench.sh left in a run directory (meta.txt, rtt.txt, one
-<scenario>.txt per acceptance scenario) and the reference bench, writes
+<scenario>.txt per acceptance scenario, and one <scenario>.mc_step.txt with
+the worst observed mc_step) and the reference bench, writes
 report.md in the same directory, prints it, and exits:
 
   0  the bench matches the reference: round trip within its limits, every
@@ -23,6 +24,7 @@ import sys
 STEP_MS = 10            # the controller's step (portable/machine_ctrl)
 RTT_P99_MAX_MS = 5.0    # half a step: a round trip above this can move reactions by more than one step
 RTT_LOST_MAX = 0
+CPU_HZ = 170_000_000    # the demo's system clock (platforms/stm32g4/README.md)
 
 SUMMARY = re.compile(r"^open-crank-accept: (PASS|FAIL|INVALID)\b.*?(\d+) late steps?")
 SUMMARY_COUNTS = re.compile(r"\((\d+) of (\d+) criteria(?: failed)?\)")
@@ -79,6 +81,23 @@ def read_scenario(path):
             elif line.startswith("open-crank-accept: INVALID"):
                 res["verdict"] = "INVALID"
     return res
+
+
+def read_mc_step(path):
+    """Cycles from <scenario>.mc_step.txt, or None if missing or unavailable."""
+    try:
+        with open(path) as f:
+            for line in f:
+                k, _, v = line.strip().partition("=")
+                if k == "mc_step_cycles_max" and v.isdigit():
+                    return int(v)
+    except OSError:
+        pass
+    return None
+
+
+def fmt_us(cycles):
+    return "%.1f" % (cycles * 1e6 / CPU_HZ)
 
 
 def fmt_ms(x):
@@ -145,18 +164,23 @@ def main(argv):
     out.append("Each scenario after a software reset of the board. Reactions in ms, with the reference bench's "
                "in brackets; a reaction matches when it is within one %d ms step of the reference." % STEP_MS)
     out.append("")
-    out.append("| Scenario | Result | Late steps | Reactions (reference) |")
-    out.append("|---|---|---|---|")
+    out.append("| Scenario | Result | Late steps | Reactions (reference) | mc_step max (cycles, µs) |")
+    out.append("|---|---|---|---|---|")
+    worst = None  # (cycles, scenario)
     for name in [s for s in args.scenarios.split(",") if s]:
         path = os.path.join(args.run_dir, name + ".txt")
         if not os.path.exists(path):
-            out.append("| `%s` | not run | | |" % name)
+            out.append("| `%s` | not run | | | |" % name)
             problems.append("%s: not run" % name)
             continue
         r = read_scenario(path)
+        cycles = read_mc_step(os.path.join(args.run_dir, name + ".mc_step.txt"))
+        if cycles is not None and (worst is None or cycles > worst[0]):
+            worst = (cycles, name)
+        mc_step = "%d, %s" % (cycles, fmt_us(cycles)) if cycles is not None else "not read"
         if r["verdict"] is None:
             note = r["note"] or "no verdict in the report"
-            out.append("| `%s` | **%s** | | |" % (name, note))
+            out.append("| `%s` | **%s** | | | %s |" % (name, note, mc_step))
             problems.append("%s: %s" % (name, note))
             continue
         passed = sum(1 for c in r["criteria"] if c[0] == "PASS")
@@ -178,7 +202,17 @@ def main(argv):
             problems.append("%s: %s" % (name, r["verdict"]))
         if r["late"]:
             problems.append("%s: %d late steps" % (name, r["late"]))
-        out.append("| `%s` | %s | %s | %s |" % (name, result, r["late"], ", ".join(reactions)))
+        out.append("| `%s` | %s | %s | %s | %s |" % (name, result, r["late"], ", ".join(reactions), mc_step))
+    out.append("")
+    if worst is None:
+        out.append("worst observed mc_step: not read")
+    else:
+        out.append("worst observed mc_step: %d cycles (%s µs, %.2f %% of the %d ms period), in `%s`" % (
+            worst[0], fmt_us(worst[0]), 100.0 * worst[0] / (CPU_HZ * STEP_MS / 1000.0), STEP_MS, worst[1]))
+    out.append("")
+    out.append("mc_step max: the demo's `mc_step_cycles_max` (DWT cycle counter at %d MHz), read with OpenOCD "
+               "after the scenario without halting the core. It is the worst observed time, not a proven bound, "
+               "and it is not a criterion of BENCH OK." % (CPU_HZ // 1_000_000))
     out.append("")
 
     out.append("## Verdict")
