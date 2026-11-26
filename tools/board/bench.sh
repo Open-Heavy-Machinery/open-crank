@@ -12,10 +12,13 @@
 #   4. programs the reference controller (program + verify: the board runs
 #      exactly this build), then for every acceptance scenario: resets the
 #      board, waits until it sends TSC1 (alive; a fresh reset starts the
-#      controller in WAIT_ENGINE, not in FAULT), and runs open-crank-accept
+#      controller in WAIT_ENGINE, not in FAULT), runs open-crank-accept,
+#      then reads the worst observed mc_step (mc_step_cycles_max, DWT cycles)
+#      from the running board with OpenOCD, without halting the core
 #   5. writes report.md: the setup, the commit, the round trip, every verdict
 #      and every reaction time against the reference bench
-#      (tools/board/bench_reference.csv)
+#      (tools/board/bench_reference.csv), and the worst observed mc_step per
+#      scenario (a measurement, not a criterion of BENCH OK)
 #
 # Usage: tools/board/bench.sh [--iface can0] [--out DIR] [--rtt-count N] [--no-rtt] [--include-serials] [SCENARIO...]
 #   --iface       SocketCAN interface of the USB-CAN adapter (default can0)
@@ -86,6 +89,9 @@ cmake -S "$OC_ROOT/platforms/stm32g4" -B "$OC_FW_BUILD" \
 cmake --build "$OC_FW_BUILD" >/dev/null
 mkdir -p "$out"
 demo_elf=$OC_FW_BUILD/oc-stm32g4-demo.elf
+# Where the demo keeps its worst observed mc_step, in the ELF that is programmed.
+mc_step_addr=$(arm-none-eabi-nm "$demo_elf" | awk '$3 == "mc_step_cycles_max" { print $1 }')
+[[ -n $mc_step_addr ]] || { echo "bench.sh: mc_step_cycles_max not found in $demo_elf" >&2; exit 2; }
 commit=$(git -C "$OC_ROOT" rev-parse --short HEAD 2>/dev/null || echo unknown)
 git -C "$OC_ROOT" diff --quiet HEAD -- 2>/dev/null || commit="$commit (with local changes)"
 # A /dev/serial/by-id name ends in _<serial>-ifNN; mask the serial unless --include-serials.
@@ -113,6 +119,20 @@ else
     step "3/5 bus round trip: skipped"
 fi
 
+# The demo's mc_step_cycles_max, read while the core runs: OpenOCD's init does
+# not halt it, and mdw goes through the ST-LINK's AHB access port. Halting would
+# change the timing being measured. Prints the value in cycles, or "unavailable".
+read_mc_step() {
+    local word
+    word=$("${OC_OPENOCD[@]}" -c "init" -c "mdw 0x$mc_step_addr" -c "shutdown" 2>&1 |
+        awk -v a="0x$mc_step_addr:" 'tolower($1) == a { print $2 }')
+    if [[ $word =~ ^[0-9a-fA-F]{8}$ ]]; then
+        echo "mc_step_cycles_max=$((16#$word))"
+    else
+        echo "mc_step_cycles_max=unavailable"
+    fi
+}
+
 step "4/5 reference controller, ${#scenarios[@]} scenarios (watch the bus: candump $iface)"
 "$OC_ROOT/tools/board/flash.sh" demo --no-build >"$out/flash-demo.log" 2>&1 || {
     echo "bench.sh: programming the demo failed; see $out/flash-demo.log" >&2; exit 1; }
@@ -131,6 +151,8 @@ for s in "${scenarios[@]}"; do
     "$OC_ROOT/build/open-crank-accept" "$iface" "$OC_ROOT/scenarios/$s.csv" --trace "$out/$s.csv" \
         --verdicts "$out/$s.verdicts.csv" \
         | tee "$out/$s.txt" || true
+    # Before the next reset, which clears it.
+    read_mc_step | tee "$out/$s.mc_step.txt"
 done
 
 step "5/5 report"
