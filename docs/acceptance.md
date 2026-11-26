@@ -197,7 +197,7 @@ open-crank-accept-loop <scenario.csv> [--criteria <file>] [--verdicts <out.csv>]
 
 ### Frame logs (`--frames`)
 
-`open-crank-accept`, `open-crank-accept-loop` and `open-crank-sil` take `--frames <file>`. It writes every frame of the run, one row each, in open-tick's frame log format ([docs/frame-log-format.md](https://github.com/Open-Heavy-Machinery/open-tick/blob/v0.3.1/docs/frame-log-format.md)). Each row has:
+`open-crank-accept`, `open-crank-accept-loop`, `open-crank-sil` and `open-crank-run` take `--frames <file>`. It writes every frame of the run, one row each, in open-tick's frame log format ([docs/frame-log-format.md](https://github.com/Open-Heavy-Machinery/open-tick/blob/v0.3.1/docs/frame-log-format.md)). Each row has:
 - `t_s`, the step in which the frame crossed the simulated machine's side; it places the frame on the trace's time axis;
 - `t_bus_s`, when it was on the bus, measured;
 - its direction (`to_dut`, `from_dut`);
@@ -210,7 +210,7 @@ Without `--frames`, nothing changes: the runners take the same code path as befo
 
 | Runner | `bus_clock` | `t_bus_s` |
 |---|---|---|
-| `open-crank-accept-loop` | `sim` | simulated: when the controller sent the frame, or received it. Exact, so `t_bus_s − t_s` of a delayed engine frame is the delay exactly. Two runs give the same file (`ctest`: `accept_frames_deterministic`) |
+| `open-crank-accept-loop`, `open-crank-run` | `sim` | simulated: when the controller sent the frame, or received it. Exact, so `t_bus_s − t_s` of a delayed engine frame is the delay exactly. Two runs give the same file (`ctest`: `accept_frames_deterministic`, `run_frames_hoist_step`), and both runners give the same frames for a scenario, header's `source` aside (`run_frames_same_as_accept_loop`) |
 | `open-crank-accept`, `open-crank-sil` | `kernel` | the kernel's timestamps, minus an anchor read at t = 0: received frames as they arrived, sent frames when they left on the interface (the socket's own copy, `CAN_RAW_RECV_OWN_MSGS`). On a USB adapter that is when the frame reached or left the PC, the adapter's latency included |
 
 **What `t_bus_s − t_s` shows on a paced run.** The paced runners compute each step at the start of its 10 ms: when the pacer wakes at T, the bench runs the step from T to T + 10 ms and sends at once the frames that report it, stamped `t_s` = T + 10 ms; then it sleeps until T + 10 ms. So **a machine frame is on the bus about one step before its `t_s`**: measured on `vcan` (2026-11-26, `cold_start`), `t_bus_s − t_s` = −9.9 ms (p50) for `to_dut` frames. During a 300 ms engine-link delay it is 290 ms: the delay minus that step. A controller frame is on the bus before the step that reads it: −2.5 ms (p50) for `from_dut` on `vcan`, depending on the controller's phase. This is how the paced loop works, not a transport delay. A viewer shows `t_bus_s` as a measurement beside the frame, never as its place on the axis.

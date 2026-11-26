@@ -7,7 +7,12 @@
  * bus: no CAN interface, no root, no wall clock. A 25 s scenario takes a few
  * milliseconds. Same code path as the closed-loop tests.
  *
- *     open-crank-run scenarios/hoist_step.csv --trace hoist.csv
+ *     open-crank-run scenarios/hoist_step.csv --trace hoist.csv [--frames hoist.frames.csv]
+ *
+ * With --frames, every frame of the in-memory bus goes into an open-tick frame
+ * log (open-tick docs/frame-log-format.md), written by the same run as the
+ * trace. The frames are those of open-crank-accept-loop for the same scenario:
+ * only the header's source differs.
  */
 
 #include <stdio.h>
@@ -15,13 +20,16 @@
 
 #include <opencrank/runtime/loop.h>
 #include <opencrank/runtime/trace.h>
+#include <opentick/framelog.h>
 
 static OcScenario g_scenario;
 static OcLoop g_loop;
 
 static void usage(void) {
     fprintf(stderr,
-            "usage: open-crank-run <scenario.csv> [--trace <out.csv>] [--quiet]\n"
+            "usage: open-crank-run <scenario.csv> [--trace <out.csv>] [--frames <out.csv>] [--quiet]\n"
+            "  --trace   writes one row per bench step\n"
+            "  --frames  writes every frame of the in-memory bus (open-tick docs/frame-log-format.md)\n"
             "  Runs the scenario with the reference machine controller until its `end` event.\n");
 }
 
@@ -36,10 +44,13 @@ static void print_status(const OcLoop *l) {
 int main(int argc, char **argv) {
     const char *scenario_path = NULL;
     const char *trace_path = NULL;
+    const char *frames_path = NULL;
     int quiet = 0;
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--trace") == 0 && i + 1 < argc) {
             trace_path = argv[++i];
+        } else if (strcmp(argv[i], "--frames") == 0 && i + 1 < argc) {
+            frames_path = argv[++i];
         } else if (strcmp(argv[i], "--quiet") == 0) {
             quiet = 1;
         } else if (argv[i][0] != '-' && scenario_path == NULL) {
@@ -79,6 +90,20 @@ int main(int argc, char **argv) {
     }
 
     oc_loop_init(&g_loop, &OC_BENCH_D936LA6, &MC_DEFAULT_PARAMS, &g_scenario);
+
+    FILE *frames_fp = NULL;
+    OtkFrameLog frames;
+    if (frames_path != NULL) {
+        /* In memory both times are simulated: exact, so the error bound is 0. */
+        const OtkFrameLogConfig cfg = { otk_ns_from_ms(g_loop.bench.cfg->step_ms), OTK_BUS_CLOCK_SIM, true, 0U,
+                                        "open-crank-run" };
+        frames_fp = fopen(frames_path, "w");
+        if (frames_fp == NULL || !otk_framelog_init(&frames, frames_fp, &cfg)) {
+            fprintf(stderr, "open-crank-run: cannot write %s\n", frames_path);
+            return 1;
+        }
+        oc_loop_set_frame_log(&g_loop, &frames);
+    }
     if (!quiet) {
         printf("open-crank-run: %s, %s, until %.1f s\n", scenario_path, g_loop.bench.cfg->plant->name,
                otk_ns_to_s(g_scenario.end));
@@ -102,6 +127,15 @@ int main(int argc, char **argv) {
     if (trace != NULL && (fclose(trace) != 0 || !otk_trace_ok(&tr))) {
         perror("open-crank-run: writing trace");
         return 1;
+    }
+    if (frames_fp != NULL) {
+        const bool frames_ok = otk_framelog_ok(&frames);
+        if (!frames_ok) {
+            fprintf(stderr, "open-crank-run: frame log: %s\n", otk_framelog_error(&frames));
+        }
+        if (fclose(frames_fp) != 0 || !frames_ok) {
+            return 1;
+        }
     }
     return 0;
 }

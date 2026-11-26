@@ -66,6 +66,34 @@ add_test(NAME accept_frames_deterministic
                  ${CMAKE_CURRENT_BINARY_DIR}/speed_command_corrupt_b.frames.csv)
 set_tests_properties(accept_frames_deterministic PROPERTIES FIXTURES_REQUIRED frames_runs)
 
+# open-crank-run --frames: the trace and the frame log come from the same run.
+# Two runs give the same frame log; the trace is the same with and without
+# --frames; and the frames are those of open-crank-accept-loop for the same
+# scenario, byte for byte except the header's source.
+set(OC_RUN_OUT ${CMAKE_CURRENT_BINARY_DIR}/run_hoist_step)
+foreach(run a b)
+    add_test(NAME run_frames_hoist_step_${run}
+             COMMAND open-crank-run ${OC_SCENARIO_DIR}/hoist_step.csv --quiet
+                     --trace ${OC_RUN_OUT}_${run}.trace.csv --frames ${OC_RUN_OUT}_${run}.frames.csv)
+    set_tests_properties(run_frames_hoist_step_${run} PROPERTIES FIXTURES_SETUP run_frames)
+endforeach()
+add_test(NAME run_trace_hoist_step_no_frames
+         COMMAND open-crank-run ${OC_SCENARIO_DIR}/hoist_step.csv --quiet --trace ${OC_RUN_OUT}_plain.trace.csv)
+set_tests_properties(run_trace_hoist_step_no_frames PROPERTIES FIXTURES_SETUP run_frames)
+add_test(NAME accept_frames_hoist_step
+         COMMAND open-crank-accept-loop ${OC_SCENARIO_DIR}/hoist_step.csv
+                 --frames ${CMAKE_CURRENT_BINARY_DIR}/accept_hoist_step.frames.csv)
+set_tests_properties(accept_frames_hoist_step PROPERTIES FIXTURES_SETUP run_frames)
+
+add_test(NAME run_frames_hoist_step
+         COMMAND ${CMAKE_COMMAND} -E compare_files ${OC_RUN_OUT}_a.frames.csv ${OC_RUN_OUT}_b.frames.csv)
+add_test(NAME run_trace_same_with_frames
+         COMMAND ${CMAKE_COMMAND} -E compare_files ${OC_RUN_OUT}_plain.trace.csv ${OC_RUN_OUT}_a.trace.csv)
+add_test(NAME run_frames_same_as_accept_loop
+         COMMAND sh -c "sed '1s/; source=open-crank-run$/; source=open-crank-accept-loop/' '${OC_RUN_OUT}_a.frames.csv' | cmp - '${CMAKE_CURRENT_BINARY_DIR}/accept_hoist_step.frames.csv'")
+set_tests_properties(run_frames_hoist_step run_trace_same_with_frames run_frames_same_as_accept_loop
+                     PROPERTIES FIXTURES_REQUIRED run_frames)
+
 # open-crank.dbc agrees with the encoders (tools/check_dbc.py, cantools).
 # Skipped (77) when cantools is not installed; CI installs it.
 add_executable(oc-dbc-vectors dbc_vectors.c)
