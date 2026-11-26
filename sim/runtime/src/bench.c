@@ -55,6 +55,34 @@ void oc_bench_set_scenario(OcBench *b, const OcScenario *s) {
     otk_player_init(&b->player, s, apply_signal, &b->sig);
 }
 
+void oc_bench_set_frame_log(OcBench *b, OtkFrameLog *log) {
+    b->frames = log;
+    b->mc_in_flight_n = 0U;
+}
+
+static void log_row(const OcBench *b, OtkNs t, OtkNs t_bus, OtkFrameDir dir, const char *link,
+                    const OtkCanFrame *f, OtkFrameFault fault) {
+    if (b->frames != NULL) {
+        const OtkFrameRow row = { t, t_bus, dir, link, f, fault };
+        (void)otk_framelog_frame(b->frames, &row); /* an error is sticky: the runner reports it */
+    }
+}
+
+/* The bus time of a frame leaving the mc link: same-id frames never overtake
+ * each other, so the first entry with its push time and identifier is it. */
+static OtkNs take_in_flight(OcBench *b, OtkNs pushed, uint32_t id) {
+    for (size_t i = 0U; i < b->mc_in_flight_n; i++) {
+        if (b->mc_in_flight[i].pushed == pushed && b->mc_in_flight[i].id == id) {
+            const OtkNs t_bus = b->mc_in_flight[i].t_bus;
+            memmove(&b->mc_in_flight[i], &b->mc_in_flight[i + 1U],
+                    (b->mc_in_flight_n - i - 1U) * sizeof(b->mc_in_flight[0]));
+            b->mc_in_flight_n--;
+            return t_bus;
+        }
+    }
+    return OTK_FRAMELOG_NO_TIME;
+}
+
 bool oc_bench_scenario_done(const OcBench *b) {
     return otk_player_done(&b->player, otk_ns_from_ms(b->t_ms));
 }
@@ -114,9 +142,18 @@ static void apply_rx(OcBench *b, const J1939Frame *f) {
 
 /* Applies the frames of the mc link that are due now. */
 static void deliver_mc(OcBench *b) {
+    const OtkNs now = otk_ns_from_ms(b->t_ms);
     OtkCanFrame o;
+    OtkLinkInfo info;
     J1939Frame f;
-    while (otk_link_pop(&b->mc_link, otk_ns_from_ms(b->t_ms), &o)) {
+    while (otk_link_pop_ex(&b->mc_link, now, &o, &info)) {
+        if (b->frames != NULL) {
+            const OtkNs t_bus = take_in_flight(b, info.pushed, o.id);
+            log_row(b, now, t_bus, OTK_FRAME_FROM_DUT, "mc", &o, otk_frame_fault_from_link(&info));
+        }
+        if (info.lost != OTK_LINK_LOST_NONE) {
+            continue; /* due while the bus is off: lost, counted by the link */
+        }
         if (oc_frame_from_otk(&o, &f)) {
             apply_rx(b, &f);
         }
@@ -124,13 +161,28 @@ static void deliver_mc(OcBench *b) {
 }
 
 void oc_bench_rx(OcBench *b, const J1939Frame *f) {
-    if (b->sig.fault_mc_tx_lost) {
-        b->rx_dropped++;
-        return;
-    }
+    oc_bench_rx_at(b, f, OTK_FRAMELOG_NO_TIME);
+}
+
+void oc_bench_rx_at(OcBench *b, const J1939Frame *f, OtkNs t_bus) {
+    const OtkNs now = otk_ns_from_ms(b->t_ms);
     OtkCanFrame o;
     oc_frame_to_otk(f, &o);
-    (void)otk_link_push(&b->mc_link, &o, otk_ns_from_ms(b->t_ms)); /* a lost frame is counted by the link */
+    if (b->sig.fault_mc_tx_lost) {
+        b->rx_dropped++;
+        /* fault.mc_tx_lost is the bench's own drop, before any link */
+        log_row(b, now, t_bus, OTK_FRAME_FROM_DUT, NULL, &o, OTK_FRAME_DROP);
+        return;
+    }
+    OtkLinkInfo info;
+    if (otk_link_push_ex(&b->mc_link, &o, now, &info)) {
+        if (b->frames != NULL && b->mc_in_flight_n < OTK_CAN_QUEUE_MAX) {
+            const OcBenchInFlight in = { now, o.id, t_bus };
+            b->mc_in_flight[b->mc_in_flight_n++] = in;
+        }
+    } else {
+        log_row(b, now, t_bus, OTK_FRAME_FROM_DUT, "mc", &o, otk_frame_fault_from_link(&info)); /* counted by the link */
+    }
     deliver_mc(b);
 }
 
@@ -138,9 +190,13 @@ static bool due(uint32_t t_ms, uint32_t period_ms) {
     return period_ms != 0U && (t_ms % period_ms) == 0U;
 }
 
-static size_t push(J1939Frame *tx, size_t n, size_t cap, const J1939Frame *f) {
+static size_t push(J1939Frame *tx, OcBenchTxInfo *info, size_t n, size_t cap, const J1939Frame *f,
+                   const OcBenchTxInfo *what) {
     if (n < cap) {
         tx[n] = *f;
+        if (info != NULL) {
+            info[n] = *what;
+        }
         return n + 1U;
     }
     return n;
@@ -150,7 +206,12 @@ static size_t push(J1939Frame *tx, size_t n, size_t cap, const J1939Frame *f) {
 static void send_engine(OcBench *b, const J1939Frame *f) {
     OtkCanFrame o;
     oc_frame_to_otk(f, &o);
-    (void)otk_link_push(&b->engine_link, &o, otk_ns_from_ms(b->t_ms)); /* a lost frame is counted by the link */
+    OtkLinkInfo info;
+    if (!otk_link_push_ex(&b->engine_link, &o, otk_ns_from_ms(b->t_ms), &info)) {
+        /* lost, counted by the link: it never reaches the bus */
+        log_row(b, otk_ns_from_ms(b->t_ms), OTK_FRAMELOG_NO_TIME, OTK_FRAME_TO_DUT, "engine", &o,
+                otk_frame_fault_from_link(&info));
+    }
 }
 
 /* DM1 every dm1_period_ms and at once on a change; with two codes it is a
@@ -210,7 +271,7 @@ static void send_dm1(OcBench *b, uint32_t t) {
     b->dm1_pending = false;
 }
 
-static size_t transmit(OcBench *b, J1939Frame *tx, size_t cap) {
+static size_t transmit(OcBench *b, J1939Frame *tx, OcBenchTxInfo *txi, size_t cap) {
     const OcBenchConfig *cfg = b->cfg;
     const uint8_t ecu_addr = cfg->ecu->source_address;
     const uint32_t t = b->t_ms;
@@ -253,11 +314,19 @@ static size_t transmit(OcBench *b, J1939Frame *tx, size_t cap) {
 
     /* What the engine link delivers now: with no fault, the frames just sent. */
     OtkCanFrame o;
-    while (otk_link_pop(&b->engine_link, otk_ns_from_ms(t), &o)) {
+    OtkLinkInfo info;
+    while (otk_link_pop_ex(&b->engine_link, otk_ns_from_ms(t), &o, &info)) {
+        if (info.lost != OTK_LINK_LOST_NONE) {
+            log_row(b, info.pushed, OTK_FRAMELOG_NO_TIME, OTK_FRAME_TO_DUT, "engine", &o,
+                    otk_frame_fault_from_link(&info));
+            continue; /* due while the bus is off: lost, counted by the link */
+        }
         if (oc_frame_from_otk(&o, &f)) {
-            n = push(tx, n, cap, &f);
+            const OcBenchTxInfo what = { info.pushed, "engine", otk_frame_fault_from_link(&info) };
+            n = push(tx, txi, n, cap, &f, &what);
         }
     }
+    const OcBenchTxInfo direct = { otk_ns_from_ms(t), NULL, OTK_FRAME_OK }; /* no link */
 
     /* The operator panel. */
     if (due(t, cfg->operator_period_ms)) {
@@ -269,7 +338,7 @@ static size_t transmit(OcBench *b, J1939Frame *tx, size_t cap) {
             .fault_reset_pressed = b->sig.fault_reset,
         };
         oc_encode_operator(&op, OC_ADDR_BENCH, &f);
-        n = push(tx, n, cap, &f);
+        n = push(tx, txi, n, cap, &f, &direct);
     }
 
     /* The watchdog test frame (test.dut_hang). */
@@ -279,12 +348,16 @@ static size_t transmit(OcBench *b, J1939Frame *tx, size_t cap) {
         for (size_t i = 0U; i < 8U; i++) {
             f.data[i] = 0xFFU;
         }
-        n = push(tx, n, cap, &f);
+        n = push(tx, txi, n, cap, &f, &direct);
     }
     return n;
 }
 
 size_t oc_bench_step(OcBench *b, J1939Frame *tx, size_t cap) {
+    return oc_bench_step_ex(b, tx, NULL, cap);
+}
+
+size_t oc_bench_step_ex(OcBench *b, J1939Frame *tx, OcBenchTxInfo *info, size_t cap) {
     const OcBenchConfig *cfg = b->cfg;
     const double dt = (double)cfg->step_ms / 1000.0;
 
@@ -316,5 +389,5 @@ size_t oc_bench_step(OcBench *b, J1939Frame *tx, size_t cap) {
 
     /* 4. Time advances; the machine reports the new state. */
     b->t_ms += cfg->step_ms;
-    return transmit(b, tx, cap);
+    return transmit(b, tx, info, cap);
 }

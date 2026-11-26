@@ -8,6 +8,10 @@
  * is missing. Frames the bench sends in a step reach the controller in the
  * same step; frames the controller sends reach the bench at the start of the
  * next step. Deterministic and free-running: as fast as the CPU allows.
+ *
+ * With oc_loop_set_frame_log(), every frame of the in-memory bus goes into an
+ * open-tick frame log (framelog.h), with bus_clock=sim: a frame's bus time is
+ * when the controller sent it or received it, in simulated time.
  */
 
 #ifndef OPEN_CRANK_RUNTIME_LOOP_H
@@ -30,6 +34,10 @@ typedef struct {
     OtkCanQueue to_mc;
     OtkCanQueue to_bench;
     uint32_t queue_overflows;
+
+    OtkFrameLog *frames;                   /**< optional frame log */
+    OcBenchTxInfo to_mc_info[OC_LOOP_QUEUE]; /**< what the log needs about each frame in to_mc */
+    uint32_t mc_sent_ms;                   /**< when the controller sent what is in to_bench */
 } OcLoop;
 
 /**
@@ -40,5 +48,11 @@ void oc_loop_init(OcLoop *l, const OcBenchConfig *cfg, const McParams *mc, const
 
 /** @brief Advances the loop by one bench step. */
 void oc_loop_step(OcLoop *l);
+
+/**
+ * @brief Writes every frame of the in-memory bus into @p log (step 10 ms,
+ *        bus_clock=sim), or stops if NULL. Set it before the first step.
+ */
+void oc_loop_set_frame_log(OcLoop *l, OtkFrameLog *log);
 
 #endif /* OPEN_CRANK_RUNTIME_LOOP_H */

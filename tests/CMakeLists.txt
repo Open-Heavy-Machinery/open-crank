@@ -52,3 +52,27 @@ add_test(NAME accept_verdicts_hoist_step
          COMMAND ${CMAKE_COMMAND} -E compare_files ${CMAKE_CURRENT_SOURCE_DIR}/data/hoist_step.verdicts.csv
                  ${CMAKE_CURRENT_BINARY_DIR}/hoist_step.verdicts.csv)
 set_tests_properties(accept_verdicts_hoist_step PROPERTIES FIXTURES_REQUIRED hoist_step_verdicts)
+
+# Frame logs (--frames, open-tick docs/frame-log-format.md): in memory, two runs
+# of a fault scenario give the same file, byte for byte.
+foreach(run a b)
+    add_test(NAME accept_frames_${run}
+             COMMAND open-crank-accept-loop ${OC_SCENARIO_DIR}/speed_command_corrupt.csv
+                     --frames ${CMAKE_CURRENT_BINARY_DIR}/speed_command_corrupt_${run}.frames.csv)
+    set_tests_properties(accept_frames_${run} PROPERTIES FIXTURES_SETUP frames_runs)
+endforeach()
+add_test(NAME accept_frames_deterministic
+         COMMAND ${CMAKE_COMMAND} -E compare_files ${CMAKE_CURRENT_BINARY_DIR}/speed_command_corrupt_a.frames.csv
+                 ${CMAKE_CURRENT_BINARY_DIR}/speed_command_corrupt_b.frames.csv)
+set_tests_properties(accept_frames_deterministic PROPERTIES FIXTURES_REQUIRED frames_runs)
+
+# open-crank.dbc agrees with the encoders (tools/check_dbc.py, cantools).
+# Skipped (77) when cantools is not installed; CI installs it.
+add_executable(oc-dbc-vectors dbc_vectors.c)
+target_link_libraries(oc-dbc-vectors PRIVATE opencrank_sim m)
+find_package(Python3 COMPONENTS Interpreter)
+if(Python3_Interpreter_FOUND)
+    add_test(NAME dbc_agrees_with_encoders
+             COMMAND sh -c "$<TARGET_FILE:oc-dbc-vectors> | ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tools/check_dbc.py ${PROJECT_SOURCE_DIR}/open-crank.dbc")
+    set_tests_properties(dbc_agrees_with_encoders PROPERTIES SKIP_RETURN_CODE 77)
+endif()

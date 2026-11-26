@@ -32,7 +32,7 @@ EMS and PMS are supervisory controllers, so Level 1 is directly useful for them 
 
 - A **plant model** of a heavy-duty diesel engine: mean-value torque production with turbocharger lag, crankshaft dynamics, a starter, and a load-sensing hydraulic pump load. Detailed thermal, air-path and aftertreatment models are later work.
 - A **simulated engine ECU** (starter control, idle and speed governor, limits, overspeed protection, command timeouts), so the plant stays pure physics and your controller faces a realistic engine-side peer.
-- A **J1939 peer**: the simulated engine publishes and consumes a small, documented set of PGNs. The full bus contract is in [docs/bus-interface.md](docs/bus-interface.md).
+- A **J1939 peer**: the simulated engine publishes and consumes a small, documented set of PGNs. The full bus contract is in [docs/bus-interface.md](docs/bus-interface.md), and in machine-readable form in [open-crank.dbc](open-crank.dbc), which CI checks against the encoders. With `--frames`, the runners write every frame of a run with its logical and its bus time ([docs/acceptance.md](docs/acceptance.md#frame-logs---frames)).
 - A **portable reference controller** in plain C, written so the same source can run on the PC, in an emulator and on a real board (board: done in v0.2, see [platforms/stm32g4](platforms/stm32g4/README.md); emulator: *planned*). CI builds it for a Cortex-M4F on every push.
 - **Scenarios as data** and headless closed-loop tests, so a control regression fails a build instead of a shift.
 - **Built on [open-tick](https://github.com/Open-Heavy-Machinery/open-tick)**, the family's machine-independent core (simulated time, scenarios, traces, CAN bridges), pinned as a git submodule. open-crank brings the engine.

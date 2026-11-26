@@ -153,13 +153,14 @@ With the board on the bus (see [platforms/stm32g4/README.md](../platforms/stm32g
 
 ```
 open-crank-accept <can-interface> <scenario.csv> [--criteria <file>] [--dut <address>] [--trace <out.csv>]
-                  [--verdicts <out.csv>]
+                  [--verdicts <out.csv>] [--frames <out.csv>]
 ```
 
 - `--criteria`: by default, the scenario's path with `.csv` replaced by `.accept.csv`.
 - `--dut`: the DUT's source address, `0x27` by default.
 - `--trace`: the same CSV trace as `open-crank-sil` writes.
 - `--verdicts`: the oracle's verdicts, one row per criterion: verdict, status, window, event, reaction and first violation, in seconds on the trace's time axis. The format is open-tick's ([docs/verdict-format.md](https://github.com/Open-Heavy-Machinery/open-tick/blob/v0.2.1/docs/verdict-format.md)). Open it in [open-rig](https://github.com/Open-Heavy-Machinery/open-rig) next to the trace to see each window, reaction and failure over the signals. It is written from the same oracle state as the report, so the two always agree.
+- `--frames`: every frame of the bus, with its logical and its bus time (see "Frame logs" below).
 
 Every received frame goes to the oracle before it goes to the simulated machine, so the oracle sees what the DUT sends even while `fault.mc_tx_lost` or the `mc` link keeps it from the engine (see "Link faults" below). The run ends when the scenario reaches `end`; the last line is one of:
 
@@ -183,7 +184,7 @@ A late step is a step that started after its wall-clock deadline: the simulated 
 ### In memory, with the reference controller
 
 ```
-open-crank-accept-loop <scenario.csv> [--criteria <file>] [--verdicts <out.csv>]
+open-crank-accept-loop <scenario.csv> [--criteria <file>] [--verdicts <out.csv>] [--frames <out.csv>]
 ```
 
 `open-crank-accept-loop` grades only the reference controller (`MC_DEFAULT_PARAMS`, `0x27`), or a mutant built from it, with the same oracle and criteria as `open-crank-accept`, but in the closed loop of `sim/runtime/loop.c`: no bus, no wall clock, as fast as the CPU allows (a fraction of a second per scenario). `--criteria` defaults to the same file as for `open-crank-accept`, and `--verdicts` writes the same verdict file. It prints the same report and ends with `open-crank-accept-loop: PASS (N of N criteria)` or `open-crank-accept-loop: FAIL (K of N criteria failed)`; it exits with 0 if the run passes, 1 if it fails, and 2 on a usage, format or I/O error. It builds on any host, Linux or not.
@@ -193,6 +194,28 @@ open-crank-accept-loop <scenario.csv> [--criteria <file>] [--verdicts <out.csv>]
 ```
 
 `ctest` runs it on every scenario that has criteria, fifteen, as the tests `accept_<scenario>` (`accept_cold_start`, `accept_engine_status_delay`, …). Each writes its verdict file into the build tree, and `accept_verdicts_hoist_step` compares hoist_step's with [tests/data/hoist_step.verdicts.csv](../tests/data/hoist_step.verdicts.csv), byte for byte.
+
+### Frame logs (`--frames`)
+
+`open-crank-accept`, `open-crank-accept-loop` and `open-crank-sil` take `--frames <file>`. It writes every frame of the run, one row each, in open-tick's frame log format ([docs/frame-log-format.md](https://github.com/Open-Heavy-Machinery/open-tick/blob/v0.3.1/docs/frame-log-format.md)). Each row has:
+- `t_s`, the step in which the frame crossed the simulated machine's side; it places the frame on the trace's time axis;
+- `t_bus_s`, when it was on the bus, measured;
+- its direction (`to_dut`, `from_dut`);
+- the link that carried it (`engine`, `mc`, or empty for the operator panel and the test frame);
+- what the link did to it (`drop`, `drop_one_in`, `bus_off`, `overflow`, `corrupt`). `fault.mc_tx_lost` shows as `drop` with no link: it is the bench's own drop, before the `mc` link.
+
+Without `--frames`, nothing changes: the runners take the same code path as before, and the traces and verdicts are byte-identical either way (CI `traces`).
+
+**The two times, and where `t_bus_s` comes from:**
+
+| Runner | `bus_clock` | `t_bus_s` |
+|---|---|---|
+| `open-crank-accept-loop` | `sim` | simulated: when the controller sent the frame, or received it. Exact, so `t_bus_s − t_s` of a delayed engine frame is the delay exactly. Two runs give the same file (`ctest`: `accept_frames_deterministic`) |
+| `open-crank-accept`, `open-crank-sil` | `kernel` | the kernel's timestamps, minus an anchor read at t = 0: received frames as they arrived, sent frames when they left on the interface (the socket's own copy, `CAN_RAW_RECV_OWN_MSGS`). On a USB adapter that is when the frame reached or left the PC, the adapter's latency included |
+
+**What `t_bus_s − t_s` shows on a paced run.** The paced runners compute each step at the start of its 10 ms: when the pacer wakes at T, the bench runs the step from T to T + 10 ms and sends at once the frames that report it, stamped `t_s` = T + 10 ms; then it sleeps until T + 10 ms. So **a machine frame is on the bus about one step before its `t_s`**: measured on `vcan` (2026-11-26, `cold_start`), `t_bus_s − t_s` = −9.9 ms (p50) for `to_dut` frames. During a 300 ms engine-link delay it is 290 ms: the delay minus that step. A controller frame is on the bus before the step that reads it: −2.5 ms (p50) for `from_dut` on `vcan`, depending on the controller's phase. This is how the paced loop works, not a transport delay. A viewer shows `t_bus_s` as a measurement beside the frame, never as its place on the axis.
+
+`tools/frames_vcan_check.sh` (CI, `vcan` job) runs `cold_start` with the reference controller and requires `bus_clock=kernel` and a bus time on every frame, so that every frame the bench sent was matched with its own copy.
 
 ## Link faults
 

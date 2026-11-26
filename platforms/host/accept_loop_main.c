@@ -9,6 +9,7 @@
  * wall clock, as fast as the CPU allows. See docs/acceptance.md.
  *
  *     open-crank-accept-loop scenarios/hoist_step.csv [--criteria <file>] [--verdicts <out.csv>]
+ *                            [--frames <out.csv>]
  *
  * The frames in the loop's to_bench queue are those the controller sent in
  * the previous step; oc_loop_step() hands them to the bench at the start of
@@ -35,9 +36,10 @@ static OcLoop g_loop;
 
 static void usage(void) {
     fprintf(stderr,
-            "usage: open-crank-accept-loop <scenario.csv> [--criteria <file>] [--verdicts <out.csv>]\n"
+            "usage: open-crank-accept-loop <scenario.csv> [--criteria <file>] [--verdicts <out.csv>] [--frames <out.csv>]\n"
             "  --criteria  defaults to the scenario's path with .csv replaced by .accept.csv\n"
             "  --verdicts  writes the oracle's verdicts, one row per criterion (open-tick docs/verdict-format.md)\n"
+            "  --frames    writes every frame of the in-memory bus (open-tick docs/frame-log-format.md)\n"
             "  Grades the reference machine controller (0x%02X) in the in-memory loop.\n",
             (unsigned)OC_ACCEPT_DUT_DEFAULT);
 }
@@ -46,11 +48,14 @@ int main(int argc, char **argv) {
     const char *scenario_path = NULL;
     const char *criteria_path = NULL;
     const char *verdicts_path = NULL;
+    const char *frames_path = NULL;
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--criteria") == 0 && i + 1 < argc) {
             criteria_path = argv[++i];
         } else if (strcmp(argv[i], "--verdicts") == 0 && i + 1 < argc) {
             verdicts_path = argv[++i];
+        } else if (strcmp(argv[i], "--frames") == 0 && i + 1 < argc) {
+            frames_path = argv[++i];
         } else if (argv[i][0] != '-' && scenario_path == NULL) {
             scenario_path = argv[i];
         } else {
@@ -95,6 +100,20 @@ int main(int argc, char **argv) {
         return EXIT_ERROR;
     }
 
+    FILE *frames_fp = NULL;
+    OtkFrameLog frames;
+    if (frames_path != NULL) {
+        /* In memory both times are simulated: exact, so the error bound is 0. */
+        const OtkFrameLogConfig cfg = { otk_ns_from_ms(g_loop.bench.cfg->step_ms), OTK_BUS_CLOCK_SIM, true, 0U,
+                                        "open-crank-accept-loop" };
+        frames_fp = fopen(frames_path, "w");
+        if (frames_fp == NULL || !otk_framelog_init(&frames, frames_fp, &cfg)) {
+            fprintf(stderr, "open-crank-accept-loop: cannot write %s\n", frames_path);
+            return EXIT_ERROR;
+        }
+        oc_loop_set_frame_log(&g_loop, &frames);
+    }
+
     printf("open-crank-accept-loop: [%s] in memory, scenario %s, criteria %s, reference controller 0x%02X\n",
            g_loop.bench.cfg->plant->name, scenario_path, criteria_path, (unsigned)MC_DEFAULT_PARAMS.source_address);
 
@@ -109,6 +128,15 @@ int main(int argc, char **argv) {
         oc_loop_step(&g_loop);
     }
 
+    if (frames_fp != NULL) {
+        const bool frames_ok = otk_framelog_ok(&frames);
+        if (!frames_ok) {
+            fprintf(stderr, "open-crank-accept-loop: frame log: %s\n", otk_framelog_error(&frames));
+        }
+        if (fclose(frames_fp) != 0 || !frames_ok) {
+            return EXIT_ERROR;
+        }
+    }
     if (oc_bench_link_overflows(&g_loop.bench) != 0U) {
         fprintf(stderr, "open-crank-accept-loop: %u frames lost because a link was full; no verdict\n",
                 (unsigned)oc_bench_link_overflows(&g_loop.bench));

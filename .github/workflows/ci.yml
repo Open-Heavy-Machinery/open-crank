@@ -175,6 +175,22 @@ jobs:
       - name: Every safety requirement is checked by a criterion or a test (docs/safety.md)
         run: python3 tools/check_requirements.py
 
+  dbc:
+    name: open-crank.dbc agrees with the encoders (cantools)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Install cantools (pinned)
+        run: python3 -m pip install --user -r tools/requirements-dbc.txt
+      - name: Build the vectors
+        run: |
+          cmake -S . -B build
+          cmake --build build -j --target oc-dbc-vectors
+      - name: Every signal and period agrees; each DBC mutation is caught
+        run: tools/check_dbc.sh build
+
   traces:
     name: traces unchanged versus the base branch
     if: github.event_name == 'pull_request'
@@ -230,6 +246,9 @@ jobs:
       - name: Acceptance suite on vcan0
         if: steps.vcan.outputs.available == 'yes'
         run: tools/accept_vcan.sh build vcan0
+      - name: Frame log with kernel times on vcan0 (open-crank-accept --frames)
+        if: steps.vcan.outputs.available == 'yes'
+        run: tools/frames_vcan_check.sh build vcan0
       - name: Report that the demo was not run
         if: steps.vcan.outputs.available != 'yes'
         run: echo "::warning::vcan is not available on this runner; the vcan demo and the acceptance suite were NOT run"

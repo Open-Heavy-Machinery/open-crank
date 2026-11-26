@@ -34,6 +34,8 @@
 #include <opentick/host/socketcan.h>
 #include <opentick/oracle.h>
 
+#include "frames_sock.h"
+
 #define EXIT_PASS 0
 #define EXIT_FAIL 1
 #define EXIT_ERROR 2
@@ -51,9 +53,10 @@ static void handle_sigint(int sig) {
 static void usage(void) {
     fprintf(stderr,
             "usage: open-crank-accept <can-interface> <scenario.csv> [--criteria <file>] [--dut <address>]"
-            " [--trace <out.csv>] [--verdicts <out.csv>]\n"
+            " [--trace <out.csv>] [--verdicts <out.csv>] [--frames <out.csv>]\n"
             "  --criteria  defaults to the scenario's path with .csv replaced by .accept.csv\n"
             "  --verdicts  writes the oracle's verdicts, one row per criterion (open-tick docs/verdict-format.md)\n"
+            "  --frames    writes every frame of the bus, with kernel times (open-tick docs/frame-log-format.md)\n"
             "  --dut       source address of the device under test, default 0x%02X\n"
             "  example: open-crank-accept vcan0 scenarios/hoist_step.csv\n",
             (unsigned)OC_ACCEPT_DUT_DEFAULT);
@@ -74,11 +77,14 @@ int main(int argc, char **argv) {
     const char *scenario_path = NULL;
     const char *criteria_path = NULL;
     const char *trace_path = NULL;
+    const char *frames_path = NULL;
     const char *verdicts_path = NULL;
     uint8_t dut = OC_ACCEPT_DUT_DEFAULT;
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--trace") == 0 && i + 1 < argc) {
             trace_path = argv[++i];
+        } else if (strcmp(argv[i], "--frames") == 0 && i + 1 < argc) {
+            frames_path = argv[++i];
         } else if (strcmp(argv[i], "--criteria") == 0 && i + 1 < argc) {
             criteria_path = argv[++i];
         } else if (strcmp(argv[i], "--verdicts") == 0 && i + 1 < argc) {
@@ -163,23 +169,44 @@ int main(int argc, char **argv) {
         }
     }
 
+    static OcFramesSock frames; /* large: keep it off the stack */
+    const bool log_frames = frames_path != NULL;
+    if (log_frames) {
+        if (!oc_frames_sock_open(&frames, frames_path, &sock, otk_ns_from_ms(bench.cfg->step_ms), "open-crank-accept")) {
+            if (trace != NULL) {
+                fclose(trace);
+            }
+            otk_socketcan_close(&sock);
+            return EXIT_ERROR;
+        }
+        oc_bench_set_frame_log(&bench, &frames.log);
+    }
+
     printf("open-crank-accept: [%s] on %s, scenario %s, criteria %s, device under test 0x%02X\n",
            bench.cfg->plant->name, ifname, scenario_path, criteria_path, (unsigned)dut);
     fflush(stdout);
 
     OtkPacer pacer;
     otk_pacer_init(&pacer, otk_ns_from_ms(bench.cfg->step_ms));
+    if (log_frames) {
+        oc_frames_sock_anchor(&frames); /* t = 0 */
+    }
     uint32_t dut_frames = 0U;
     while (g_running) {
         OtkCanFrame in;
-        while (otk_socketcan_recv(&sock, &in) > 0) {
+        OtkSocketCanRxInfo rx = { false, false, 0U };
+        while ((log_frames ? otk_socketcan_recv_ex(&sock, &in, &rx) : otk_socketcan_recv(&sock, &in)) > 0) {
+            if (rx.own) {
+                oc_frames_sock_own(&frames, &in, &rx); /* one of ours, back with its kernel time */
+                continue;
+            }
             otk_oracle_frame(&g_oracle, &in, otk_ns_from_ms(bench.t_ms));
             J1939Frame f;
             if (oc_frame_from_otk(&in, &f)) {
                 if (j1939_id_source(f.id) == dut) {
                     dut_frames++;
                 }
-                oc_bench_rx(&bench, &f);
+                oc_bench_rx_at(&bench, &f, log_frames ? oc_frames_sock_rx_time(&frames, &rx) : OTK_FRAMELOG_NO_TIME);
             }
         }
         otk_oracle_step(&g_oracle, otk_ns_from_ms(bench.t_ms));
@@ -188,11 +215,15 @@ int main(int argc, char **argv) {
         }
 
         J1939Frame tx[8];
-        const size_t n = oc_bench_step(&bench, tx, sizeof(tx) / sizeof(tx[0]));
+        OcBenchTxInfo txi[8];
+        const size_t n = oc_bench_step_ex(&bench, tx, txi, sizeof(tx) / sizeof(tx[0]));
         for (size_t i = 0; i < n; i++) {
             OtkCanFrame out;
             oc_frame_to_otk(&tx[i], &out);
-            (void)otk_socketcan_send(&sock, &out);
+            const bool sent = otk_socketcan_send(&sock, &out);
+            if (log_frames) {
+                oc_frames_sock_sent(&frames, &out, &txi[i], sent);
+            }
         }
         if (trace != NULL) {
             oc_trace_row(&tr, &bench, NULL);
@@ -202,6 +233,12 @@ int main(int argc, char **argv) {
 
     if (trace != NULL) {
         fclose(trace);
+    }
+    if (log_frames) {
+        if (!oc_frames_sock_close(&frames, "open-crank-accept")) {
+            otk_socketcan_close(&sock);
+            return EXIT_ERROR;
+        }
     }
     otk_socketcan_close(&sock);
 
