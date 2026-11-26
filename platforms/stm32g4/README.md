@@ -192,10 +192,10 @@ Worst observed: 2287 cycles (13.5 µs), about 0.13 % of the 10 ms period. Anothe
 | `mc_init` | 16 bytes |
 | `mc_init_after_watchdog` | 24 bytes |
 | `mc_handle_frame` | 152 bytes |
-| `mc_step` | 76 bytes |
+| `mc_step` | 132 bytes |
 | `mc_clear_fault` | 0 bytes |
 
-`memcpy`, `memmove`, `memset` and `memcmp` are not counted. This is the controller's stack only: the demo's own code, the HAL and the interrupt handlers come on top, and the demo's build (CubeIDE, `-O0`) is not the build measured here. Other GCC versions give other figures (GCC 10.3.1: `mc_step` 84 bytes). `mc_step` grew from 68 to 76 bytes in v0.3.1 with the TSC1 counter and checksum, and `mc_handle_frame` from 96 to 152 bytes with the engine's DM1 (a decoded DM1 on its stack).
+`memcpy`, `memmove`, `memset` and `memcmp` are not counted. This is the controller's stack only: the demo's own code, the HAL and the interrupt handlers come on top, and the demo's build (CubeIDE, `-O0`) is not the build measured here. Other GCC versions give other figures (GCC 10.3.1 gives 132 bytes for `mc_step` too). `mc_step` grew from 68 to 76 bytes in v0.3.1 with the TSC1 counter and checksum, and to 132 bytes with the controller's own DM1 (a DM1 to encode on its stack), and `mc_handle_frame` from 96 to 152 bytes with the engine's DM1 (a decoded DM1 on its stack).
 
 ### The watchdog check
 

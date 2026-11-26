@@ -15,6 +15,7 @@ All notable changes to this project. The project is pre-alpha; nothing here is a
 
 - **`portable/`:** `j1939_encode_dm1()` moved from `sim/engine_ecu` (`j1939_diag_tx.h`) to `portable/j1939` (`j1939_diag.h`). The BAM sender stays in `sim/`: the controller's DM1 never needs it.
 - **`mc_step()` returns up to three frames** (TSC1, OC_PUMP_CMD and, once a second, DM1). Every platform in the repository already passes a buffer of four; [docs/porting.md](docs/porting.md) asks for a `cap` of at least 3.
+- Worst-case stack of `mc_step`: 76 to 132 bytes (Cortex-M4F MinSizeRel, Arm GNU Toolchain 14.2.rel1; budget 1024 bytes).
 - The traces of the fifteen scenarios are byte-identical to v0.3.2: the simulated machine does not read the controller's DM1. Frame logs and verdict files change (new frames, new criteria).
 
 ## v0.3.2: Frame logs and the bus dictionary (2026-11-26)
