@@ -12,6 +12,13 @@
  * never reads a clock. Whoever calls oc_bench_step() decides how fast time
  * passes: a free-running loop (tests, CI), a wall-clock-paced loop (SIL demo)
  * or, later, an emulator (virtual time).
+ *
+ * Frame log (open-tick framelog.h): with oc_bench_set_frame_log(), the bench
+ * writes the rows it can complete itself: every frame from the device under
+ * test (delivered or lost on the mc link, or dropped by fault.mc_tx_lost),
+ * and every machine frame lost on the engine link. The frames it puts on the
+ * bus (oc_bench_step_ex()) come with an OcBenchTxInfo; the runner writes
+ * their rows once it knows when they were on the bus.
  */
 
 #ifndef OPEN_CRANK_RUNTIME_BENCH_H
@@ -28,10 +35,25 @@
 #include <opencrank/runtime/scenario.h>
 #include <opencrank/runtime/signals.h>
 #include <opencrank/j1939_diag_tx.h>
+#include <opentick/framelog.h>
 #include <opentick/link.h>
 #include <opentick/player.h>
 
 /** @brief What the bench simulates, and how. */
+/** @brief What the frame log needs about a frame the bench puts on the bus. */
+typedef struct {
+    OtkNs t;             /**< logical time: the step that sent it (it may have waited in the engine link) */
+    const char *link;    /**< "engine", or NULL (operator panel, test frame: no link) */
+    OtkFrameFault fault; /**< OTK_FRAME_OK or OTK_FRAME_CORRUPT */
+} OcBenchTxInfo;
+
+/** @brief A frame from the device under test in the mc link, with its bus time. */
+typedef struct {
+    OtkNs pushed;
+    uint32_t id;
+    OtkNs t_bus;
+} OcBenchInFlight;
+
 typedef struct {
     const PlantParams *plant;
     const EngineEcuParams *ecu;
@@ -97,6 +119,11 @@ typedef struct {
     uint8_t bam_n;                           /**< frames of the BAM in progress (TP.CM included) */
     uint8_t bam_next;                        /**< next one to send */
     uint32_t bam_next_ms;                    /**< when */
+
+    /* Frame log (optional): the bus times of the frames in the mc link. */
+    OtkFrameLog *frames;
+    OcBenchInFlight mc_in_flight[OTK_CAN_QUEUE_MAX];
+    size_t mc_in_flight_n;
 } OcBench;
 
 void oc_bench_init(OcBench *b, const OcBenchConfig *cfg);
@@ -114,10 +141,28 @@ bool oc_bench_scenario_done(const OcBench *b);
 void oc_bench_rx(OcBench *b, const J1939Frame *f);
 
 /**
+ * @brief oc_bench_rx(), with the time the frame was on the bus (@p t_bus,
+ *        or OTK_FRAMELOG_NO_TIME) for the frame log.
+ */
+void oc_bench_rx_at(OcBench *b, const J1939Frame *f, OtkNs t_bus);
+
+/**
  * @brief Advances the simulated machine by one step.
  * @return number of frames written to @p tx (at most @p cap) to put on the bus.
  */
 size_t oc_bench_step(OcBench *b, J1939Frame *tx, size_t cap);
+
+/**
+ * @brief oc_bench_step(), and for each frame in @p tx what the frame log
+ *        needs (@p info, @p cap entries; may be NULL).
+ */
+size_t oc_bench_step_ex(OcBench *b, J1939Frame *tx, OcBenchTxInfo *info, size_t cap);
+
+/**
+ * @brief Writes the bench's rows (see above) into @p log, or stops if NULL.
+ *        The log's step must be the bench's. Set it before the first step.
+ */
+void oc_bench_set_frame_log(OcBench *b, OtkFrameLog *log);
 
 /**
  * @brief Frames lost because a link's line was full (opentick/link.h). Not a

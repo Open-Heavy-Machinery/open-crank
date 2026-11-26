@@ -2,6 +2,24 @@
 
 All notable changes to this project. The project is pre-alpha; nothing here is a stable API yet.
 
+## Unreleased
+
+### Added
+
+- **`--frames <file>`** in `open-crank-accept`, `open-crank-accept-loop` and `open-crank-sil`: every frame of the run in open-tick's frame log format (v0.3.1). Each frame has its logical time (`t_s`, the step) and its bus time (`t_bus_s`), its direction, its link and what the link did to it ([docs/acceptance.md](docs/acceptance.md), "Frame logs").
+  - In memory (`accept-loop`), both times are simulated (`bus_clock=sim`) and two runs give the same file (`accept_frames_deterministic`).
+  - Over SocketCAN, `t_bus_s` is the kernel's timestamp of the received frame, or of the socket's own copy of a sent one (`bus_clock=kernel`). On `vcan`, a machine frame is on the bus about one step before its `t_s`: the paced loop computes each step at its start. This is documented.
+- **`open-crank.dbc`**: the bus contract ([docs/bus-interface.md](docs/bus-interface.md)) in machine-readable form, J1939 (`ProtocolType "J1939"`, `VFrameFormat` J1939PG), with every message, signal, value table and period, plus the bench-only frames.
+  - `tests/dbc_vectors.c` encodes frames with open-crank's own encoders and `tools/check_dbc.py` (cantools 45.2.0, `tools/requirements-dbc.txt`) decodes them with the DBC. Every signal must match, and every period must be the DBC's `GenMsgCycleTime`.
+  - `tools/check_dbc.sh` also requires seven deliberate errors in the DBC to be caught. CI job `dbc`; ctest `dbc_agrees_with_encoders`, skipped without cantools.
+- The bench reports what the links did to each frame (`oc_bench_set_frame_log()`, `oc_bench_rx_at()`, `oc_bench_step_ex()`); so does the in-memory loop (`oc_loop_set_frame_log()`).
+- `tools/frames_vcan_check.sh` (CI `vcan` job): `open-crank-accept --frames` on `cold_start` with the reference controller. The log must say `bus_clock=kernel`, and every frame must have a bus time.
+
+### Changed
+
+- open-tick submodule: `v0.3.0` to `v0.3.1` (frame logs).
+- The bench uses `otk_link_push_ex()` and `otk_link_pop_ex()`, which behave as before: the fifteen scenarios' traces and verdicts are byte-identical to `main`.
+
 ## v0.3.1: Robustness on the board (2026-11-25)
 
 Every injected fault now has a test of the controller's reaction, and every safety requirement is traced to its tests. The milestone v0.3 is done, in three steps:

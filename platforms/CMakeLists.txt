@@ -10,13 +10,13 @@ target_link_libraries(open-crank-accept-loop PRIVATE opencrank_sim opencrank_acc
 
 # Linux SocketCAN: the SIL executables, paced by the wall clock.
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    add_executable(open-crank-sil linux-socketcan/sil_main.c)
+    add_executable(open-crank-sil linux-socketcan/sil_main.c linux-socketcan/frames_sock.c)
     target_link_libraries(open-crank-sil PRIVATE opencrank_sim opentick::host)
 
     add_executable(open-crank-mc linux-socketcan/mc_main.c)
     target_link_libraries(open-crank-mc PRIVATE opencrank_portable opencrank_can_otk opentick::host)
 
-    add_executable(open-crank-accept linux-socketcan/accept_main.c)
+    add_executable(open-crank-accept linux-socketcan/accept_main.c linux-socketcan/frames_sock.c)
     target_link_libraries(open-crank-accept PRIVATE opencrank_sim opencrank_accept opentick::host)
 
     # Executables land next to each other in the top of the build tree.

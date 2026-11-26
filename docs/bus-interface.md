@@ -4,6 +4,8 @@ This is the contract between the simulated machine and a **Level 1 device under 
 
 Everything travels as 29-bit CAN frames with J1939 framing, so the same controller works against the SIL on `vcan`, in an emulator, and (from v0.2) on a real board.
 
+**Machine-readable form: [`open-crank.dbc`](../open-crank.dbc).** Every message below, with its signals, scaling, value tables and period (`GenMsgCycleTime`), as a DBC for cantools, SavvyCAN or Vector tools (`ProtocolType "J1939"`, `VFrameFormat` J1939PG; identifiers with the nominal source addresses). **This page is the contract; the DBC must agree with it**, and CI checks that it agrees with the code that puts the frames on the bus: `tests/dbc_vectors.c` encodes frames with open-crank's encoders and `tools/check_dbc.py` decodes them with the DBC, signal by signal (`tools/check_dbc.sh`, which also checks that seven deliberate errors in the DBC are caught). DBC cannot describe J1939 transport: a DM1 with two codes or more travels as a BAM (TP_CM_BAM, TP_DT), and a reader reassembles it itself.
+
 > **Verify against your copy of SAE J1939-71.** The J1939 layouts below are original work from public sources. The repository ships no spec text.
 
 ## Bus
