@@ -2,7 +2,17 @@
 
 All notable changes to this project. The project is pre-alpha; nothing here is a stable API yet.
 
-## Unreleased
+## v0.3.2: Frame logs and the bus dictionary (2026-11-26)
+
+Every run can now write its CAN frames to a file, each with two times, and the bus contract is a DBC that CI checks against the encoders. open-rig v0.3 reads both. Nothing changes for a controller:
+- the fifteen scenarios' traces, verdicts and reports are byte-identical to v0.3.1;
+- the firmware's sources (`portable/`, `platforms/stm32g4/`, `cmake/`) are unchanged since v0.3.1, so v0.3.1's board evidence (BENCH OK, watchdog PASS) still applies. There is no new board run.
+
+### Known limitations
+
+- **The board bench writes no frame log** (`tools/board/bench.sh --frames` *(planned)*). Frame logs come from the in-memory runners and from SocketCAN.
+- **On a paced run, `t_bus_s` is about one step before `t_s`** for machine frames: the loop computes each step at its start ([docs/acceptance.md](docs/acceptance.md), "Frame logs"). It is a property of the paced loop, not a transport delay.
+- **`open-crank.dbc` is checked against the encoders with cantools only** (45.2.0). open-rig's CI also decodes it; other CAN tools have not been tried.
 
 ### Added
 

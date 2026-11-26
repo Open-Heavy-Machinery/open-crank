@@ -12,6 +12,7 @@ Scope is deliberately narrow. Each milestone is small enough to finish and usefu
 | **v0.2.1** (done) | Acceptance suite over the bus | 1 |
 | **v0.2.2** (done) | Board automation | 1 |
 | **v0.3** (done, released as `v0.3.1`) | Robustness on the board | 1 |
+| **v0.3.2** (done) | Frame logs and the bus dictionary | 1 |
 | **v0.4** | Level 2: your firmware as the engine ECU | 2 |
 | **v0.5** | Two engines on one machine | 1 |
 | **v0.6** | Marine 2-stroke plant | 1 |
@@ -220,6 +221,16 @@ The reports and traces are attached to the GitHub release of v0.3.1.
    - The DM1 faults: *met* since v0.3.1 step 3d (`engine_dtc_red`, `engine_dtc_amber`, `engine_dtc_red_and_amber`).
 2. Each safety requirement is linked to at least one test.
    - *Met:* `SR-1`…`SR-9`, each cited by an acceptance criterion or a unit test ([`docs/safety.md`](docs/safety.md)); `tools/check_requirements.py` fails CI otherwise. Requirements added in v0.3.1 must keep it so.
+
+---
+
+## v0.3.2: Frame logs and the bus dictionary
+
+**Status: done** (2026-11-26). It brings in open-tick v0.3.1's frame logs and gives the bus contract a machine-readable form:
+- `--frames <file>` in every runner (`open-crank-run`, `open-crank-accept-loop`, `open-crank-accept`, `open-crank-sil`; #40, #41);
+- [`open-crank.dbc`](open-crank.dbc), checked against the encoders and their periods by cantools in CI (#40).
+
+Controller behaviour and firmware are unchanged since v0.3.1: the traces, verdicts and reports of the fifteen scenarios are byte-identical. The board bench does not write frame logs yet *(planned)*.
 
 ---
 
