@@ -13,11 +13,14 @@ All notable changes to this project. The project is pre-alpha; nothing here is a
   - `tests/dbc_vectors.c` encodes frames with open-crank's own encoders and `tools/check_dbc.py` (cantools 45.2.0, `tools/requirements-dbc.txt`) decodes them with the DBC. Every signal must match, and every period must be the DBC's `GenMsgCycleTime`.
   - `tools/check_dbc.sh` also requires seven deliberate errors in the DBC to be caught. CI job `dbc`; ctest `dbc_agrees_with_encoders`, skipped without cantools.
 - The bench reports what the links did to each frame (`oc_bench_set_frame_log()`, `oc_bench_rx_at()`, `oc_bench_step_ex()`); so does the in-memory loop (`oc_loop_set_frame_log()`).
+- **`--frames <file>` in `open-crank-run`**, the deterministic runner of the CI `traces` job: the trace and the frame log come from the same run (`bus_clock=sim`, `bus_clock_err_ns=0`, `source=open-crank-run`). Without `--frames`, nothing changes.
+  - `ctest`: two runs give the same frame log (`run_frames_hoist_step`); the trace is the same with and without `--frames` (`run_trace_same_with_frames`); the frames are those of `open-crank-accept-loop` for `hoist_step`, byte for byte except the header's `source` (`run_frames_same_as_accept_loop`).
 - `tools/frames_vcan_check.sh` (CI `vcan` job): `open-crank-accept --frames` on `cold_start` with the reference controller. The log must say `bus_clock=kernel`, and every frame must have a bus time.
 
 ### Changed
 
 - open-tick submodule: `v0.3.0` to `v0.3.1` (frame logs).
+- README: requirement traceability is no longer marked *(planned)*; it has existed since v0.3.1 ([docs/safety.md](docs/safety.md), `tools/check_requirements.py`).
 - The bench uses `otk_link_push_ex()` and `otk_link_pop_ex()`, which behave as before: the fifteen scenarios' traces and verdicts are byte-identical to `main`.
 
 ## v0.3.1: Robustness on the board (2026-11-25)

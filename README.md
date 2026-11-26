@@ -37,7 +37,7 @@ EMS and PMS are supervisory controllers, so Level 1 is directly useful for them 
 - **Scenarios as data** and headless closed-loop tests, so a control regression fails a build instead of a shift.
 - **Built on [open-tick](https://github.com/Open-Heavy-Machinery/open-tick)**, the family's machine-independent core (simulated time, scenarios, traces, CAN bridges), pinned as a git submodule. open-crank brings the engine.
 - **Bring your own firmware.** Any board, RTOS or language that speaks CAN. The bus contract in [docs/bus-interface.md](docs/bus-interface.md) is all it needs.
-- **Practise critical-firmware techniques**: MISRA-oriented checks, stack usage by call graph and the worst observed execution time on the board, in CI and in the docs since v0.1.x and v0.2; acceptance tests over the bus since v0.2.1 ([docs/acceptance.md](docs/acceptance.md)); requirement traceability *(planned)*. This is practice, not certification: open-crank is not a certified tool (see below).
+- **Practise critical-firmware techniques**: MISRA-oriented checks, stack usage by call graph and the worst observed execution time on the board, in CI and in the docs since v0.1.x and v0.2; acceptance tests over the bus since v0.2.1 ([docs/acceptance.md](docs/acceptance.md)); requirement traceability since v0.3.1: every safety requirement in [docs/safety.md](docs/safety.md) is cited by its tests, and CI checks it with `tools/check_requirements.py`. This is practice, not certification: open-crank is not a certified tool (see below).
 
 ## What this is not
 
@@ -138,7 +138,10 @@ ctest --test-dir build --output-on-failure
 ```sh
 ./build/open-crank-run scenarios/hoist_step.csv
 ./build/open-crank-run scenarios/overspeed.csv --trace overspeed.csv
+./build/open-crank-run scenarios/overspeed.csv --trace overspeed.csv --frames overspeed.frames.csv
 ```
+
+With `--frames`, the same run also writes every frame of the in-memory bus, in open-tick's frame log format ([docs/acceptance.md](docs/acceptance.md#frame-logs---frames)): the trace and the frames come from one run, so they line up step by step. The frames are those `open-crank-accept-loop` writes for the same scenario; only the header's `source` differs (`ctest`: `run_frames_same_as_accept_loop`).
 
 The trace is a CSV with one row per 10 ms step: speed, fuel, torques, ECU state, pump, controller state. To look at one, or to lay a board's trace over the simulator's, open it in [open-rig](https://github.com/Open-Heavy-Machinery/open-rig) with [`viewer.json`](viewer.json), which says which columns go in which panel. The scenarios in `scenarios/` are the same files the closed-loop tests use; see [ARCHITECTURE.md](ARCHITECTURE.md#46-runtime-simruntime) for the signals you can set.
 
