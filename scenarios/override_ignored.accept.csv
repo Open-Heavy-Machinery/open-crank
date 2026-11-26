@@ -5,3 +5,4 @@ G1,begin,end,0,tsc1_speed_control == 1 -> tsc1_speed_rpm <= 2100,SR-2: requested
 G2,begin,end,20,pump_cmd_pct > 0 -> tsc1_speed_control == 1,SR-3: pump commanded only while in speed control
 G3,begin,end,0,tsc1_intact == 1,SR-10: every TSC1 carries a valid checksum and a counter that moves by one
 O1,start=1+2500ms,end,0,tsc1_override == 0 && pump_cmd_pct == 0,SR-5, SR-7: override released when the engine does not honour it (by 2.5 s after start), and kept
+F1,start=1+3600ms,end,0,dm1_red_stop == 1 && dm1_spn == 520196,SR-14: the controller reports its fault (override rejected) as DM1 within 1.1 s of entering FAULT (red stop lamp and SPN 520196 - FMI 31), and kept

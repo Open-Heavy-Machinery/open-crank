@@ -6,7 +6,7 @@ The reference controller is [`portable/machine_ctrl`](../portable/machine_ctrl),
 
 1. **Once, at start:** `mc_init(&mc, &MC_DEFAULT_PARAMS);`. `McCtx` is plain storage, one per controller.
 2. **For every CAN frame received:** fill a `J1939Frame` (`id` is the 29-bit identifier with no flag bits, `dlc` is 0 to 8, `data` holds 8 bytes) and call `mc_handle_frame(&mc, &f, now_ms)`. Pass only extended (29-bit) data frames. The controller ignores the frames it does not use.
-3. **Every 10 ms:** `n = mc_step(&mc, now_ms, out, cap)`, then send the `n` frames written to `out`. Today it returns at most two (TSC1 and OC_PUMP_CMD), so `cap` must be at least 2.
+3. **Every 10 ms:** `n = mc_step(&mc, now_ms, out, cap)`, then send the `n` frames written to `out`. It returns at most three: TSC1 and OC_PUMP_CMD every step, and the controller's own DM1 once a second. Give it a `cap` of at least 3. With less room nothing is lost from TSC1 and OC_PUMP_CMD, and the DM1 waits for a step with room. The transmit queue must take three frames per step: the STM32G4's FDCAN has three transmit buffers, emptied well within a 10 ms step at 250 kbit/s.
 4. **Time:** `now_ms` is a millisecond counter that the platform keeps, as a `uint32_t` that only goes up; the controller copes with its wrap-around. Use the same counter in both calls.
 
 ## Rules

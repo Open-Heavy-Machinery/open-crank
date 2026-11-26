@@ -44,6 +44,17 @@ BO_ 2566834688 DM1: 8 Engine
  SG_ DTC1_OccurrenceCount : 40|7@1+ (1,0) [0|127] "" MachineController
  SG_ DTC1_ConversionMethod : 47|1@1+ (1,0) [0|1] "" MachineController
 
+BO_ 2566834727 DM1_MC: 8 MachineController
+ SG_ ProtectLampStatus : 0|2@1+ (1,0) [0|3] "" Engine
+ SG_ AmberWarningLampStatus : 2|2@1+ (1,0) [0|3] "" Engine
+ SG_ RedStopLampStatus : 4|2@1+ (1,0) [0|3] "" Engine
+ SG_ MalfunctionIndicatorLampStatus : 6|2@1+ (1,0) [0|3] "" Engine
+ SG_ DTC1_SPN_Low : 16|16@1+ (1,0) [0|65535] "" Engine
+ SG_ DTC1_FMI : 32|5@1+ (1,0) [0|31] "" Engine
+ SG_ DTC1_SPN_High : 37|3@1+ (1,0) [0|7] "" Engine
+ SG_ DTC1_OccurrenceCount : 40|7@1+ (1,0) [0|127] "" Engine
+ SG_ DTC1_ConversionMethod : 47|1@1+ (1,0) [0|1] "" Engine
+
 BO_ 2565668608 TP_CM_BAM: 8 Engine
  SG_ ControlByte : 0|8@1+ (1,0) [0|255] "" MachineController
  SG_ TotalMessageSize : 8|16@1+ (1,0) [0|1785] "byte" MachineController
@@ -77,6 +88,7 @@ CM_ BO_ 2364539904 "Electronic Engine Controller 1, PGN 61444, broadcast, every 
 CM_ BO_ 2566843904 "Engine Temperature 1, PGN 65262, every 1000 ms.";
 CM_ BO_ 2566844160 "Engine Fluid Level/Pressure 1, PGN 65263, every 500 ms.";
 CM_ BO_ 2566834688 "Active diagnostic trouble codes, PGN 65226, every 1000 ms and at once on a change. This is the single-frame layout (lamps and the first DTC). With two codes or more DM1 is longer than 8 bytes and travels as a BAM (TP_CM_BAM, TP_DT): a J1939 reader reassembles it.";
+CM_ BO_ 2566834727 "The machine controller's own active diagnostic trouble codes, PGN 65226, from 0x27, every 1000 ms. In FAULT: red stop lamp on and one DTC, SPN 520192 + the fault number (proprietary range), FMI 31, occurrence count 1. Outside FAULT: every lamp off and no DTC. Always one frame.";
 CM_ BO_ 2565668608 "Transport protocol connection management, PGN 60416, to global: the BAM that announces a DM1 longer than 8 bytes.";
 CM_ BO_ 2565603072 "Transport protocol data transfer, PGN 60160, to global: the BAM's packets, 50 ms apart, 7 bytes each, the last padded with 0xFF.";
 CM_ BO_ 2566856956 "open-crank operator controls (not SAE J1939), PGN 0xFF20, from the bench (0xFC), every 20 ms.";
@@ -96,6 +108,7 @@ BA_ "VFrameFormat" BO_ 2364539904 3;
 BA_ "VFrameFormat" BO_ 2566843904 3;
 BA_ "VFrameFormat" BO_ 2566844160 3;
 BA_ "VFrameFormat" BO_ 2566834688 3;
+BA_ "VFrameFormat" BO_ 2566834727 3;
 BA_ "VFrameFormat" BO_ 2565668608 3;
 BA_ "VFrameFormat" BO_ 2565603072 3;
 BA_ "VFrameFormat" BO_ 2566856956 3;
@@ -108,6 +121,7 @@ BA_ "GenMsgCycleTime" BO_ 2364539904 10;
 BA_ "GenMsgCycleTime" BO_ 2566843904 1000;
 BA_ "GenMsgCycleTime" BO_ 2566844160 500;
 BA_ "GenMsgCycleTime" BO_ 2566834688 1000;
+BA_ "GenMsgCycleTime" BO_ 2566834727 1000;
 BA_ "GenMsgCycleTime" BO_ 2566856956 20;
 BA_ "GenMsgCycleTime" BO_ 2365530407 10;
 VAL_ 2348810279 OverrideControlMode 0 "Override disabled" 1 "Speed control" 2 "Torque control" 3 "Speed/torque limit control" ;
@@ -116,5 +130,9 @@ VAL_ 2566834688 ProtectLampStatus 0 "Off" 1 "On" 3 "Not available" ;
 VAL_ 2566834688 AmberWarningLampStatus 0 "Off" 1 "On" 3 "Not available" ;
 VAL_ 2566834688 RedStopLampStatus 0 "Off" 1 "On" 3 "Not available" ;
 VAL_ 2566834688 MalfunctionIndicatorLampStatus 0 "Off" 1 "On" 3 "Not available" ;
+VAL_ 2566834727 ProtectLampStatus 0 "Off" 1 "On" 3 "Not available" ;
+VAL_ 2566834727 AmberWarningLampStatus 0 "Off" 1 "On" 3 "Not available" ;
+VAL_ 2566834727 RedStopLampStatus 0 "Off" 1 "On" 3 "Not available" ;
+VAL_ 2566834727 MalfunctionIndicatorLampStatus 0 "Off" 1 "On" 3 "Not available" ;
 VAL_ 2565668608 ControlByte 32 "BAM" ;
 VAL_ 2566856956 FaultResetButton 0 "Released" 1 "Pressed" 3 "Not available" ;

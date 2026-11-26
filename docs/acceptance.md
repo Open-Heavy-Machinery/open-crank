@@ -16,7 +16,7 @@ It does not grade:
 
 ## Observables
 
-The oracle reads five observables from the DUT's frames. Only frames whose source address is the DUT's count (`--dut`, `0x27` by default); a TSC1 counts only if it is addressed to the engine (`0x00`). Engine frames are never looked at.
+The oracle reads seven observables from the DUT's frames. Only frames whose source address is the DUT's count (`--dut`, `0x27` by default); a TSC1 counts only if it is addressed to the engine (`0x00`). Engine frames are never looked at.
 
 | Observable | Value | Holds for | Default |
 |---|---|---|---|
@@ -25,6 +25,10 @@ The oracle reads five observables from the DUT's frames. Only frames whose sourc
 | `pump_cmd_pct` | the OC_PUMP_CMD displacement; 0 if "not available" | 200 ms | 0 |
 | `tsc1_override` | 1 if the TSC1 has an override mode other than `00` (speed, torque or limit); 0 if it is `00` | 200 ms | 0 |
 | `tsc1_intact` | 1 if the TSC1's checksum (SPN 4207) is right and its counter (SPN 4206) is the previous TSC1's + 1, with 15 wrapping to 0; 0 otherwise. The first TSC1 needs only the checksum (since v0.3.1) | 200 ms | 1: silence is not a broken frame |
+| `dm1_red_stop` | 1 if the DUT's own DM1 (single frame) has its red stop lamp on; 0 otherwise | 3000 ms | 0 |
+| `dm1_spn` | the SPN of the first active DTC of the DUT's own DM1; a gap when it has none | 3000 ms | gap |
+
+The two DM1 observables hold for 3000 ms, three periods of a DM1 sent once a second: the 200 ms of the others would make them flicker between frames. A DUT that never sends DM1 reads as "no lamp, no code" (SR-14).
 
 **Silence counts as releasing.** An observable falls back to its default when no frame has updated it for more than 200 ms, because that is what the simulated machine does: the engine drops a TSC1 older than 200 ms and returns to its own idle governor, and the pump takes a command older than 200 ms as zero (and "not available" as zero). "Released" therefore means: TSC1 with override mode `00`, or no TSC1 for more than 200 ms; and the pump at 0, or no OC_PUMP_CMD for more than 200 ms. A TSC1 that keeps any other override mode is not a release, even without a valid requested speed: the simulated engine then falls back to low idle, but the bus contract does not say what a real engine does with a speed-control request that carries no speed, and a release in mode `00` is unambiguous.
 
@@ -117,6 +121,8 @@ And per scenario:
 | | A2 | from the amber lamp, for 1 s | requested speed ≥ 1199 rpm and pump ≥ 49.6 % | into limp-home without falling through it. The smoothness itself (rates) is checked by the unit test `test_limp_home`: the oracle has no rates |
 | | A3 | 1.5 s after the lamp goes off, to `end` | requested speed 1500 ± 1 rpm and pump 85 ± 0.4 % | back to the operator's values on its own |
 | `engine_dtc_red_and_amber` | M1 | 300 ms after both lamps, to `end` | no override and pump at 0 | two codes make the DM1 10 bytes long, so it comes as a BAM (TP.CM and two TP.DT, 50 ms apart): the reference reacts in 110 ms |
+| every scenario that ends in FAULT (nine; not `watchdog_reset`, which is board-only) | F1 | 1.1 s after the bound of that scenario's release criterion (R1, M1, D1, E2, B1, O1, V1, K1, L1), until 10 ms before the fault reset or to `end` | the DUT's own DM1 with its red stop lamp and SPN 520192 + its fault number | SR-14. The release criterion bounds when the DUT is in FAULT at the latest; a DM1 sent once a second then needs up to 1 s, plus a step. The SPN tells which fault: 520193 engine status lost, 520194 overspeed, 520196 override rejected, 520198 the engine's red stop lamp ([bus-interface.md](bus-interface.md)) |
+| the five of them with a fault reset | F2 | 1.1 s after the fault reset, to `end` | the DUT's own DM1 without its red stop lamp | SR-14: the report ends with the fault |
 
 ## Running it
 
@@ -313,8 +319,11 @@ All mutations are in `portable/machine_ctrl/src/machine_ctrl.c`:
 | controller: the engine's red stop lamp ignored | R1, M1 |
 | controller: the engine's amber lamp ignored (no limp-home) | A1 |
 | controller: a DM1 that comes as a BAM is ignored | M1 |
+| controller: its own DM1 never shows the red stop lamp | F1 |
+| controller: its own DM1 sent only every 5 s | F1 |
+| controller: its own DM1's SPN does not say which fault | F1 |
 
-Four are one per link-fault scenario (v0.3); the last two check the TSC1 counter and checksum (v0.3.1). The checksum mutant is in `portable/j1939/src/j1939.c`, the codec the controller uses. The last three check the engine's DM1 (v0.3.1, step 3d); the BAM mutant is in `portable/j1939/src/j1939_diag.c`. In total: 15 mutants killed, 1 accepted survivor.
+Four are one per link-fault scenario (v0.3); the last two check the TSC1 counter and checksum (v0.3.1). The checksum mutant is in `portable/j1939/src/j1939.c`, the codec the controller uses. The last three check the engine's DM1 (v0.3.1, step 3d); the BAM mutant is in `portable/j1939/src/j1939_diag.c`. The last three check the controller's own DM1 (SR-14). In total: 18 mutants killed, 1 accepted survivor.
 
 **Why the mutant of `speed_command_intermittent` is killed by I2 and not by I1.** Losing one frame in three is invisible to a controller that sends every 10 ms: the engine's 200 ms request timeout never expires, so its EEC1 keeps showing the controller in control, and the controller has nothing to react to. No one-line change to the reference makes it fail I1, which is a robustness check: it fails a controller that would react where it should not. The defect the loss exposes is a controller that sends too seldom. The mutant that sends every 150 ms fails I2, because its pump command lags the lever by more than 100 ms. It fails the same check in every scenario with the hoist, with or without frame loss.
 

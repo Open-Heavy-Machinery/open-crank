@@ -2,7 +2,7 @@
 /**
  * @file test_accept.c
  * @brief open-crank's observables for the acceptance oracle (sim/accept):
- *        decoding of TSC1 and OC_PUMP_CMD, defaults, and frames from other
+ *        decoding of TSC1, OC_PUMP_CMD and the DUT's DM1, defaults, and frames from other
  *        nodes. The oracle itself is tested in open-tick.
  */
 
@@ -12,6 +12,7 @@
 #include <opencrank/accept.h>
 #include <opencrank/can_otk.h>
 #include <opencrank/j1939.h>
+#include <opencrank/j1939_diag.h>
 #include <opencrank/oc_msgs.h>
 #include <opentick/oracle.h>
 
@@ -40,15 +41,22 @@ static J1939Frame tsc1_frame(J1939OverrideMode mode, bool speed_valid, float rpm
 
 static void test_accept_table(void) {
     oc_accept_init(&accept, OC_ACCEPT_DUT_DEFAULT, &accept_table);
-    CHECK(accept_table.count == 5U);
+    CHECK(accept_table.count == 7U);
     CHECK(strcmp(OC_ACCEPT_OBSERVABLES[OC_ACCEPT_TSC1_SPEED_CONTROL].name, "tsc1_speed_control") == 0);
     CHECK(strcmp(OC_ACCEPT_OBSERVABLES[OC_ACCEPT_TSC1_SPEED_RPM].name, "tsc1_speed_rpm") == 0);
     CHECK(strcmp(OC_ACCEPT_OBSERVABLES[OC_ACCEPT_PUMP_CMD_PCT].name, "pump_cmd_pct") == 0);
     CHECK(strcmp(OC_ACCEPT_OBSERVABLES[OC_ACCEPT_TSC1_OVERRIDE].name, "tsc1_override") == 0);
     CHECK(strcmp(OC_ACCEPT_OBSERVABLES[OC_ACCEPT_TSC1_INTACT].name, "tsc1_intact") == 0);
-    for (size_t i = 0; i < accept_table.count; i++) {
+    CHECK(strcmp(OC_ACCEPT_OBSERVABLES[OC_ACCEPT_DM1_RED_STOP].name, "dm1_red_stop") == 0);
+    CHECK(strcmp(OC_ACCEPT_OBSERVABLES[OC_ACCEPT_DM1_SPN].name, "dm1_spn") == 0);
+    for (size_t i = 0; i < OC_ACCEPT_DM1_RED_STOP; i++) {
         CHECK(OC_ACCEPT_OBSERVABLES[i].stale == 200U * OTK_NS_PER_MS);
     }
+    CHECK(OC_ACCEPT_OBSERVABLES[OC_ACCEPT_DM1_RED_STOP].stale == 3000U * OTK_NS_PER_MS);
+    CHECK(OC_ACCEPT_OBSERVABLES[OC_ACCEPT_DM1_SPN].stale == 3000U * OTK_NS_PER_MS);
+    CHECK(!OC_ACCEPT_OBSERVABLES[OC_ACCEPT_DM1_RED_STOP].fallback.gap &&
+          OC_ACCEPT_OBSERVABLES[OC_ACCEPT_DM1_RED_STOP].fallback.value == 0.0);
+    CHECK(OC_ACCEPT_OBSERVABLES[OC_ACCEPT_DM1_SPN].fallback.gap);
     CHECK(!OC_ACCEPT_OBSERVABLES[OC_ACCEPT_TSC1_SPEED_CONTROL].fallback.gap &&
           OC_ACCEPT_OBSERVABLES[OC_ACCEPT_TSC1_SPEED_CONTROL].fallback.value == 0.0);
     CHECK(OC_ACCEPT_OBSERVABLES[OC_ACCEPT_TSC1_SPEED_RPM].fallback.gap);
@@ -172,8 +180,38 @@ static void test_accept_pump_cmd(void) {
     CHECK(up[0].observable == OC_ACCEPT_PUMP_CMD_PCT && !up[0].value.gap && up[0].value.value == 0.0);
 }
 
+/* SR-14 */
+static void test_accept_dm1(void) {
+    oc_accept_init(&accept, OC_ACCEPT_DUT_DEFAULT, &accept_table);
+    OtkOracleUpdate up[OTK_ORACLE_MAX_OBSERVABLES];
+    J1939Dm1 m = { 0 };
+    J1939Frame f;
+    f.id = j1939_make_id(J1939_PRIORITY_INFO, J1939_PGN_DM1, J1939_ADDR_GLOBAL, 0x27U);
+    f.dlc = 8U;
+
+    /* No fault: lamp off, no DTC (a gap). */
+    CHECK(j1939_encode_dm1(&m, f.data, 8U) == 8U);
+    CHECK(decode_j1939(&f, up) == 2U);
+    CHECK(up[0].observable == OC_ACCEPT_DM1_RED_STOP && !up[0].value.gap && up[0].value.value == 0.0);
+    CHECK(up[1].observable == OC_ACCEPT_DM1_SPN && up[1].value.gap);
+
+    /* In FAULT: red stop lamp and the first DTC's SPN. */
+    m.red_stop = J1939_LAMP_ON;
+    m.n_dtc = 1U;
+    m.dtc[0] = (J1939Dtc){ 520194U, 31U, 1U };
+    CHECK(j1939_encode_dm1(&m, f.data, 8U) == 8U);
+    CHECK(decode_j1939(&f, up) == 2U);
+    CHECK(up[0].value.value == 1.0);
+    CHECK(!up[1].value.gap && up[1].value.value == 520194.0);
+
+    /* The engine's DM1 is not the DUT's. */
+    f.id = j1939_make_id(J1939_PRIORITY_INFO, J1939_PGN_DM1, J1939_ADDR_GLOBAL, J1939_ADDR_ENGINE_1);
+    CHECK(decode_j1939(&f, up) == 0U);
+}
+
 int main(void) {
     RUN_TEST(test_accept_table);
+    RUN_TEST(test_accept_dm1);
     RUN_TEST(test_accept_tsc1_speed_control);
     RUN_TEST(test_accept_tsc1_intact);
     RUN_TEST(test_accept_tsc1_released);

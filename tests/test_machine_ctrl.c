@@ -30,6 +30,9 @@ typedef struct {
     J1939Tsc1 tsc1;            /* last TSC1 sent by the controller */
     OcPumpCmd pump;            /* last pump command */
     uint32_t tsc1_count;
+    J1939Dm1 dm1;              /* last DM1 sent by the controller */
+    uint32_t dm1_count;
+    uint32_t dm1_ms;           /* when it was sent */
 } Harness;
 
 static void h_init(Harness *h, uint32_t start_ms) {
@@ -45,6 +48,9 @@ static void h_init(Harness *h, uint32_t start_ms) {
     h->reset_pressed = false;
     h->tsc1_count = 0U;
     h->tsc1.override_mode = J1939_OVERRIDE_DISABLED;
+    memset(&h->dm1, 0, sizeof(h->dm1));
+    h->dm1_count = 0U;
+    h->dm1_ms = 0U;
 }
 
 static void h_tick(Harness *h) {
@@ -70,6 +76,13 @@ static void h_tick(Harness *h) {
             CHECK(out[i].id == 0x0C000027UL);
         }
         (void)oc_decode_pump_cmd(&out[i], &h->pump);
+        if (j1939_id_pgn(out[i].id) == J1939_PGN_DM1) {
+            CHECK(out[i].id == 0x18FECA27UL); /* priority 6, from 0x27 */
+            CHECK(out[i].dlc == 8U);
+            CHECK(j1939_decode_dm1(out[i].data, 8U, &h->dm1));
+            h->dm1_count++;
+            h->dm1_ms = h->now_ms;
+        }
     }
     h->now_ms += 10U;
 }
@@ -358,6 +371,56 @@ static void test_limp_home(void) {
     CHECK_NEAR(h.pump.displacement_pct, 85.0, 0.4);
 }
 
+/* SR-14 */
+static void test_own_dm1(void) {
+    Harness h;
+    h_init(&h, 0U);
+    h_tick(&h);
+    CHECK(h.dm1_count == 1U && h.dm1_ms == 0U); /* the first one with the first step */
+    CHECK(h.dm1.red_stop == J1939_LAMP_OFF && h.dm1.amber_warning == J1939_LAMP_OFF);
+    CHECK(h.dm1.mil == J1939_LAMP_OFF && h.dm1.protect == J1939_LAMP_OFF && h.dm1.n_dtc == 0U);
+    h_run(&h, 990U);
+    CHECK(h.dm1_count == 1U);
+    h_tick(&h);
+    CHECK(h.dm1_count == 2U && h.dm1_ms == 1000U); /* then every 1000 ms */
+
+    /* In FAULT: red stop lamp and one DTC, SPN 520192 + the fault number, FMI 31. */
+    h_to_run(&h);
+    h.engine_rpm = 2400.0f;
+    h_tick(&h);
+    CHECK(h.mc.state == MC_STATE_FAULT && h.mc.fault == MC_FAULT_OVERSPEED);
+    const uint32_t before = h.dm1_count;
+    h_run(&h, 1000U);
+    CHECK(h.dm1_count == before + 1U); /* periodic only: no extra DM1 on the change */
+    CHECK(h.dm1.red_stop == J1939_LAMP_ON && h.dm1.amber_warning == J1939_LAMP_OFF);
+    CHECK(h.dm1.n_dtc == 1U && h.dm1.dtc[0].spn == 520194U && h.dm1.dtc[0].fmi == 31U && h.dm1.dtc[0].oc == 1U);
+
+    /* After the fault reset: no lamp, no DTC. */
+    h.engine_rpm = 750.0f;
+    h.reset_pressed = true;
+    h_tick(&h);
+    h.reset_pressed = false;
+    h_run(&h, 1000U);
+    CHECK(h.mc.state != MC_STATE_FAULT);
+    CHECK(h.dm1.red_stop == J1939_LAMP_OFF && h.dm1.n_dtc == 0U);
+
+    /* A watchdog restart reports its own fault (5: SPN 520197). */
+    Harness w;
+    h_init(&w, 0U);
+    mc_init_after_watchdog(&w.mc, P);
+    h_tick(&w);
+    CHECK(w.dm1.red_stop == J1939_LAMP_ON && w.dm1.n_dtc == 1U && w.dm1.dtc[0].spn == 520197U);
+
+    /* Three frames at most; with room for two the DM1 waits, nothing else is lost. */
+    McCtx c;
+    J1939Frame out[4];
+    mc_init(&c, P);
+    CHECK(mc_step(&c, 0U, out, 4U) == 3U);
+    mc_init(&c, P);
+    CHECK(mc_step(&c, 0U, out, 2U) == 2U);
+    CHECK(mc_step(&c, 10U, out, 3U) == 3U && j1939_id_pgn(out[2].id) == J1939_PGN_DM1);
+}
+
 /* SR-7 */
 static void test_reset_on_press_only(void) {
     Harness h;
@@ -432,5 +495,6 @@ int main(void) {
     RUN_TEST(test_starts_in_fault_after_watchdog);
     RUN_TEST(test_operator_timeout);
     RUN_TEST(test_time_wraps);
+    RUN_TEST(test_own_dm1);
     return check_report();
 }

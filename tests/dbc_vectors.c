@@ -138,6 +138,42 @@ static void pump(float pct) {
     end();
 }
 
+/* One single-frame DM1, signal by signal. */
+static void dm1_frame(const char *name, const J1939Frame *f) {
+    J1939Dm1 d;
+    (void)j1939_decode_dm1(f->data, 8U, &d);
+    frame_head(name, f);
+    sig("ProtectLampStatus", (double)d.protect);
+    sig("AmberWarningLampStatus", (double)d.amber_warning);
+    sig("RedStopLampStatus", (double)d.red_stop);
+    sig("MalfunctionIndicatorLampStatus", (double)d.mil);
+    const uint32_t spn = (d.n_dtc > 0U) ? d.dtc[0].spn : 0U;
+    sig("DTC1_SPN_Low", (double)(spn & 0xFFFFU));
+    sig("DTC1_SPN_High", (double)((spn >> 16U) & 0x07U));
+    sig("DTC1_FMI", (double)((d.n_dtc > 0U) ? d.dtc[0].fmi : 0U));
+    sig("DTC1_OccurrenceCount", (double)((d.n_dtc > 0U) ? d.dtc[0].oc : 0U));
+    sig("DTC1_ConversionMethod", 0.0);
+    end();
+}
+
+/* The controller's own DM1, as mc_step() sends it: outside FAULT, and in
+ * FAULT after a watchdog restart (SPN 520192 + 5). */
+static void mc_dm1(bool fault) {
+    McCtx c;
+    J1939Frame out[4];
+    if (fault) {
+        mc_init_after_watchdog(&c, &MC_DEFAULT_PARAMS);
+    } else {
+        mc_init(&c, &MC_DEFAULT_PARAMS);
+    }
+    const size_t n = mc_step(&c, 0U, out, 4U);
+    for (size_t i = 0U; i < n; i++) {
+        if (j1939_id_pgn(out[i].id) == J1939_PGN_DM1) {
+            dm1_frame("DM1_MC", &out[i]);
+        }
+    }
+}
+
 /* A DM1 the way the engine sends it: one frame, or a BAM with two codes. */
 static void dm1(uint8_t red, uint8_t amber, uint8_t n_dtc) {
     J1939Dm1 m;
@@ -156,18 +192,7 @@ static void dm1(uint8_t red, uint8_t amber, uint8_t n_dtc) {
         f.id = j1939_make_id(J1939_PRIORITY_INFO, J1939_PGN_DM1, J1939_ADDR_GLOBAL, J1939_ADDR_ENGINE_1);
         f.dlc = 8U;
         memcpy(f.data, bytes, 8U);
-        frame_head("DM1", &f);
-        sig("ProtectLampStatus", (double)d.protect);
-        sig("AmberWarningLampStatus", (double)d.amber_warning);
-        sig("RedStopLampStatus", (double)d.red_stop);
-        sig("MalfunctionIndicatorLampStatus", (double)d.mil);
-        const uint32_t spn = (d.n_dtc > 0U) ? d.dtc[0].spn : 0U;
-        sig("DTC1_SPN_Low", (double)(spn & 0xFFFFU));
-        sig("DTC1_SPN_High", (double)((spn >> 16U) & 0x07U));
-        sig("DTC1_FMI", (double)((d.n_dtc > 0U) ? d.dtc[0].fmi : 0U));
-        sig("DTC1_OccurrenceCount", (double)((d.n_dtc > 0U) ? d.dtc[0].oc : 0U));
-        sig("DTC1_ConversionMethod", 0.0);
-        end();
+        dm1_frame("DM1", &f);
         return;
     }
     J1939Frame bam[J1939_TP_MAX_PACKETS + 1U];
@@ -225,6 +250,8 @@ int main(void) {
     dm1(J1939_LAMP_OFF, J1939_LAMP_OFF, 0U);
     dm1(J1939_LAMP_ON, J1939_LAMP_OFF, 1U);
     dm1(J1939_LAMP_ON, J1939_LAMP_ON, 2U); /* a BAM: TP.CM and TP.DT */
+    mc_dm1(false);
+    mc_dm1(true);
     bench_only("BENCH_ECHO_REQUEST", 0x18FF2EFCUL, 123456789UL);
     bench_only("BENCH_ECHO", 0x18FF2F27UL, 42UL);
     bench_only("BENCH_HANG_TEST", 0x18FF2DFCUL, 0xFFFFFFFFUL);
@@ -240,5 +267,6 @@ int main(void) {
     printf("cycle,DM1,%u\n", (unsigned)c->dm1_period_ms);
     printf("cycle,TSC1,%u\n", (unsigned)loop.mc_period_ms);        /* one TSC1 per controller step */
     printf("cycle,OC_PUMP_CMD,%u\n", (unsigned)loop.mc_period_ms); /* one OC_PUMP_CMD per controller step */
+    printf("cycle,DM1_MC,%u\n", (unsigned)MC_DM1_PERIOD_MS);
     return 0;
 }

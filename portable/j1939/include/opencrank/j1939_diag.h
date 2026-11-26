@@ -71,6 +71,13 @@ typedef struct {
 } J1939Dm1;
 
 /**
+ * @brief Writes a DM1 as bytes into @p out: 2 + 4 per DTC (one all-zero DTC
+ *        when there is none), padded with 0xFF to at least 8.
+ * @return the length written, or 0 if @p cap is too small
+ */
+size_t j1939_encode_dm1(const J1939Dm1 *m, uint8_t *out, size_t cap);
+
+/**
  * @brief Reads a DM1 from @p len bytes (one frame, or a reassembled BAM).
  *        An all-zero DTC, or one with SPN and FMI "not available", is no DTC.
  *        DTCs past J1939_DM1_MAX_DTC are dropped.

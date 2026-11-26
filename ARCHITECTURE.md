@@ -189,7 +189,7 @@ Addresses: engine `0x00`, machine controller `0x27`, bench `0xFC`. The first sli
 
 **TSC1 message counter and checksum** (SPN 4206/4207, since v0.3.1): `j1939_tsc1_checksum()` implements J1939-71's formula. The encoder writes byte 7 from `J1939Tsc1.message_counter`, and the decoder fills `message_counter` and `checksum_valid`. The controller counts; the simulated engine checks.
 
-**DM1 and BAM** (since v0.3.1). In `portable/`, `opencrank/j1939_diag.h` has the receiving side: `j1939_decode_dm1()` (lamps and DTCs, J1939-73) and the BAM receiver `J1939BamRx` (J1939-21: sequence checked, T1 750 ms, one message per sender at a time). The sending side, `j1939_encode_dm1()` and `j1939_bam_encode()`, is in `sim/engine_ecu` (`opencrank/j1939_diag_tx.h`), because only the simulated engine sends DM1. The controller reads DM1, also as a BAM. Not implemented: the connection-mode transport (RTS/CTS), and the controller sending its own DM1.
+**DM1 and BAM** (since v0.3.1). In `portable/`, `opencrank/j1939_diag.h` has `j1939_encode_dm1()` and `j1939_decode_dm1()` (lamps and DTCs, J1939-73) and the BAM receiver `J1939BamRx` (J1939-21: sequence checked, T1 750 ms, one message per sender at a time). The BAM sender, `j1939_bam_encode()`, is in `sim/engine_ecu` (`opencrank/j1939_diag_tx.h`), because only the simulated engine sends a DM1 longer than one frame. The controller reads DM1, also as a BAM, and sends its own, always in one frame ([bus-interface.md](docs/bus-interface.md)). Not implemented: the connection-mode transport (RTS/CTS).
 
 ### 4.5 Machine-controller core (`portable/machine_ctrl`)
 
@@ -384,7 +384,7 @@ The migration itself is recorded in [ROADMAP.md](ROADMAP.md), section "v0.1".
 - **Generic plant plugin contract.** With one plant, any abstraction would be a guess. Extract it from what the second plant needs (v0.6). The first slice's function-pointer hooks were removed for this reason.
 - **Protocol abstraction.** J1939 is the right protocol for the current plant. The 2-stroke uses a different control scheme; separate it then.
 - **Level 2 signal layer** (crank and cam waveforms, analog I/O), including crank angle. Designing it now would be speculation; it arrives with the HIL backend in v0.4.
-- **The controller's own DM1, and RTS/CTS transport.** After v0.3.1.
+- **RTS/CTS transport.** After v0.3.1.
 - **Smarter reference controller** (power limiting, anti-stall). The interface allows it; the reference stays minimal until the basics are proven.
 - **YAML profiles.** When added, they load in `sim/` only. `portable/` never reads files.
 - **FMI/FMU export.** Attractive for interoperability; revisit once the plant interface has settled.
