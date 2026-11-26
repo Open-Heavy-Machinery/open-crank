@@ -11,6 +11,9 @@ All notable changes to this project. The project is pre-alpha; nothing here is a
   - Three new broken controllers in `tools/accept_mutants.sh` (18 killed, 1 accepted survivor).
   - `DM1_MC` in `open-crank.dbc`, checked against the controller's own frames; two more DBC mutations in `tools/check_dbc.sh` (nine).
 
+- **`tools/board/bench.sh` measures `mc_step` on the board:** after each scenario it reads the demo's `mc_step_cycles_max` with OpenOCD, without halting the core, into `<scenario>.mc_step.txt`; `report.md` has a column and the worst observed `mc_step`. It is a measurement, not a criterion of BENCH OK.
+  - The execution times in the board README are now those of the CMake build (Debug, `-O0`), fifteen scenarios: worst observed 4200 cycles (24.7 µs, 0.25 % of the period), in `engine_dtc_amber`. v0.2's figures (CubeIDE build, six scenarios) stay as history.
+
 ### Changed
 
 - **`portable/`:** `j1939_encode_dm1()` moved from `sim/engine_ecu` (`j1939_diag_tx.h`) to `portable/j1939` (`j1939_diag.h`). The BAM sender stays in `sim/`: the controller's DM1 never needs it.
@@ -139,7 +142,7 @@ The reference board is built, programmed and tested from the PC with one command
 - "Not in FAULT" before each scenario rests on the software reset. From the bus alone, FAULT and WAIT_ENGINE look the same (both send TSC1 with override disabled).
 - The bench runs by hand on a PC with the board; no CI job uses a board.
 - One reference bench. Its reference reactions are v0.2.1's single board run per scenario.
-- The firmware builds as Debug (`-O0`) by default, as CubeIDE's does. The execution times in the board README were measured on the CubeIDE build in v0.2 and were not measured again on the CMake build.
+- The firmware builds as Debug (`-O0`) by default, as CubeIDE's does.
 - The CubeIDE path (`BRINGUP.md`) was not followed again for this release.
 - From v0.2, unchanged: the board runs on its HSI oscillator; the demo does not recover from bus-off; `open-crank-sil` does not write its late steps into the trace.
 
