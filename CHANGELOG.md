@@ -6,6 +6,7 @@ All notable changes to this project. The project is pre-alpha; nothing here is a
 
 ### Added
 
+- **The Level 2 wiring, Tang Nano 20K ↔ NUCLEO-G431KB** ([platforms/stm32g4/WIRING-L2.md](platforms/stm32g4/WIRING-L2.md); v0.4): one row per signal (crank and cam to TIM2, six injectors from TIM1/TIM3/TIM4, four analog inputs through a Sallen-Key filter), the pins left unused and why, the filter, and the checks on levels, ground and power-up order. Checked against UM2397 and the CubeMX pin database. The analog channels and the continuity check are planned.
 - **The controller's own DM1** (PGN 65226, `0x18FECA27`, every 1000 ms from its first step): in FAULT, the red stop lamp and one DTC, SPN 520192 + the `McFault` number, FMI 31, occurrence count 1; outside FAULT, no lamp and no DTC. It is always one frame ([docs/bus-interface.md](docs/bus-interface.md)).
   - Requirement **SR-14** in [docs/safety.md](docs/safety.md): in FAULT, the controller reports its fault as DM1 within 1.1 s. Criteria F1 in the nine scenarios that end in FAULT, F2 in the five with a fault reset; observables `dm1_red_stop` and `dm1_spn` (held 3000 ms).
   - Three new broken controllers in `tools/accept_mutants.sh` (18 killed, 1 accepted survivor).
