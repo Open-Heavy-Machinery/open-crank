@@ -6,7 +6,8 @@
 #
 # or simply tools/board/flash.sh, which also programs the board. Outputs:
 # oc-stm32g4-demo.elf/.bin/.map (the reference controller) and
-# oc-stm32g4-echo.elf/.bin/.map (the round-trip echo).
+# oc-stm32g4-echo.elf/.bin/.map (the round-trip echo) and
+# oc-stm32g4-wirecheck.elf/.bin/.map (the Level 2 harness check).
 #
 # ST's CMSIS and HAL are downloaded at configure time from STMicroelectronics'
 # repositories, pinned by tag and SHA-256, and never copied into this
@@ -109,3 +110,5 @@ oc_firmware(oc-stm32g4-demo ${CMAKE_CURRENT_SOURCE_DIR}/demo/main.c opencrank_po
 oc_firmware(oc-stm32g4-demo-hangtest ${CMAKE_CURRENT_SOURCE_DIR}/demo/main.c opencrank_portable)
 target_compile_definitions(oc-stm32g4-demo-hangtest PRIVATE OC_WDG_HANG_TEST=1)
 oc_firmware(oc-stm32g4-echo ${CMAKE_CURRENT_SOURCE_DIR}/echo/main.c)
+# Harness check for the Level 2 wiring (WIRING-L2.md, tools/board/wirecheck.py).
+oc_firmware(oc-stm32g4-wirecheck ${CMAKE_CURRENT_SOURCE_DIR}/wirecheck/main.c)

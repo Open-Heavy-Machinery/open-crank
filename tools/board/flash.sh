@@ -5,9 +5,10 @@
 # NUCLEO-G431KB through its ST-LINK: program, verify, reset. No CubeIDE and no
 # button.
 #
-# Usage: tools/board/flash.sh [demo|echo|demo-hangtest] [--no-build]
+# Usage: tools/board/flash.sh [demo|echo|wirecheck|demo-hangtest] [--no-build]
 #   demo        the reference controller (default)
 #   echo        the round-trip echo for tools/can_rtt.py
+#   wirecheck   the Level 2 harness check (tools/board/wirecheck.py)
 #   demo-hangtest  test build only: the demo plus an intentional hang on the
 #               bench's test frame (tools/board/watchdog_check.sh). Never leave
 #               it on the board: program demo afterwards.
@@ -22,9 +23,9 @@ app=demo
 build=1
 for arg in "$@"; do
     case $arg in
-        demo|echo|demo-hangtest)  app=$arg ;;
+        demo|echo|wirecheck|demo-hangtest)  app=$arg ;;
         --no-build) build=0 ;;
-        -h|--help)  sed -n '4,15p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        -h|--help)  sed -n '4,16p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         *)          echo "flash.sh: unknown argument '$arg'" >&2; exit 2 ;;
     esac
 done
