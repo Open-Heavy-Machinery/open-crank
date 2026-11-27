@@ -13,6 +13,7 @@ Scope is deliberately narrow. Each milestone is small enough to finish and usefu
 | **v0.2.2** (done) | Board automation | 1 |
 | **v0.3** (done, released as `v0.3.1`) | Robustness on the board | 1 |
 | **v0.3.2** (done) | Frame logs and the bus dictionary | 1 |
+| **v0.3.3** (done) | The controller's DM1; the Level 2 harness | 1 |
 | **v0.4** | Level 2: your firmware as the engine ECU | 2 |
 | **v0.5** | Two engines on one machine | 1 |
 | **v0.6** | Marine 2-stroke plant | 1 |
@@ -231,6 +232,14 @@ The reports and traces are attached to the GitHub release of v0.3.1.
 - [`open-crank.dbc`](open-crank.dbc), checked against the encoders and their periods by cantools in CI (#40).
 
 Controller behaviour and firmware are unchanged since v0.3.1: the traces, verdicts and reports of the fifteen scenarios are byte-identical. The board bench does not write frame logs yet *(planned)*.
+
+---
+
+## v0.3.3: The controller's DM1, and the Level 2 harness
+
+**Status: done** (2026-11-28).
+- The controller's own DM1, requirement SR-14 (#43); `bench.sh` reads the worst `mc_step` from the board (#44). Both BENCH OK on the board.
+- The Level 2 wiring, Tang Nano 20K ↔ NUCLEO-G431KB ([WIRING-L2.md](platforms/stm32g4/WIRING-L2.md), #45), and its harness check, wire by wire (`tools/board/wirecheck.py`, #46): all eight wired lines right on the reference bench. The analog channels are not wired yet *(planned)*.
 
 ---
 
