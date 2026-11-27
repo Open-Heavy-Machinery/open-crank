@@ -16,14 +16,14 @@ The Tang pins are those of open-tick's `gateware/tang_nano_20k/tang_nano_20k.cst
 
 | Signal | Tang pin | Direction | NUCLEO connector-pin (Arduino) | MCU pin | Peripheral (alternate function) | In series | First wiring |
 |---|---|---|---|---|---|---|---|
-| Crank, 60−2 wheel | 73 | Tang → NUCLEO | CN3-12 (A0) | PA0 | TIM2_CH1 (AF1), input capture | 220–330 Ω at the Tang end | yes |
-| Cam | 74 | Tang → NUCLEO | CN3-11 (A1) | PA1 | TIM2_CH2 (AF1), input capture | 220–330 Ω at the Tang end | yes |
-| Injector 1 | 27 | NUCLEO → Tang | CN4-12 (D9) | PA8 | TIM1_CH1 (AF6), one-pulse output compare | 220–330 Ω at the NUCLEO end | yes |
-| Injector 2 | 28 | NUCLEO → Tang | CN4-1 (D1) | PA9 | TIM1_CH2 (AF6) | 220–330 Ω at the NUCLEO end | yes |
-| Injector 3 | 25 | NUCLEO → Tang | CN4-2 (D0) | PA10 | TIM1_CH3 (AF6) | 220–330 Ω at the NUCLEO end | yes |
-| Injector 4 | 26 | NUCLEO → Tang | CN4-15 (D12) | PB4 | TIM3_CH1 (AF2) | 220–330 Ω at the NUCLEO end | yes |
-| Injector 5 | 29 | NUCLEO → Tang | CN4-14 (D11) | PB5 | TIM3_CH2 (AF2) | 220–330 Ω at the NUCLEO end | yes |
-| Injector 6 | 30 | NUCLEO → Tang | CN4-9 (D6) | PB6 | TIM4_CH1 (AF2) | 220–330 Ω at the NUCLEO end | yes |
+| Crank, 60−2 wheel | 73 | Tang → NUCLEO | CN3-12 (A0) | PA0 | TIM2_CH1 (AF1), input capture | 220–330 Ω | yes |
+| Cam | 74 | Tang → NUCLEO | CN3-11 (A1) | PA1 | TIM2_CH2 (AF1), input capture | 220–330 Ω | yes |
+| Injector 1 | 27 | NUCLEO → Tang | CN4-12 (D9) | PA8 | TIM1_CH1 (AF6), one-pulse output compare | 220–330 Ω | yes |
+| Injector 2 | 28 | NUCLEO → Tang | CN4-1 (D1) | PA9 | TIM1_CH2 (AF6) | 220–330 Ω | yes |
+| Injector 3 | 25 | NUCLEO → Tang | CN4-2 (D0) | PA10 | TIM1_CH3 (AF6) | 220–330 Ω | yes |
+| Injector 4 | 26 | NUCLEO → Tang | CN4-15 (D12) | PB4 | TIM3_CH1 (AF2) | 220–330 Ω | yes |
+| Injector 5 | 29 | NUCLEO → Tang | CN4-14 (D11) | PB5 | TIM3_CH2 (AF2) | 220–330 Ω | yes |
+| Injector 6 | 30 | NUCLEO → Tang | CN4-9 (D6) | PB6 | TIM4_CH1 (AF2) | 220–330 Ω | yes |
 | Analog 1 | 76 | Tang → NUCLEO | CN3-9 (A3) | PA4 | ADC2_IN17 | [filter](#analog-filter) | *(planned)* |
 | Analog 2 | 86 | Tang → NUCLEO | CN3-6 (A6) | PA7 | ADC2_IN4 | [filter](#analog-filter) | *(planned)* |
 | Analog 3 | 72 | Tang → NUCLEO | CN4-6 (D3) | PB0 | ADC1_IN15 | [filter](#analog-filter) | *(planned)* |
@@ -32,6 +32,29 @@ The Tang pins are those of open-tick's `gateware/tang_nano_20k/tang_nano_20k.cst
 | Filter supply | | | CN3-14 (3V3) | | | 100 nF next to each MCP6022 | *(planned)* |
 
 The Tang's analog channels are `analog[0]` to `analog[3]` in the gateware, and its injector captures `inj[0]` to `inj[5]`.
+
+### Where the Tang pins are on its headers
+
+Seen from above with the USB-C connector at the top (Sipeed's datasheet v1.3, "Pinout"), counting each header from the USB-C end:
+
+| Header | Position | Tang pin | Signal |
+|---|---|---|---|
+| left | 1 | 73 (IOT40A) | crank |
+| left | 2 | 74 (IOT34B) | cam |
+| left | 8 | 27 (IOB8A) | injector 1 |
+| left | 9 | 28 (IOB8B) | injector 2 |
+| left | 10 | 25 (IOB6A) | injector 3 |
+| left | 11 | 26 (IOB6B) | injector 4 |
+| left | 12 | 29 (IOB14A) | injector 5 |
+| left | 13 | 30 (IOB14B) | injector 6 |
+| left | 19, 20 | 3V3, GND | ground: position 20; 3V3 is not used |
+| right | 1, 2 | 5V, GND | not used (5 V) |
+| right | 3 | 76 (IOT30B) | analog 1 |
+| right | 13 | 86 (IOT4A) | analog 2 |
+| right | 17 | 72 (IOT40B) | analog 3 |
+| right | 18 | 71 (IOT44A) | analog 4 |
+
+The first wiring (crank, cam, six injectors, ground) is all on the left header.
 
 **On the NUCLEO side:**
 - Crank and cam share TIM2, a 32-bit timer, so the time between teeth never wraps within a revolution at engine speeds. Each input has a pull-down and a small input filter (ICxF).
@@ -89,7 +112,7 @@ The bridge's analog outputs are first-order sigma-delta bit streams at its 27 MH
 
 - **Logic levels.** Both boards are 3.3 V LVCMOS: the Tang's header banks are at 3.3 V, and the STM32G431 runs at VDD = 3.3 V. No level shifter is needed.
 - **Ground.** Both boards are powered over USB from the same PC, so they already share a ground through it. The ground wire is still needed: short and direct, so that the signals' return current does not go through the USB cables.
-- **One board powered before the other.** An output that drives an unpowered board feeds current into that board through its input protection. The series resistor limits it to about 10 mA at 330 Ω, which is why it sits at the driving end of each line.
+- **One board powered before the other.** An output that drives an unpowered board feeds current into that board through its input protection. The series resistor limits it to about 10 mA at 330 Ω. It limits the current wherever it sits on the line; with short jumper wires, which end does not matter, so all eight can sit on the breadboard where there is room (on the maintainer's bench, next to the NUCLEO).
 - **The Tang at power-up.** The bridge keeps crank, cam and the analog outputs low outside a run, and its injector inputs are pulled down. At power-up, the Tang loads the design in its flash, not the one programmed into SRAM. On the maintainer's bench the bridge is in the flash too (`openFPGALoader -b tangnano20k -f bridge.fs`), so the Tang always starts with its outputs low. The measurement scripts still load SRAM before each run.
 - **The rule:**
   - power both boards from the same PC;
