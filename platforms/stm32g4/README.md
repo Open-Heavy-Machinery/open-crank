@@ -2,7 +2,7 @@
 
 ## What this is
 
-The reference board of [v0.2](../../ROADMAP.md#v02-reference-board-on-the-bus): an STM32G431KB running the reference machine controller (`portable/machine_ctrl`), as a Level 1 device under test, against `open-crank-sil` over a real CAN bus. To set it up from nothing, follow [BRINGUP.md](BRINGUP.md).
+The reference board of [v0.2](../../ROADMAP.md#v02-reference-board-on-the-bus): an STM32G431KB running the reference machine controller (`portable/machine_ctrl`), as a Level 1 device under test, against `open-crank-sil` over a real CAN bus. To set it up from nothing, follow [BRINGUP.md](BRINGUP.md). For [v0.4](../../ROADMAP.md#v04-level-2-your-firmware-as-the-engine-ecu), where the board runs as the engine ECU against a Tang Nano 20K, the wiring is in [WIRING-L2.md](WIRING-L2.md).
 
 There are two ways to build it:
 
