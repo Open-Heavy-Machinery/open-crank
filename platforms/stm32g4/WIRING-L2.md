@@ -6,7 +6,7 @@ The CAN bus stays wired as in [README.md](README.md#hardware). The pins below do
 
 **Status (2026-11-27):**
 - The pin map is decided.
-- First wiring: crank, cam and the six injectors (column "First wiring").
+- First wiring: crank, cam, the six injectors and ground (column "First wiring"). On the maintainer's bench they are wired and were checked wire by wire on 2026-11-27, all eight lines right, with the continuity check described [below](#checking-the-harness).
 - The four analog channels come later *(planned)*: their pins and filter are fixed here.
 - The reference engine-ECU firmware that uses these pins is *(planned)*.
 
@@ -134,4 +134,4 @@ Beyond the [CAN bench](README.md#hardware):
 
 ## Checking the harness
 
-A continuity check in software is *(planned)*: the NUCLEO counts the crank and cam edges the bridge generates, and sends a different number of pulses on each injector line for the bridge to capture. A crossed or open wire shows as a wrong count on that line.
+A continuity check in software: the NUCLEO counts the crank and cam edges the bridge generates, and sends each injector line pulses of its own width (injector k, k × 100 µs) for the bridge to capture. An open wire shows as no pulse on that line, and a crossed one as the width of the injector it is crossed with. Its tool, `tools/board/wirecheck.py`, is *(planned)* on `main`; on 2026-11-27 it found two crossed injector wires on the maintainer's bench before they were fixed.
