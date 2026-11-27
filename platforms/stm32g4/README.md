@@ -65,6 +65,18 @@ openocd -f interface/stlink.cfg -f target/stm32g4x.cfg -c "program build-stm32g4
 
 The build type defaults to Debug (`-O0 -g`), as CubeIDE's, which is how the execution times below were measured. CI builds both firmwares on every push (job `firmware`) and keeps the ELF, BIN and MAP files as an artefact.
 
+### The Level 2 harness check
+
+For v0.4's wiring to a Tang Nano 20K, `tools/board/wirecheck.py` checks each wire on its own. The NUCLEO runs `oc-stm32g4-wirecheck`: it counts the crank and cam edges it receives and reports them on its virtual COM port once a second, and every 100 ms it sends injector k a pulse of k × 100 µs. open-tick's `otk-hard-probe wires` turns a 60-2 crank on the bridge and captures the six injector lines.
+
+```sh
+eval "$(<open-tick>/tools/fpga_toolchain.sh)"     # openFPGALoader
+tools/board/wirecheck.py --probe <open-tick build>/otk-hard-probe \
+    --bitstream <open-tick>/build-gateware/bridge.fs [--lines crank,cam,inj1]
+```
+
+One line per wire, `ok` or `FAIL` with the reason: no pulse (open), the wrong width (crossed with the injector that width belongs to), or the wrong tooth count or speed. Exit 0 every checked line ok, 1 a line failed, 2 the bench is not ready. Program `demo` again afterwards for the bench check.
+
 ### The bench check
 
 `tools/board/bench.sh [--iface can0] [--include-serials] [SCENARIO...]` is the standard check of a physical setup. Run it before bringing your own firmware, and after changing anything on the bench. The report names the ST-LINK and the USB-CAN adapter by their `/dev/serial/by-id` names. Their serial numbers are written as `<serial>`, so a report can be shared as it is; `--include-serials` keeps them, for example to tell two benches with the same hardware apart.

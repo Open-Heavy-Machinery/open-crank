@@ -6,6 +6,7 @@ All notable changes to this project. The project is pre-alpha; nothing here is a
 
 ### Added
 
+- **The Level 2 harness check** (`tools/board/wirecheck.py`, firmware `oc-stm32g4-wirecheck`; v0.4): wire by wire, between the Tang Nano 20K and the NUCLEO-G431KB. The NUCLEO counts the crank's teeth, gaps and speed and the cam's edges, and sends injector k pulses of k × 100 µs; open-tick's `otk-hard-probe wires` turns the crank and captures them. A crossed wire is named by the width it carries. `tools/board/flash.sh wirecheck` programs it.
 - **The controller's own DM1** (PGN 65226, `0x18FECA27`, every 1000 ms from its first step): in FAULT, the red stop lamp and one DTC, SPN 520192 + the `McFault` number, FMI 31, occurrence count 1; outside FAULT, no lamp and no DTC. It is always one frame ([docs/bus-interface.md](docs/bus-interface.md)).
   - Requirement **SR-14** in [docs/safety.md](docs/safety.md): in FAULT, the controller reports its fault as DM1 within 1.1 s. Criteria F1 in the nine scenarios that end in FAULT, F2 in the five with a fault reset; observables `dm1_red_stop` and `dm1_spn` (held 3000 ms).
   - Three new broken controllers in `tools/accept_mutants.sh` (18 killed, 1 accepted survivor).
