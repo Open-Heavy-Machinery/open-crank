@@ -133,7 +133,8 @@ Rules: no I/O, no clock, no allocation, no global state, fixed step. Same inputs
 - **Fuel by cylinder.** A linear injector model turns a pulse's width into fuel. An injection counts for a cylinder when it begins inside that cylinder's window around its compression TDC and arrives on that cylinder's channel; each cylinder keeps the fuel of its last counted injection, and a window that closes without one is a misfire, which drops it to zero. The mean of the six goes into `plant_step()` unchanged. A wrong phase (360° off) or a crossed channel therefore burns nothing, and the engine does not run.
 - **Late captures.** On a hard run a capture reaches the plant H steps of look-ahead plus a round trip after it happened (the DUT-to-plant delay, [bridge-protocol.md](https://github.com/Open-Heavy-Machinery/open-tick/blob/v0.4.0-beta.1/docs/bridge-protocol.md#2-look-ahead) §2). The plant keeps the last 256 steps, places each capture by its own tick, and judges a window only after `capture_delay_steps`.
 - **Why mean-value still.** With that dead time, per-cylinder torque would land in the next cylinder's interval: it would not be faithful. Mean speed control is (bridge-protocol.md §2).
-- The wheel, the windows and the injector model are in [`docs/parameters.md`](docs/parameters.md). The in-memory Level 2 loop, the engine-ECU firmware and the hard-run runner that use it are *(planned)*.
+- The wheel, the windows and the injector model are in [`docs/parameters.md`](docs/parameters.md).
+- **The in-memory Level 2 loop** (`l2_loop.h`, `open-crank-l2-run`) runs the plant with the reference ECU's logic through a model of the bridge's edges and captures, with the HSI's bias and the DUT-to-plant delay; its scenarios and criteria are in [`docs/acceptance.md`](docs/acceptance.md#level-2-the-engine-ecu-v04). The engine-ECU firmware and the hard-run runner are *(planned)*.
 
 ### 4.2 Loads (`sim/loads`)
 
@@ -216,7 +217,7 @@ In RUN it asks the engine for the operator's target speed through TSC1 (speed co
 
 ### 4.5b Engine-ECU logic (`portable/engine_ecu`, v0.4)
 
-The reference Level 2 engine ECU's logic, the same code for the board's firmware and the in-memory Level 2 loop *(planned)*: plain C, `float`, no I/O (`opencrank/ecu.h`). It has two parts with two owners:
+The reference Level 2 engine ECU's logic, the same code for the board's firmware *(planned)* and the in-memory Level 2 loop (§4.1): plain C, `float`, no I/O (`opencrank/ecu.h`). It has two parts with two owners:
 - **The wheel** runs in the crank and cam capture interrupt. It takes edge times in ticks of a free-running 32-bit timer, finds the 60−2 gap, counts the teeth, takes the cycle's phase from the cam, measures the speed over 120°, and says which injector to arm on the next tooth's edge, with its delay and width.
 
   ```
@@ -409,7 +410,7 @@ The migration itself is recorded in [ROADMAP.md](ROADMAP.md), section "v0.1".
 
 - **Generic plant plugin contract.** With one plant, any abstraction would be a guess. Extract it from what the second plant needs (v0.6). The first slice's function-pointer hooks were removed for this reason.
 - **Protocol abstraction.** J1939 is the right protocol for the current plant. The 2-stroke uses a different control scheme; separate it then.
-- **Level 2 signal layer.** The crank angle and the captured fuel exist (`sim/l2`, §4.1); the in-memory loop, the analog sensors and the hard-run runner arrive with the rest of v0.4 *(planned)*.
+- **Level 2 signal layer.** The crank angle, the captured fuel and the in-memory loop exist (`sim/l2`, §4.1); the analog sensors and the hard-run runner arrive with the rest of v0.4 *(planned)*.
 - **RTS/CTS transport.** After v0.3.1.
 - **Smarter reference controller** (power limiting, anti-stall). The interface allows it; the reference stays minimal until the basics are proven.
 - **YAML profiles.** When added, they load in `sim/` only. `portable/` never reads files.

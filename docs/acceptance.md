@@ -223,6 +223,58 @@ Without `--frames`, nothing changes: the runners take the same code path as befo
 
 `tools/frames_vcan_check.sh` (CI, `vcan` job) runs `cold_start` with the reference controller and requires `bus_clock=kernel` and a bus time on every frame, so that every frame the bench sent was matched with its own copy.
 
+## Level 2: the engine ECU (v0.4)
+
+At Level 2 the device under test is the engine's own ECU: it reads the crank and the cam and drives six injectors. In memory, `open-crank-l2-run` runs it against the Level 2 plant (`sim/l2/l2_loop.h`): the reference ECU's logic (`portable/engine_ecu`), as it runs on the board, the plant at 1 ms with the bridge's own crank angle, the hoist pump, and the reference machine controller sending TSC1 and reading the ECU's EEC1.
+
+```sh
+build/open-crank-l2-run scenarios/l2/hoist_step.csv --trace hoist_l2.csv --verdicts hoist_l2.verdicts.csv --jitter hoist_l2.jitter.csv
+```
+
+- **The bridge, modelled.** The crank and cam edges are those the Tang Nano 20K's gateware puts out for the plant's accumulator, each at its exact tick, converted to the ECU's 170 MHz timer with the reference board's HSI bias (−2658 ppm, so the ECU reads 0.27 % fast). An injection the ECU arms starts on the next crank edge it sees, plus its delay; it reaches the plant as a capture 17 steps after it ends (H = 16 steps of look-ahead and a round trip on a hard run).
+- **Criteria on the engine.** The criteria are about what the engine does, not only what crosses the bus, so the runner hands the oracle the plant's state every step as *observation frames*: 11-bit frames from `0x7F0`, which exist only between the runner and the oracle, never on a bus or in a frame log (`sim/l2/l2_accept.h`). A hard run (v0.4 step 7) computes the same observables from the same plant.
+
+| Observable | Value | Default |
+|---|---|---|
+| `plant_rpm` | the plant's crankshaft speed | 0 |
+| `ecu_rpm` | the speed in the ECU's EEC1, read with its own clock | gap |
+| `misplaced` | injections outside every cylinder's window, or on another cylinder's channel, since the start | 0 |
+| `misfires_1s` | windows that closed with no injection, in the last second | 0 |
+| `first_injection_rev` | crank revolutions from rest to the first injection that counted | gap |
+| `soi_err_deg` | the last counted injection's start, minus the angle the ECU commands (10° before its TDC) | gap |
+| `fuel_pct` | the fuel the plant burns, the mean of its six cylinders | 0 |
+
+**The scenarios** (`scenarios/l2/`, each with its `.accept.csv`; ctest `l2_accept_<name>`):
+
+| Scenario | What it shows |
+|---|---|
+| `start_to_idle` | from rest to the ECU's own low idle, 750 rpm |
+| `hold_750`, `hold_1500`, `hold_2100` | a speed asked by the controller, held within ±0.5 % |
+| `hoist_step` | Level 1's load step: 570 Nm on and off at 1500 rpm |
+| `crank_tooth_lost` | one crank edge never reaches the ECU (`fault.crank_teeth_lost`): it loses sync, stops injecting, resynchronises |
+| `overspeed` | an external torque drives the engine past 2400 rpm; the fuel stays cut until it stops |
+
+**The exit criteria of v0.4** (Level 2 design, decision 13), in every scenario's criteria:
+- **"Synchronises":** `misplaced == 0` throughout; `first_injection_rev <= 3.5` (FULL sync within three revolutions of rest, plus the way to the next start of injection); `misfires_1s == 0` once running.
+- **"Holds a requested speed":** `plant_rpm` within ±0.5 % of the request from 6 s on. The band covers the HSI: the ECU holds what it reads, so the plant runs about 0.27 % low (1496 rpm for 1500).
+- **The load step** (`hoist_step`): back within ±0.5 % within 3 s of the step and of its release. The dip may not go below 1227 rpm: the in-memory loop's own dip (227 rpm, to 1272.8 rpm, 0.39 s after the step) plus 20 %. The overshoot on release is held to the loop's 281 rpm plus 20 %, 1837 rpm.
+
+**The jitter budget** (v0.4 exit criterion 1), written by `--jitter` for every injection counted after the first second of running, in the style of open-tick's hard-run budget:
+
+```
+# oc-l2-jitter 1; source=open-crank-l2-run; scenario=scenarios/l2/hold_1500.csv; hsi_bias_ppm=-2658; delay_steps=17
+quantity,declared,measured,unit,within
+injections,,908,count,
+soi_err_p50_deg,,0.000217,deg,
+soi_err_p99_deg,0.1,0.019444,deg,yes
+soi_err_max_deg,0.5,0.027724,deg,yes
+width_err_max_us,,1.636194,us,
+width_err_max_rel,,0.002721,,
+width_err_over_0.3pct_us,1,-0.063139,us,yes
+```
+
+In memory the start of injection lands within 0.03° of its angle at every speed (the ECU extrapolates from its last tooth period; the timer ticks and the bridge's ticks add the rest), and every width is 0.27 % long, the HSI. On the board the same file will come from the bridge's captures (v0.4 step 7).
+
 ## Link faults
 
 The four scenarios added in v0.3 inject transport faults with open-tick's links ([open-tick `docs/link-faults.md`](https://github.com/Open-Heavy-Machinery/open-tick/blob/main/docs/link-faults.md)). The simulated machine has two:

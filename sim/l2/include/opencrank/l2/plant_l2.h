@@ -150,6 +150,13 @@ typedef enum {
 OcL2CaptureResult oc_l2_capture(OcL2Plant *s, const OcL2Params *p, unsigned channel, uint64_t start_tick,
                                 uint32_t width_ticks, double *deg);
 
+/**
+ * @brief The crank angle at bridge tick @p tick (counted from step 0), in
+ *        degrees since step 0 (not wrapped), if that tick is in a step already
+ *        computed and still in the history.
+ */
+bool oc_l2_angle_at(const OcL2Plant *s, uint64_t tick, double *deg);
+
 /** @brief The fuel the plant burns now: the mean of the six cylinders. */
 double oc_l2_fuel_mean(const OcL2Plant *s);
 

@@ -28,6 +28,7 @@ typedef enum {
     OC_SIG_FAULT_ENGINE_DTC_RED,   /**< fault.engine_dtc_red: the engine reports low oil pressure, red stop lamp, 0/1 */
     OC_SIG_FAULT_ENGINE_DTC_AMBER, /**< fault.engine_dtc_amber: the engine reports high coolant temperature, amber lamp, 0/1 */
     OC_SIG_TEST_DUT_HANG,          /**< test.dut_hang: the bench sends the test frame that hangs a hang-test build, 0/1 */
+    OC_SIG_FAULT_CRANK_TEETH_LOST, /**< fault.crank_teeth_lost: Level 2 only: the next N crank edges never reach the ECU */
     OC_SIG_LINK_MC,                /**< fault.link.mc.*: the six faults of the link controller -> machine */
     OC_SIG_LINK_ENGINE = OC_SIG_LINK_MC + (int)OTK_LINK_SIGNAL_COUNT, /**< fault.link.engine.*: engine -> controller */
     OC_SIG_END = OC_SIG_LINK_ENGINE + (int)OTK_LINK_SIGNAL_COUNT,     /**< end: marks the end of the scenario (value ignored) */
@@ -50,6 +51,7 @@ typedef struct {
     bool fault_engine_dtc_red;
     bool fault_engine_dtc_amber;
     bool test_dut_hang;
+    double fault_crank_teeth_lost; /**< Level 2 only; the Level 1 bench ignores it */
 
     OtkLinkFaults link_mc;       /**< fault.link.mc.*: what the controller sends to the machine */
     OtkLinkFaults link_engine;   /**< fault.link.engine.*: what the engine sends to the controller */

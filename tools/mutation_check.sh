@@ -66,6 +66,8 @@ ECU=sim/engine_ecu/src/engine_ecu.c
 MC=portable/machine_ctrl/src/machine_ctrl.c
 PLANT=sim/core/src/plant.c
 ECU2=portable/engine_ecu/src/ecu.c
+L2LOOP=sim/l2/src/l2_loop.c
+L2ACC=sim/l2/src/l2_accept.c
 L2=sim/l2/src/plant_l2.c
 
 mutate "plant: combustion torque on a stationary shaft (self-start)" $PLANT \
@@ -131,6 +133,32 @@ mutate "L2 ECU: fuel without FULL sync" $ECU2 \
     "if (phase_known && !e->overspeed_tripped) {" "if (!e->overspeed_tripped) {"
 mutate "L2 ECU: no anti-windup" $ECU2 \
     "if (!up_into_limit && !down_into_limit) {" "if (true) {"
+mutate "L2 loop: an injection starts on the edge that armed it, not the next" $L2LOOP \
+    "    if (l->arm_pending) {
+        l->arm_pending = false;
+        inject(l, b);
+    }
+    l->teeth_seen++;" "    l->teeth_seen++;"
+mutate "L2 loop: the ECU's clock without the HSI's bias" $L2LOOP \
+    "static uint32_t ecu_ticks(const OcL2Loop *l, double bridge_tick) {
+    const double ratio = TIMER_HZ_NOMINAL * (1.0 + l->cfg->hsi_bias) / (double)OC_L2_TICK_HZ;" "static uint32_t ecu_ticks(const OcL2Loop *l, double bridge_tick) {
+    const double ratio = TIMER_HZ_NOMINAL / (double)OC_L2_TICK_HZ; (void)l;"
+mutate "L2 loop: the cam never reaches the ECU" $L2LOOP \
+    "ecu_wheel_cam(&l->wheel, ecu_ticks(l, (double)b));" "(void)b;"
+mutate "L2 loop: a lost tooth still reaches the ECU" $L2LOOP \
+    "if (l->teeth_to_drop > 0U) {" "if (false) {"
+mutate "L2 loop: captures reach the plant one step after they end" $L2LOOP \
+    "c->due = (uint32_t)((c->start + c->width) / OC_L2_STEP_TICKS) + l->cfg->capture_delay_steps;" "c->due = (uint32_t)((c->start + c->width) / OC_L2_STEP_TICKS) + 1U;"
+mutate "L2 loop: misfires counted since the start, not in the last second" $L2LOOP \
+    "    l->misfire_hist[slot] = l->plant.misfires;" "    (void)slot;"
+mutate "L2 loop: the ECU's width is never handed to the wheel" $L2LOOP \
+    "ecu_wheel_set_width(&l->wheel, ecu_width_ticks(&l->ecu));" "(void)0;"
+mutate "L2 observables: misplaced always 0" $L2ACC \
+    "obs(&out[1], OC_L2_OBS_MISPLACED, false, (double)l->plant.misplaced);" "obs(&out[1], OC_L2_OBS_MISPLACED, false, 0.0);"
+mutate "L2 observables: no gap before the first injection" $L2ACC \
+    "obs(&out[3], OC_L2_OBS_FIRST_INJECTION_REV, !l->first_injection_seen, l->first_injection_rev);" "obs(&out[3], OC_L2_OBS_FIRST_INJECTION_REV, false, l->first_injection_rev);"
+mutate "L2 observables: another node's EEC1 is taken as the ECU's" $L2ACC \
+    "j1939_id_source(jf.id) == ecu && j1939_decode_eec1(&jf, &m)" "(ecu == ecu) && j1939_decode_eec1(&jf, &m)"
 mutate "engine ECU: stale speed requests never time out" $ECU \
     "age_ms <= p->request_timeout_ms" "(age_ms <= p->request_timeout_ms || true)"
 mutate "engine ECU: overspeed never trips" $ECU \

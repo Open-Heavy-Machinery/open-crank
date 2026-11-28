@@ -7,6 +7,7 @@ set(OC_TESTS
     test_ecu
     test_plant
     test_plant_l2
+    test_l2_loop
     test_hydraulic_pump
     test_engine_ecu
     test_bench
@@ -26,7 +27,7 @@ set(OC_SCENARIO_DIR ${PROJECT_SOURCE_DIR}/scenarios)
 target_compile_definitions(test_closed_loop PRIVATE OC_SCENARIO_DIR="${OC_SCENARIO_DIR}")
 
 # Every shipped scenario must parse, so a broken demo file fails the build.
-file(GLOB OC_SCENARIO_FILES CONFIGURE_DEPENDS ${OC_SCENARIO_DIR}/*.csv ${OC_SCENARIO_DIR}/board/*.csv)
+file(GLOB OC_SCENARIO_FILES CONFIGURE_DEPENDS ${OC_SCENARIO_DIR}/*.csv ${OC_SCENARIO_DIR}/board/*.csv ${OC_SCENARIO_DIR}/l2/*.csv)
 list(FILTER OC_SCENARIO_FILES EXCLUDE REGEX "\\.accept\\.csv$") # acceptance criteria, not scenarios
 if(NOT OC_SCENARIO_FILES)
     message(FATAL_ERROR "no scenario files found in ${OC_SCENARIO_DIR}")
@@ -50,6 +51,19 @@ endforeach()
 
 # hoist_step's verdict file is the one kept in tests/data, byte for byte.
 set_tests_properties(accept_hoist_step PROPERTIES FIXTURES_SETUP hoist_step_verdicts)
+# Level 2: the reference ECU passes each scenarios/l2/<name>.accept.csv in the
+# in-memory Level 2 loop (open-crank-l2-run), with its jitter budget written next
+# to its verdicts.
+file(GLOB OC_L2_ACCEPT_FILES CONFIGURE_DEPENDS ${OC_SCENARIO_DIR}/l2/*.accept.csv)
+foreach(criteria ${OC_L2_ACCEPT_FILES})
+    get_filename_component(criteria_name ${criteria} NAME)
+    string(REGEX REPLACE "\\.accept\\.csv$" "" scenario_name ${criteria_name})
+    add_test(NAME l2_accept_${scenario_name}
+             COMMAND open-crank-l2-run ${OC_SCENARIO_DIR}/l2/${scenario_name}.csv --quiet
+                     --verdicts ${CMAKE_CURRENT_BINARY_DIR}/l2_${scenario_name}.verdicts.csv
+                     --jitter ${CMAKE_CURRENT_BINARY_DIR}/l2_${scenario_name}.jitter.csv)
+endforeach()
+
 add_test(NAME accept_verdicts_hoist_step
          COMMAND ${CMAKE_COMMAND} -E compare_files ${CMAKE_CURRENT_SOURCE_DIR}/data/hoist_step.verdicts.csv
                  ${CMAKE_CURRENT_BINARY_DIR}/hoist_step.verdicts.csv)

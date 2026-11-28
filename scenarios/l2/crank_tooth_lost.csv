@@ -1,0 +1,9 @@
+# Level 2: at 1500 rpm one crank edge never reaches the ECU. It loses sync,
+# stops injecting, and resynchronises.
+time_s,signal,value
+0.0,key_on,1
+0.0,target_rpm,1500
+0.5,start,1
+3.0,start,0
+8.0,fault.crank_teeth_lost,1
+15.0,end,0
