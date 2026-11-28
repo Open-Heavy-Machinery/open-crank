@@ -223,12 +223,12 @@ History: v0.2 measured 2287 cycles (13.5 µs) on the CubeIDE build at `-O0`, six
 | `mc_step` | 132 bytes |
 | `mc_clear_fault` | 0 bytes |
 
-And the engine ECU's (`portable/engine_ecu`, v0.4 Level 2; not in any firmware yet). The wheel's functions run in the capture interrupt, so their figure adds to the interrupted code's stack:
+And the engine ECU's (`portable/engine_ecu`, v0.4 Level 2; not in any firmware yet), from the same CI job (open-crank#51). The wheel's functions run in the capture interrupt, so their figure adds to the interrupted code's stack:
 
 | Function | Context | Worst-case stack |
 |---|---|---|
 | `ecu_wheel_tooth` | interrupt | 52 bytes |
-| `ecu_wheel_cam` | interrupt | 12 bytes |
+| `ecu_wheel_cam` | interrupt | 8 bytes |
 | `ecu_wheel_poll` | interrupt | 56 bytes |
 | `ecu_wheel_init`, `ecu_wheel_status`, `ecu_wheel_set_width` | | 16, 12, 0 bytes |
 | `ecu_init` | loop | 16 bytes |
