@@ -114,6 +114,22 @@ tools/board/ecucheck.py --check build/open-crank-ecu-check \
 
 It writes, per speed, the captures (`captures_<rpm>rpm.csv`, one row per injection with its angle and error), the jitter budget (`jitter_<rpm>rpm.csv`, the format of `open-crank-l2-run --jitter`), open-tick's budget of the hard run, the check's output and the EEC1 log, plus the NUCLEO's lines and a `summary.txt`. Exit 0 every check ok, 1 a check failed, 2 the bench is not ready. **The NUCLEO is left running `oc-stm32g4-ecu`**, the reference build (`--no-eec1` leaves the fixed-fuel build: program `ecu` afterwards).
 
+**On the reference bench** (2026-11-28, commit `7dcdb0f`, bridge `6659c249…` on a root USB port, the host idle; every check ok, no retry). The start error is the captured angle minus TDC − 10°; widths are what the bridge captured, against 520 µs commanded:
+
+| rpm | injections per channel in 30 s (expected) | start error: mean | p99 of \|error\| | max \|error\| | width: mean (min–max) | the ECU reads | EEC1: period mean, speed / rpm |
+|---|---|---|---|---|---|---|---|
+| 200 | 50 on each (50) | +0.0003° | 0.0030° | 0.0035° | 521.35 µs (521.11–521.63) | 200.5 rpm | 10.027 ms, 1.0025–1.0031 |
+| 750 | 187–188 (187.5) | +0.0012° | 0.0038° | 0.0048° | 521.35 µs (521.00–521.67) | 752.0 rpm | 10.027 ms, 1.0023–1.0030 |
+| 1500 | 375 on each (375) | +0.0024° | 0.0050° | 0.0060° | 521.37 µs (521.11–521.74) | 1503.9 rpm | 10.027 ms, 1.0023–1.0032 |
+| 2400 | 600 on each (600) | +0.0038° | 0.0066° | 0.0084° | 521.36 µs (521.04–521.67) | 2406.3 rpm | 10.027 ms, 1.0022–1.0032 |
+
+- Every injection was on its own cylinder's channel; 0 captures lost; 0 sync losses, missed or refused armings and TIM2 overruns while judged; every USART2 row FULL. The hard runs were `ok`, 0 underruns, round trip p99 1.32–1.34 ms.
+- **Against the jitter budget** (p99 ≤ 0.1°, max ≤ 0.5°): the worst p99 is 0.0066°, fifteen times inside it. The mean error grows with speed, by the same constant time: 264–267 ns between the bridge's crank edge and the injector edge it captures, at 750, 1500 and 2400 rpm. Its parts (TIM2's 47 ns input filter, the slave timers' trigger synchronisation, the bridge's own capture) are not measured one by one. The spread around the mean (standard deviation 0.0011° at every speed) includes the NUCLEO's HSI noise (about 200 ppm, see the harness check) over the 8° from the reference tooth.
+- **Widths:** 0.26 % long, the HSI's bias; standard deviation 0.10 µs. Inside the budget's 0.3 % + 1 µs by 0.82 µs at worst (`width_err_over_0.3pct_us` 0.18 µs, at 1500 rpm).
+- Evidence: [`docs/measurements/2026-11-28-ecu-board/`](../../docs/measurements/2026-11-28-ecu-board/).
+
+**Execution time**, the worst seen on USART2 over that run (DWT cycles, Debug `-O0`, the CMake build; observed, not a proven bound): the TIM2 interrupt that handles a tooth, **3565 cycles (21.0 µs)**, 5 % of a tooth period at 2400 rpm (417 µs); `ecu_step()`, **5518 cycles (32.5 µs)**, 0.33 % of its 10 ms period. The fixed-fuel build gives the same within 10 cycles. The arming only has to finish before the next crank edge, since the injection itself is in hardware.
+
 ### The bench check
 
 `tools/board/bench.sh [--iface can0] [--include-serials] [SCENARIO...]` is the standard check of a physical setup. Run it before bringing your own firmware, and after changing anything on the bench. The report names the ST-LINK and the USB-CAN adapter by their `/dev/serial/by-id` names. Their serial numbers are written as `<serial>`, so a report can be shared as it is; `--include-serials` keeps them, for example to tell two benches with the same hardware apart.
@@ -267,6 +283,14 @@ And the engine ECU's (`portable/engine_ecu`, v0.4 Level 2, in `oc-stm32g4-ecu`),
 | `ecu_handle_frame` | loop | 72 bytes |
 | `ecu_step` | loop | 80 bytes |
 | `ecu_width_ticks` | loop | 0 bytes |
+
+The ECU firmware's own interrupt handler, from the call graph of the firmware's build (Debug, `-O0`; `-fcallgraph-info=su` on `oc-stm32g4-ecu` and `portable/`, `tools/stack_budget.py --roots TIM2_IRQHandler`), as printed by the CI job `firmware` (open-crank#54):
+
+| Function | Context | Worst-case stack |
+|---|---|---|
+| `TIM2_IRQHandler` | interrupt | 232 bytes (`TIM2_IRQHandler` → `on_tooth` → `ecu_wheel_tooth` → `speed_update`) |
+
+On top of it comes the exception frame: 32 bytes, or 104 with the floating-point context (the main loop uses the FPU). TIM2's interrupt is the only one above SysTick's priority.
 
 `memcpy`, `memmove`, `memset` and `memcmp` are not counted. This is the controller's stack only: the demo's own code, the HAL and the interrupt handlers come on top, and the demo's build (CubeIDE, `-O0`) is not the build measured here. Other GCC versions give other figures (GCC 10.3.1 gives 132 bytes for `mc_step` too). `mc_step` grew from 68 to 76 bytes in v0.3.1 with the TSC1 counter and checksum, and to 132 bytes with the controller's own DM1 (a DM1 to encode on its stack), and `mc_handle_frame` from 96 to 152 bytes with the engine's DM1 (a decoded DM1 on its stack).
 
