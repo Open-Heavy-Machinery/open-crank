@@ -65,6 +65,23 @@ The Level 2 plant is the same `d936la6` plant above, stepped every 1 ms, with a 
 | cam | high from 90° to 120° of the 720° cycle | Choice | One pulse per cycle, in its first revolution, away from the gap. |
 | firing order | 1-5-3-6-2-4 | Choice | The usual inline-six order: TDCs at 0°, 120°, 240°, 360°, 480°, 600° for cylinders 1, 5, 3, 6, 2, 4. |
 
+## Reference engine ECU, Level 2 (`portable/engine_ecu/src/ecu.c`, `ECU_DEFAULT_PARAMS`, v0.4)
+
+The reference engine-ECU logic that runs on the board at Level 2. Its wheel and injector numbers are the Level 2 plant's above, and its governor is the simulated ECU's (`tests/test_ecu.c` checks both), in `float`.
+
+| Parameter | Value | Provenance | Notes |
+|---|---|---|---|
+| `tick_hz` | 170 MHz | Choice | TIM2 on the reference board, clocked from the 170 MHz system clock (HSI through the PLL; about −0.27 % against a host clock). |
+| `tooth0_deg`, `cam_deg`, `tdc_deg` | −60°; 90°; 0, 480, 240, 600, 120, 360 | Derived | The Level 2 plant's wheel and firing order (above). |
+| `cam_window_deg` | ±30° | Choice | Five teeth either side of the cam's edge: wide enough for any speed change within a revolution, narrow enough that a cam in the wrong revolution is never accepted. |
+| `soi_btdc_deg` | 10° | Estimate | A fixed start of injection, in the usual range for a heavy-duty diesel near rated speed. No timing map: the plant does not model its effect (Level 2 design, decision 8). |
+| `injector_dead_us`, `injector_full_us` | 200 µs, 1600 µs | Derived | The Level 2 plant's injector model, inverted by the ECU. |
+| `no_tooth_ms` | 100 ms | Choice | Below the slowest cranking tooth period by far (about 33 ms per tooth at 30 rpm), so only a stop triggers it. |
+| `low_idle_rpm` … `request_timeout_ms`, `source_address` | as the simulated ECU | Derived | `ENGINE_ECU_D936LA6` above: 750, 2100, 2400, 500 rpm, 30 %, kp 0.10, ki 0.30, 200 ms, address 0x00. |
+| gap ratio | > 1.5 × the previous period, confirmed by the next < 0.5 × it | Choice | The 60−2 gap is three pitches; the margins leave room for acceleration within one tooth. |
+| speed | over the last 20 tooth positions (120°) | Choice | One firing interval of a six-cylinder engine: no cylinder ripple, a new value every tooth. |
+| EEC1 torque | the fuel %, as both driver's demand and actual | Choice | The ECU has no torque model; fuel % is the closest it knows. |
+
 ## Hydraulic hoist pump (`sim/loads/src/hydraulic_pump.c`)
 
 | Parameter | Value | Provenance | Notes |

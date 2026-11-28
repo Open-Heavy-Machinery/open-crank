@@ -22,3 +22,23 @@ The reference controller is [`portable/machine_ctrl`](../portable/machine_ctrl),
 
 - **That `portable/` builds for your target** the way the CI checks it for the Cortex-M4F: [`tools/check_portable.sh`](../tools/check_portable.sh).
 - **That it behaves the same on the bus:** run `scenarios/hoist_step.csv` with your board in the loop and compare it with the paced SIL as in [board-vs-sil.md](board-vs-sil.md).
+
+## The engine ECU (Level 2)
+
+The reference engine ECU's logic is [`portable/engine_ecu`](../portable/engine_ecu) (`opencrank/ecu.h`), for v0.4's Level 2: the device under test reads the crank and cam and drives six injectors. Unlike the controller, it has **two contexts**, and each function belongs to one:
+
+| Context | Functions | When |
+|---|---|---|
+| the crank and cam capture interrupt | `ecu_wheel_tooth()`, `ecu_wheel_cam()`, `ecu_wheel_poll()` | every rising crank edge, every rising cam edge, and at least every 100 ms for a stop |
+| the main loop | `ecu_handle_frame()`, `ecu_step()` | every received frame, and every 10 ms |
+
+- **Times in the interrupt** are ticks of one free-running 32-bit timer, the same for crank, cam and the poll; `EcuParams.tick_hz` is its frequency (170 MHz on the reference board). Wrap-around is handled.
+- **Arming an injector.** When `ecu_wheel_tooth()` returns true, its `EcuArm` says which injector to start on the *next* crank edge, after `delay_ticks`, for `width_ticks`. Do it in hardware: a one-pulse timer started by that edge, so the injection does not depend on interrupt latency.
+- **The hand-over** between the two contexts, once per `ecu_step()`:
+  1. copy the wheel's status with `ecu_wheel_status()` while the capture interrupt is masked, and pass it to `ecu_step()`;
+  2. pass `ecu_width_ticks()` to `ecu_wheel_set_width()`: one aligned 32-bit store, which the interrupt reads whole.
+
+  Nothing else is shared. Never call a wheel function from the loop with the interrupt enabled, nor a governor function from the interrupt.
+- **CAN:** TSC1 in (speed control, to this ECU or global; a wrong checksum or a repeated counter is ignored), one EEC1 out per `ecu_step()`. Give it a `cap` of at least 1.
+- **Resources:** no heap; worst-case stack by call graph in the [STM32G4 README](../platforms/stm32g4/README.md#stack-usage-of-the-controller), checked by `tools/check_portable.sh` as for the controller.
+

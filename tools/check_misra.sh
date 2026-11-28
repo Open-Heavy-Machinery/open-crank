@@ -63,7 +63,7 @@ cd "$ROOT"
 # cppcheck reports findings on stderr, one per line, with this template.
 cppcheck_status=0
 cppcheck --addon=misra --std=c11 --enable=style --platform=arm32-wchar_t4 --quiet \
-    -I portable/j1939/include -I portable/machine_ctrl/include \
+    -I portable/j1939/include -I portable/machine_ctrl/include -I portable/engine_ecu/include \
     --template='{file}:{line}:{id}' \
     portable 2>"$WORK/raw.txt" >"$WORK/stdout.txt" || cppcheck_status=$?
 

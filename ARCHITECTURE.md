@@ -58,7 +58,7 @@ flowchart LR
 
 | Zone | Contains | May depend on | Must not contain |
 |---|---|---|---|
-| `portable/` | J1939 codec, bench messages, machine-controller logic | nothing but `<stdint.h>`, `<stdbool.h>`, `<stddef.h>` | `printf`, `malloc`, files, sockets, OS calls, the plant, `double`, open-tick |
+| `portable/` | J1939 codec, bench messages, machine-controller logic, the Level 2 engine-ECU logic (v0.4) | nothing but `<stdint.h>`, `<stdbool.h>`, `<stddef.h>` | `printf`, `malloc`, files, sockets, OS calls, the plant, `double`, open-tick |
 | `sim/` | plant physics, plants, loads, simulated engine ECU, bench, signals, trace columns, J1939 ↔ open-tick frames | `portable/`, open-tick's core, the C standard library | sockets, a specific OS, firmware HALs |
 | `platforms/` | host runner, SIL programs, the STM32G4 reference board's firmware (and its `USER CODE` zones for CubeIDE); (later) Renode glue, FPGA glue | `portable/`, `sim/`, open-tick (core and host) | control logic, physics |
 
@@ -213,6 +213,25 @@ In RUN it asks the engine for the operator's target speed through TSC1 (speed co
 **Why it checks SPN 1483.** Sending TSC1 is not the same as being in control: the frames can be lost, or the engine can refuse the override. Without the check, a controller would keep "running" a machine it no longer controls. The check also catches the loss of the speed command from the controller's side.
 
 **Why a reference controller at all.** It is both an example for newcomers and the test fixture that proves the interface works end to end. Users are expected to replace it with their own.
+
+### 4.5b Engine-ECU logic (`portable/engine_ecu`, v0.4)
+
+The reference Level 2 engine ECU's logic, the same code for the board's firmware and the in-memory Level 2 loop *(planned)*: plain C, `float`, no I/O (`opencrank/ecu.h`). It has two parts with two owners:
+- **The wheel** runs in the crank and cam capture interrupt. It takes edge times in ticks of a free-running 32-bit timer, finds the 60−2 gap, counts the teeth, takes the cycle's phase from the cam, measures the speed over 120°, and says which injector to arm on the next tooth's edge, with its delay and width.
+
+  ```
+  NONE --(edges)--> SEEKING --(a gap, then another exactly 58 teeth later)--> CRANK --(the cam in its window)--> FULL
+  CRANK, FULL --(a gap where none belongs | no gap where one belongs | cam wrong 2 cycles running)--> SEEKING
+  any --(no tooth for 100 ms)--> NONE
+  ```
+
+  A cam seen in its window while the teeth are counted gives FULL at the second gap, so FULL comes within three revolutions of the first edge from any angle (2.5 at worst in `tests/test_ecu.c`).
+- **The governor** runs in the main loop every 10 ms: Level 1's PI law and anti-windup (§4.3) in `float`, low idle or a TSC1 speed request (checksum and counter checked, 200 ms timeout), start fuel until running, an overspeed trip latched until the engine stops, and no fuel outside FULL. It sends EEC1.
+- **The hand-over** between the two is the platform's: the wheel's status copied with the interrupt masked, and the commanded width as one 32-bit store ([docs/porting.md](docs/porting.md#the-engine-ecu-level-2)).
+
+**Why the wheel only arms.** The injector's edges are set by a timer in hardware, started by the reference tooth's own edge (`platforms/stm32g4/WIRING-L2.md`), so their jitter is the timer's, not the interrupt's latency. The logic only computes what to arm, one tooth ahead.
+
+**Why the same geometry as the plant.** The wheel's angles (TDC 1 at tooth 10, the cam at 90°, the firing order) are parameters here and constants in `sim/l2`; a test checks that they agree, so the ECU and the plant cannot drift apart.
 
 ### 4.6 Runtime (`sim/runtime`)
 

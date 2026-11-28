@@ -223,6 +223,19 @@ History: v0.2 measured 2287 cycles (13.5 µs) on the CubeIDE build at `-O0`, six
 | `mc_step` | 132 bytes |
 | `mc_clear_fault` | 0 bytes |
 
+And the engine ECU's (`portable/engine_ecu`, v0.4 Level 2; not in any firmware yet). The wheel's functions run in the capture interrupt, so their figure adds to the interrupted code's stack:
+
+| Function | Context | Worst-case stack |
+|---|---|---|
+| `ecu_wheel_tooth` | interrupt | 52 bytes |
+| `ecu_wheel_cam` | interrupt | 12 bytes |
+| `ecu_wheel_poll` | interrupt | 56 bytes |
+| `ecu_wheel_init`, `ecu_wheel_status`, `ecu_wheel_set_width` | | 16, 12, 0 bytes |
+| `ecu_init` | loop | 16 bytes |
+| `ecu_handle_frame` | loop | 72 bytes |
+| `ecu_step` | loop | 80 bytes |
+| `ecu_width_ticks` | loop | 0 bytes |
+
 `memcpy`, `memmove`, `memset` and `memcmp` are not counted. This is the controller's stack only: the demo's own code, the HAL and the interrupt handlers come on top, and the demo's build (CubeIDE, `-O0`) is not the build measured here. Other GCC versions give other figures (GCC 10.3.1 gives 132 bytes for `mc_step` too). `mc_step` grew from 68 to 76 bytes in v0.3.1 with the TSC1 counter and checksum, and to 132 bytes with the controller's own DM1 (a DM1 to encode on its stack), and `mc_handle_frame` from 96 to 152 bytes with the engine's DM1 (a decoded DM1 on its stack).
 
 ### The watchdog check
