@@ -4,6 +4,10 @@ All notable changes to this project. The project is pre-alpha; nothing here is a
 
 ## Unreleased
 
+### Added
+
+- **The harness check counts every capture and measures the crank's tooth period.** `tools/board/wirecheck.py --inj-hz N` asks `oc-stm32g4-wirecheck`, over its virtual COM port, for a counted series of injector bursts once the bridge is running; each channel must capture exactly that many pulses. The NUCLEO also sums the crank's tooth periods (TIM2, 170 MHz, the gap excluded), and the crank line gives their mean, standard deviation and spread. `--out DIR` keeps the raw lines. The firmware no longer sends bursts on its own: the script asks for them.
+
 ### Changed
 
 - open-tick submodule: `v0.3.1` to `v0.4.0-beta.1` (the Tang Nano 20K bridge, the hard driver and the fidelity contract), which Level 2's runner will use. Nothing in open-crank uses them yet: the fifteen scenarios' traces are byte-identical to `v0.3.3` (CI `traces`).

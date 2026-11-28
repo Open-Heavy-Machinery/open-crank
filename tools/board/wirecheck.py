@@ -3,22 +3,30 @@
 """Check the Level 2 harness, wire by wire (platforms/stm32g4/WIRING-L2.md).
 
 The NUCLEO-G431KB runs oc-stm32g4-wirecheck: it counts the crank and cam edges
-it receives and, every 100 ms, sends a pulse on each injector line, injector k
-high for k x 100 us. The Tang Nano 20K runs open-tick's bridge: open-tick's
-`otk-hard-probe wires` makes it turn a 60-2 crank and a cam at a fixed speed
-and captures the six injector inputs.
+it receives, and sums the crank's tooth periods. The Tang Nano 20K runs
+open-tick's bridge: open-tick's `otk-hard-probe wires` makes it turn a 60-2
+crank and a cam at a fixed speed and captures the six injector inputs. Once
+the bridge is running, this script asks the NUCLEO for a counted series of
+bursts, --inj-hz a second: in each, injector k goes high for k x 100 us.
 
 Each line is judged on its own, so a harness wired in part reports what is
 there:
   crank   the NUCLEO sees 58 teeth and one gap per revolution at the set speed
   cam     the NUCLEO sees one edge per 720 degrees
-  inj1-6  the bridge's channel k captures pulses of k x 100 us, about ten a
-          second; another width means the wire is crossed with that injector
+  inj1-6  the bridge's channel k captures exactly one pulse of k x 100 us per
+          burst sent, and none is lost; another width means the wire is
+          crossed with that injector
+
+The crank line also gives the tooth period as TIM2 reads it (170 MHz; the gap
+excluded): mean, standard deviation, max - min and the largest deviation from
+the mean, in ns of the NUCLEO's clock. That deviation includes the NUCLEO's
+own capture (one TIM2 tick, 5.9 ns) and is what the bridge's fidelity file
+takes as the crank's jitter.
 
 Usage:
   tools/board/wirecheck.py --probe <open-tick build>/otk-hard-probe \\
-      --bitstream <open-tick>/build-gateware/bridge.fs [--seconds 5] [--rpm 1500]
-      [--lines crank,cam,inj1,...] [--no-flash]
+      --bitstream <open-tick>/build-gateware/bridge.fs [--seconds 10] [--rpm 1500]
+      [--inj-hz 10] [--lines crank,cam,inj1,...] [--no-flash] [--out DIR]
 
 Needs openFPGALoader on PATH (open-tick: eval "$(tools/fpga_toolchain.sh)"),
 and the tools of tools/board/setup.sh for the NUCLEO. Python standard library
@@ -49,7 +57,11 @@ INJ = {
 TEETH = 58  # a 60-2 wheel
 PULSE_UNIT_US = 100.0
 WIDTH_TOL_US = 20.0
-BURSTS_PER_S = 10
+TIM2_HZ = 170e6
+# Bursts start this long after the probe does (the bridge is running by then)
+# and end this long before it stops, so every burst falls inside the run.
+BURST_LEAD_S = 3.0
+BURST_TAIL_S = 2.0
 
 
 def one(pattern, what):
@@ -64,7 +76,7 @@ class SerialLines(threading.Thread):
 
     def __init__(self, path):
         super().__init__(daemon=True)
-        self.fd = os.open(path, os.O_RDONLY | os.O_NOCTTY | os.O_NONBLOCK)
+        self.fd = os.open(path, os.O_RDWR | os.O_NOCTTY | os.O_NONBLOCK)
         attr = termios.tcgetattr(self.fd)
         attr[0] = 0  # iflag
         attr[1] = 0  # oflag
@@ -75,6 +87,10 @@ class SerialLines(threading.Thread):
         termios.tcflush(self.fd, termios.TCIFLUSH)
         self.lines = []
         self.stop = False
+
+    def send(self, text):
+        os.write(self.fd, text.encode())
+        termios.tcdrain(self.fd)
 
     def run(self):
         buf = b""
@@ -111,17 +127,25 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--probe", required=True, help="open-tick's otk-hard-probe")
     ap.add_argument("--bitstream", required=True, help="open-tick's bridge.fs, loaded into the Tang's SRAM")
-    ap.add_argument("--seconds", type=float, default=5.0)
+    ap.add_argument("--seconds", type=float, default=10.0)
     ap.add_argument("--rpm", type=float, default=1500.0)
+    ap.add_argument("--inj-hz", type=int, default=10,
+                    help="injector bursts a second, 1-100 with 1000 / hz whole (default 10)")
     ap.add_argument("--lines", default="crank,cam,inj1,inj2,inj3,inj4,inj5,inj6",
                     help="the lines to judge, comma-separated (default all)")
     ap.add_argument("--no-flash", action="store_true", help="the NUCLEO already runs oc-stm32g4-wirecheck")
+    ap.add_argument("--out", help="a directory to keep the NUCLEO's lines (nucleo.log) and the probe's output (probe.txt)")
     a = ap.parse_args()
     lines = [x.strip() for x in a.lines.split(",") if x.strip()]
     known = {"crank", "cam"} | {f"inj{k}" for k in INJ}
     bad = [x for x in lines if x not in known]
     if bad:
         sys.exit(f"wirecheck: unknown line(s) {', '.join(bad)}; known: {', '.join(sorted(known))}")
+    if not (1 <= a.inj_hz <= 100 and 1000 % a.inj_hz == 0):
+        sys.exit("wirecheck: --inj-hz must be 1-100 and divide 1000")
+    n_bursts = int(a.inj_hz * (a.seconds - BURST_LEAD_S - BURST_TAIL_S))
+    if any(x.startswith("inj") for x in lines) and n_bursts < 1:
+        sys.exit(f"wirecheck: --seconds must be over {BURST_LEAD_S + BURST_TAIL_S:.0f} to check the injectors")
     if not os.access(a.probe, os.X_OK) or not os.path.isfile(a.bitstream):
         print("wirecheck: --probe must be an executable and --bitstream a file", file=sys.stderr)
         return 2
@@ -137,37 +161,66 @@ def main():
     reader = SerialLines(vcp)
     reader.start()
     print(f"== the bridge turns the crank at {a.rpm:.0f} rpm for {a.seconds:.0f} s", flush=True)
+    reader.send("stop\n")
     t0 = time.monotonic()
-    probe = subprocess.run([a.probe, "--dev", tang, "--seconds", str(a.seconds), "--rpm", str(a.rpm), "wires"],
-                           stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    proc = subprocess.Popen([a.probe, "--dev", tang, "--seconds", str(a.seconds), "--rpm", str(a.rpm), "wires"],
+                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    if n_bursts >= 1:
+        time.sleep(BURST_LEAD_S)
+        print(f"== {n_bursts} injector bursts at {a.inj_hz} Hz", flush=True)
+        reader.send(f"bursts {a.inj_hz} {n_bursts}\n")
+    out, _ = proc.communicate()
     t1 = time.monotonic()
     time.sleep(1.2)  # the NUCLEO's report for the last second
     reader.stop = True
     reader.join()
-    if probe.returncode != 0:
-        print(probe.stdout)
-        print(f"wirecheck: otk-hard-probe failed (exit {probe.returncode})", file=sys.stderr)
+    if proc.returncode != 0:
+        print(out)
+        print(f"wirecheck: otk-hard-probe failed (exit {proc.returncode})", file=sys.stderr)
+        return 2
+    if a.out:
+        os.makedirs(a.out, exist_ok=True)
+        with open(os.path.join(a.out, "nucleo.log"), "w") as f:
+            for t, x in reader.lines:
+                f.write(f"{t - t0:.3f} {x}\n")
+        with open(os.path.join(a.out, "probe.txt"), "w") as f:
+            f.write(out)
+    acked = any(re.match(rf"wirecheck: bursts hz={a.inj_hz} n={n_bursts}$", x) for _, x in reader.lines)
+    done = [t for t, x in reader.lines if x == f"wirecheck: bursts done n={n_bursts}"]
+    if n_bursts >= 1 and not acked:
+        print("wirecheck: the NUCLEO did not take the bursts command: is this oc-stm32g4-wirecheck's current build?",
+              file=sys.stderr)
+        return 2
+    if n_bursts >= 1 and not (done and done[0] <= t1):
+        print("wirecheck: the NUCLEO had not finished its bursts when the bridge stopped", file=sys.stderr)
         return 2
 
     # the bridge's captures, per channel
     caps = {}
     for m in re.finditer(r"capture (\d+): (\d+) pulses(?:, width us min ([\d.]+) mean ([\d.]+) max ([\d.]+))?",
-                         probe.stdout):
+                         out):
         caps[int(m.group(1)) + 1] = (int(m.group(2)), float(m.group(4) or 0.0))
-    lost = re.search(r"captures lost \(bridge overflow\): (\d+)", probe.stdout)
+    lost = re.search(r"captures lost \(bridge overflow\): (\d+)", out)
 
     # the NUCLEO's reports over whole seconds inside the run
     rep = []
+    steady = []
     for t, line in reader.lines:
-        m = re.match(r"wirecheck s=\d+ crank=(\d+) cam=(\d+) gaps=(\d+) rpm=(\d+) ovr=(\d+) bursts=(\d+)", line)
+        m = re.match(r"wirecheck s=\d+ crank=(\d+) cam=(\d+) gaps=(\d+) rpm=(\d+) ovr=(\d+) bursts=(\d+)"
+                     r" tn=(\d+) ts=(\d+) tq=(\d+) tmin=(\d+) tmax=(\d+)", line)
         if m and t0 + 1.0 < t <= t1:
             rep.append(tuple(int(x) for x in m.groups()))
+            # the tooth periods only from seconds wholly inside the steady run:
+            # not the crank's start, nor its stop
+            if t0 + BURST_LEAD_S + 1.0 <= t <= t1 - 0.5:
+                steady.append(rep[-1])
     if not reader.lines:
         print("wirecheck: nothing from the NUCLEO's virtual COM port: is oc-stm32g4-wirecheck running?",
               file=sys.stderr)
         return 2
 
     results = []
+    tooth = None
     if "crank" in lines or "cam" in lines:
         if len(rep) < 2:
             print(f"wirecheck: only {len(rep)} NUCLEO report(s) inside the run; try --seconds 5 or more",
@@ -185,6 +238,17 @@ def main():
             results.append(("crank", "Tang 73 -> A0 (PA0)", ok,
                             f"{crank} teeth/s (expected {TEETH * rev_s:.0f}), {gaps} gaps/s ({rev_s:.1f}), "
                             f"{rpm} rpm, {ovr} overruns"))
+            tn = sum(r[6] for r in steady)
+            if tn:
+                ts, tq = sum(r[7] for r in steady), sum(r[8] for r in steady)
+                tmin = min(r[9] for r in steady if r[6])
+                tmax = max(r[10] for r in steady)
+                mean = ts / tn
+                sd = max(tq / tn - mean * mean, 0.0) ** 0.5
+                dev = max(tmax - mean, mean - tmin)
+                ns = 1e9 / TIM2_HZ
+                tooth = (f"tooth period over {tn} teeth ({len(steady)} s steady): mean {mean * ns:.1f} ns, sd {sd * ns:.1f} ns, "
+                         f"max - min {(tmax - tmin) * ns:.1f} ns, largest deviation from the mean {dev * ns:.1f} ns")
         if "cam" in lines:
             ok = abs(cam - rev_s / 2.0) <= 1.0
             results.append(("cam", "Tang 74 -> A1 (PA1)", ok, f"{cam} edges/s (expected {rev_s / 2.0:.1f})"))
@@ -195,20 +259,24 @@ def main():
             continue
         n, width = caps.get(k, (0, 0.0))
         expect = k * PULSE_UNIT_US
-        rate = n / a.seconds
         if n == 0:
             ok, why = False, "no pulse captured: open wire, or not wired"
-        elif abs(width - expect) <= WIDTH_TOL_US and abs(rate - BURSTS_PER_S) <= 0.2 * BURSTS_PER_S:
-            ok, why = True, f"{n} pulses ({rate:.1f}/s), mean width {width:.1f} us (expected {expect:.0f})"
+        elif abs(width - expect) <= WIDTH_TOL_US and n == n_bursts:
+            ok, why = True, (f"{n} of {n_bursts} pulses ({a.inj_hz}/s), mean width {width:.1f} us "
+                             f"(expected {expect:.0f})")
         else:
             other = round(width / PULSE_UNIT_US)
             hint = f": crossed with injector {other}'s wire ({INJ[other][0]})" if other in INJ and other != k else ""
-            ok, why = False, f"{n} pulses ({rate:.1f}/s), mean width {width:.1f} us, expected {expect:.0f}{hint}"
+            lost_n = f", {n_bursts - n} lost" if n < n_bursts else ""
+            ok, why = False, (f"{n} of {n_bursts} pulses{lost_n}, mean width {width:.1f} us, "
+                              f"expected {expect:.0f}{hint}")
         results.append((name, f"{nucleo} -> Tang {tang_pin}", ok, why))
 
     print()
     for name, path, ok, why in results:
         print(f"{'ok  ' if ok else 'FAIL'}  {name:<5} {path:<22} {why}")
+        if name == "crank" and tooth:
+            print(f"      {'':<5} {'':<22} {tooth}")
     if lost and int(lost.group(1)) != 0:
         print(f"note  the bridge lost {lost.group(1)} captures (overflow)")
     failed = [r[0] for r in results if not r[2]]
