@@ -2,7 +2,7 @@
 
 ## What this is
 
-The reference board of [v0.2](../../ROADMAP.md#v02-reference-board-on-the-bus): an STM32G431KB running the reference machine controller (`portable/machine_ctrl`), as a Level 1 device under test, against `open-crank-sil` over a real CAN bus. To set it up from nothing, follow [BRINGUP.md](BRINGUP.md). For [v0.4](../../ROADMAP.md#v04-level-2-your-firmware-as-the-engine-ecu), where the board runs as the engine ECU against a Tang Nano 20K, the wiring is in [WIRING-L2.md](WIRING-L2.md).
+The reference board of [v0.2](../../ROADMAP.md#v02-reference-board-on-the-bus): an STM32G431KB running the reference machine controller (`portable/machine_ctrl`), as a Level 1 device under test, against `open-crank-sil` over a real CAN bus. To set it up from nothing, follow [BRINGUP.md](BRINGUP.md). For [v0.4](../../ROADMAP.md#v04-level-2-your-firmware-as-the-engine-ecu), where the board runs as the engine ECU against a Tang Nano 20K, the wiring is in [WIRING-L2.md](WIRING-L2.md) and the firmware in [`ecu/main.c`](ecu/main.c): see [The engine ECU (Level 2)](#the-engine-ecu-level-2).
 
 There are two ways to build it:
 
@@ -63,7 +63,7 @@ cmake --build build-stm32g4
 openocd -f interface/stlink.cfg -f target/stm32g4x.cfg -c "program build-stm32g4/oc-stm32g4-demo.elf verify reset exit"
 ```
 
-The build type defaults to Debug (`-O0 -g`), as CubeIDE's, which is how the execution times below were measured. CI builds both firmwares on every push (job `firmware`) and keeps the ELF, BIN and MAP files as an artefact.
+The build type defaults to Debug (`-O0 -g`), as CubeIDE's, which is how the execution times below were measured. CI builds every firmware on every push (job `firmware`) and keeps the ELF, BIN and MAP files as an artefact.
 
 ### The Level 2 harness check
 
@@ -82,6 +82,54 @@ tools/board/wirecheck.py --probe <open-tick build>/otk-hard-probe \
 
 One line per wire, `ok` or `FAIL` with the reason: no pulse (open), the wrong width (crossed with the injector that width belongs to), or the wrong tooth count or speed. Exit 0 every checked line ok, 1 a line failed, 2 the bench is not ready. Program `demo` again afterwards for the bench check.
 
+### The engine ECU (Level 2)
+
+`oc-stm32g4-ecu` ([`ecu/main.c`](ecu/main.c), `tools/board/flash.sh ecu`) is v0.4's reference engine ECU: the logic of [`portable/engine_ecu`](../../portable/engine_ecu) on the pins of [WIRING-L2.md](WIRING-L2.md). The firmware only sets up the timers, the interrupt, CAN and the UART ([docs/porting.md](../../docs/porting.md#the-engine-ecu-level-2)); registers through CMSIS beyond `board_init()`'s HAL clock and FDCAN set-up.
+
+- **The wheel** runs in TIM2's interrupt. TIM2 is free-running, 32 bits at 170 MHz; CH1 (PA0) captures every rising crank edge and CH2 (PA1) every rising cam edge, each with a pull-down and a 47 ns input filter. The interrupt calls `ecu_wheel_tooth()` and `ecu_wheel_cam()` (the earlier of the two first, when both are pending) and, from a CH3 compare every 50 ms, `ecu_wheel_poll()`.
+- **The injectors** are timers in one-pulse mode: injectors 1–3 on TIM1 CH1–3 (PA8, PA9, PA10), 4 and 5 on TIM3 CH1–2 (PB4, PB5), 6 on TIM4 CH1 (PB6). Each is a slave in trigger mode on `tim_itr1`, which is `tim2_trgo` for TIM1, TIM3 and TIM4 (RM0440, tables 267 and 291), and TIM2's TRGO is "Compare Pulse" (MMS = 011): a pulse at every CH1 capture. When `ecu_wheel_tooth()` returns an `EcuArm`, the interrupt programs that injector's timer, still stopped: the delay in its CCR, delay + width − 1 in ARR (PWM mode 2: high from CCR to ARR), and a prescaler so that both fit in 16 bits (it divides by 1 while delay + width is under 65 000 ticks, by 19 at 200 rpm). It sets the other channels of that timer to forced low and enables the trigger. **The next crank edge starts the counter in hardware**, and the compare match and the update set both edges: no injector edge is set by software, so interrupt latency does not move an injection. At that next edge the interrupt disables the trigger again, so each arming fires once; it counts the arming as *fired* if the counter is running then, and as *missed* if it is not (an arming that came after its edge). An arming for a timer whose last pulse is not over is refused and counted. The injectors of one timer are 240° apart, so their pulses never overlap.
+- **Every 10 ms** the main loop hands the received frames (FDCAN1, as the demo) to `ecu_handle_frame()`; copies the wheel's status with TIM2's interrupt masked; runs `ecu_step()` and sends its EEC1; hands the commanded width to the wheel, masked again; and kicks the IWDG (as the demo, 100 ms).
+- **USART2** (the ST-LINK's virtual COM port, 115200 8N1) gives a line `# oc-stm32g4-ecu start; build=…; reset=…` at start, a CSV header, and one row every 100 ms, sent from a buffer without blocking the loop: `ms`, `sync`, `rpm` (as the ECU reads it), `target_rpm`, `fuel_pct`, `width_us`, `sync_losses`, `gaps`, `injections` (fired), `arms`, `missed`, `conflicts` (refused), `teeth`, `cam`, `stops`, `overruns` (captures lost by TIM2), `isr_cycles_max` (the worst TIM2 interrupt that handled a tooth, DWT), `step_cycles_max` (the worst `ecu_step()`, DWT) and `tx_dropped` (CAN frames dropped with the TX FIFO full).
+- **`oc-stm32g4-ecu-fixedfuel`** is a test build only (`tools/board/flash.sh ecu-fixedfuel`): the same firmware with the width handed to the wheel fixed at 20 % fuel, 520 µs through the injector model, instead of the governor's. At a constant bridge speed the real governor would cut fuel, and nothing would be injected. CI fails if any other firmware contains its `oc_test_fixed_fuel_ticks`.
+
+#### Checking it on the board
+
+`tools/board/ecucheck.py` runs the ECU against the Tang Nano 20K at constant crank speeds, without a plant (the closed loop with the plant is the hard-run runner, *(planned)*):
+
+```sh
+eval "$(<open-tick>/tools/fpga_toolchain.sh)"     # openFPGALoader
+tools/board/ecucheck.py --check build/open-crank-ecu-check \
+    --bitstream <open-tick>/build-gateware/bridge.fs [--rpm 200,750,1500,2400] \
+    [--seconds 30] [--eec1-seconds 10] [--iface can0] [--no-eec1] [--out DIR]
+```
+
+1. **Injections**, with `oc-stm32g4-ecu-fixedfuel`. For each speed the bridge is loaded fresh, because its phase accumulator is the crank angle only from a freshly loaded bitstream. `open-crank-ecu-check` (`platforms/linux-socketcan/`) configures the bridge with the Level 2 wheel (`oc_l2_bridge_config()`), holds one `crank_phase_inc` for 2 s of warm-up, the judged seconds and 0.5 s more through open-tick's hard loop, and collects every capture. The angle of each injection's start is the bridge's accumulator at its tick, `inc × (t − t_start)` mod 2⁴⁸ = 720°, as the Level 2 plant computes it. Its criteria:
+   - per channel, the injections that start in the judged window are rpm / 120 × seconds, ±1;
+   - every injection on its cylinder's channel, its start within 0.5° of that cylinder's TDC − 10°, and p99 of the error ≤ 0.1° (the jitter budget of the Level 2 design);
+   - every width 520 µs × 1.0027 ± 1 µs (the NUCLEO's HSI runs 0.27 % slow, so its pulses come out long; see [Clock](#stm32cubeide-project));
+   - no capture lost.
+
+   The script adds the ECU's own view, from USART2 rows inside the judged window only (the ST-LINK keeps what was printed while the port was closed): sync FULL in every row, and no sync loss, missed or refused arming, or TIM2 overrun. A hard run that ends aborted is retried once, and the summary says so; both outputs are kept (`check_<rpm>rpm.txt`, `check_<rpm>rpm.attempt2.txt`).
+2. **EEC1**, with the reference build `oc-stm32g4-ecu`: at each speed, the ECU's EEC1 frames on the CAN interface (`candump`, kernel times) must come every 10 ms (mean within 1 %, no gap over 20 ms) with an engine speed of rpm × 1.0027 ± 0.2 % (the HSI again).
+
+It writes, per speed, the captures (`captures_<rpm>rpm.csv`, one row per injection with its angle and error), the jitter budget (`jitter_<rpm>rpm.csv`, the format of `open-crank-l2-run --jitter`), open-tick's budget of the hard run, the check's output and the EEC1 log, plus the NUCLEO's lines and a `summary.txt`. Exit 0 every check ok, 1 a check failed, 2 the bench is not ready. **The NUCLEO is left running `oc-stm32g4-ecu`**, the reference build (`--no-eec1` leaves the fixed-fuel build: program `ecu` afterwards).
+
+**On the reference bench** (2026-11-28, commit `7dcdb0f`, bridge `6659c249…` on a root USB port, the host idle; every check ok, no retry). The start error is the captured angle minus TDC − 10°; widths are what the bridge captured, against 520 µs commanded:
+
+| rpm | injections per channel in 30 s (expected) | start error: mean | p99 of \|error\| | max \|error\| | width: mean (min–max) | the ECU reads | EEC1: period mean, speed / rpm |
+|---|---|---|---|---|---|---|---|
+| 200 | 50 on each (50) | +0.0003° | 0.0030° | 0.0035° | 521.35 µs (521.11–521.63) | 200.5 rpm | 10.027 ms, 1.0025–1.0031 |
+| 750 | 187–188 (187.5) | +0.0012° | 0.0038° | 0.0048° | 521.35 µs (521.00–521.67) | 752.0 rpm | 10.027 ms, 1.0023–1.0030 |
+| 1500 | 375 on each (375) | +0.0024° | 0.0050° | 0.0060° | 521.37 µs (521.11–521.74) | 1503.9 rpm | 10.027 ms, 1.0023–1.0032 |
+| 2400 | 600 on each (600) | +0.0038° | 0.0066° | 0.0084° | 521.36 µs (521.04–521.67) | 2406.3 rpm | 10.027 ms, 1.0022–1.0032 |
+
+- Every injection was on its own cylinder's channel; 0 captures lost; 0 sync losses, missed or refused armings and TIM2 overruns while judged; every USART2 row FULL. The hard runs were `ok`, 0 underruns, round trip p99 1.32–1.34 ms.
+- **Against the jitter budget** (p99 ≤ 0.1°, max ≤ 0.5°): the worst p99 is 0.0066°, fifteen times inside it. The mean error grows with speed, by the same constant time: 264–267 ns between the bridge's crank edge and the injector edge it captures, at 750, 1500 and 2400 rpm. Its parts (TIM2's 47 ns input filter, the slave timers' trigger synchronisation, the bridge's own capture) are not measured one by one. The spread around the mean (standard deviation 0.0011° at every speed) includes the NUCLEO's HSI noise (about 200 ppm, see the harness check) over the 8° from the reference tooth.
+- **Widths:** 0.26 % long, the HSI's bias; standard deviation 0.10 µs. Inside the budget's 0.3 % + 1 µs by 0.82 µs at worst (`width_err_over_0.3pct_us` 0.18 µs, at 1500 rpm).
+- Evidence: [`docs/measurements/2026-11-28-ecu-board/`](../../docs/measurements/2026-11-28-ecu-board/).
+
+**Execution time**, the worst seen on USART2 over that run (DWT cycles, Debug `-O0`, the CMake build; observed, not a proven bound): the TIM2 interrupt that handles a tooth, **3565 cycles (21.0 µs)**, 5 % of a tooth period at 2400 rpm (417 µs); `ecu_step()`, **5518 cycles (32.5 µs)**, 0.33 % of its 10 ms period. The fixed-fuel build gives the same within 10 cycles. The arming only has to finish before the next crank edge, since the injection itself is in hardware.
+
 ### The bench check
 
 `tools/board/bench.sh [--iface can0] [--include-serials] [SCENARIO...]` is the standard check of a physical setup. Run it before bringing your own firmware, and after changing anything on the bench. The report names the ST-LINK and the USB-CAN adapter by their `/dev/serial/by-id` names. Their serial numbers are written as `<serial>`, so a report can be shared as it is; `--include-serials` keeps them, for example to tell two benches with the same hardware apart.
@@ -99,7 +147,7 @@ Exit 0 **BENCH OK**, 1 the bench does not match (the report lists why), 2 the PC
 
 | Piece | Source | Licence |
 |---|---|---|
-| `board/` (clock, FDCAN1, HAL configuration, linker script), `demo/main.c`, `echo/main.c` | written in this repository | Apache-2.0 |
+| `board/` (clock, FDCAN1, HAL configuration, linker script), `demo/main.c`, `echo/main.c`, `wirecheck/main.c`, `ecu/main.c` | written in this repository | Apache-2.0 |
 | `portable/` (the controller) | this repository, unchanged | Apache-2.0 |
 | CMSIS Core (`core_cm4.h` and friends) | [STMicroelectronics/cmsis_core](https://github.com/STMicroelectronics/cmsis_core) `v5.9.0_20250520`, downloaded at configure time | Apache-2.0 |
 | Device header, `system_stm32g4xx.c`, `startup_stm32g431xx.s` | [STMicroelectronics/cmsis_device_g4](https://github.com/STMicroelectronics/cmsis_device_g4) `v1.2.6`, downloaded, used as they come | Apache-2.0 |
@@ -223,7 +271,7 @@ History: v0.2 measured 2287 cycles (13.5 µs) on the CubeIDE build at `-O0`, six
 | `mc_step` | 132 bytes |
 | `mc_clear_fault` | 0 bytes |
 
-And the engine ECU's (`portable/engine_ecu`, v0.4 Level 2; not in any firmware yet), from the same CI job (open-crank#51). The wheel's functions run in the capture interrupt, so their figure adds to the interrupted code's stack:
+And the engine ECU's (`portable/engine_ecu`, v0.4 Level 2, in `oc-stm32g4-ecu`), from the same CI job (open-crank#51). The wheel's functions run in the capture interrupt, so their figure adds to the interrupted code's stack:
 
 | Function | Context | Worst-case stack |
 |---|---|---|
@@ -235,6 +283,14 @@ And the engine ECU's (`portable/engine_ecu`, v0.4 Level 2; not in any firmware y
 | `ecu_handle_frame` | loop | 72 bytes |
 | `ecu_step` | loop | 80 bytes |
 | `ecu_width_ticks` | loop | 0 bytes |
+
+The ECU firmware's own interrupt handler, from the call graph of the firmware's build (Debug, `-O0`; `-fcallgraph-info=su` on `oc-stm32g4-ecu` and `portable/`, `tools/stack_budget.py --roots TIM2_IRQHandler`), as printed by the CI job `firmware` (open-crank#54):
+
+| Function | Context | Worst-case stack |
+|---|---|---|
+| `TIM2_IRQHandler` | interrupt | 232 bytes (`TIM2_IRQHandler` → `on_tooth` → `ecu_wheel_tooth` → `speed_update`) |
+
+On top of it comes the exception frame: 32 bytes, or 104 with the floating-point context (the main loop uses the FPU). TIM2's interrupt is the only one above SysTick's priority.
 
 `memcpy`, `memmove`, `memset` and `memcmp` are not counted. This is the controller's stack only: the demo's own code, the HAL and the interrupt handlers come on top, and the demo's build (CubeIDE, `-O0`) is not the build measured here. Other GCC versions give other figures (GCC 10.3.1 gives 132 bytes for `mc_step` too). `mc_step` grew from 68 to 76 bytes in v0.3.1 with the TSC1 counter and checksum, and to 132 bytes with the controller's own DM1 (a DM1 to encode on its stack), and `mc_handle_frame` from 96 to 152 bytes with the engine's DM1 (a decoded DM1 on its stack).
 

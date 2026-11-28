@@ -1,0 +1,9 @@
+# oc-l2-jitter 1; source=open-crank-ecu-check; rpm=750; seconds=30.0; warmup=2.0; width_us=520; bitstream_md5=6659c249a3a8c779c0f7bb9cac6e6fa5; commit=7dcdb0f205f4fa6649113612b6ac5b19c346e310
+quantity,declared,measured,unit,within
+injections,,1211,count,
+soi_err_p50_deg,,0.001251,deg,
+soi_err_p99_deg,0.1,0.003808,deg,yes
+soi_err_max_deg,0.5,0.004824,deg,yes
+width_err_max_us,,1.666667,us,
+width_err_max_rel,,0.003205,,
+width_err_over_0.3pct_us,1,0.106667,us,yes

@@ -1,0 +1,16 @@
+open-crank-ecu-check: 2400 rpm (crank_phase_inc 208499983) for 12.5 s, judged over [2.0, 12.0) s
+hard run ok: 12499 steps (12500 of 12500 computed), 0 underruns, 0 late, 2082 exchanges, 0 timeouts, 0 crc errors, 0 sequence errors, round trip p99 1349 us; 0 captures, 0 lost
+step 0 at monotonic 39431622479753 ns
+
+criteria (2400 rpm):
+  FAIL  injector 1: 0 injections in 10 s (expected 200.0 +-1), 0 in the whole run
+  FAIL  injector 2: 0 injections in 10 s (expected 200.0 +-1), 0 in the whole run
+  FAIL  injector 3: 0 injections in 10 s (expected 200.0 +-1), 0 in the whole run
+  FAIL  injector 4: 0 injections in 10 s (expected 200.0 +-1), 0 in the whole run
+  FAIL  injector 5: 0 injections in 10 s (expected 200.0 +-1), 0 in the whole run
+  FAIL  injector 6: 0 injections in 10 s (expected 200.0 +-1), 0 in the whole run
+  FAIL  start of injection vs TDC - 10 deg: 0 injections, 0 off by more than 0.5 deg; |error| p50 0.0000, p99 0.0000 (<= 0.1), max 0.0000 deg; mean error +0.0000 deg
+  FAIL  width vs 521.404 us +-1: 0 outside; min 0.000, mean 0.000, max 0.000 us
+  ok    captures lost: 0 (bridge overflow 0, queue 0); before step 0 or on an unknown channel: 0
+
+open-crank-ecu-check: FAILED

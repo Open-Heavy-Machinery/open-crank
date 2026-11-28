@@ -1,0 +1,7 @@
+commit=7dcdb0f205f4fa6649113612b6ac5b19c346e310
+bitstream_md5=6659c249a3a8c779c0f7bb9cac6e6fa5
+tang_usb=/sys/devices/pci0000:00/0000:00:14.0/usb3/3-2/3-2:1.1/ttyUSB1
+host=david-asus
+speeds=200,750,1500,2400
+seconds=30.0
+warmup=2.0

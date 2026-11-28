@@ -1,0 +1,16 @@
+open-crank-ecu-check: 200 rpm (crank_phase_inc 17374999) for 32.5 s, judged over [2.0, 32.0) s
+hard run ok: 32499 steps (32500 of 32500 computed), 0 underruns, 0 late, 5415 exchanges, 0 timeouts, 0 crc errors, 0 sequence errors, round trip p99 1320 us; 318 captures, 0 lost
+step 0 at monotonic 39216543546162 ns
+
+criteria (200 rpm):
+  ok    injector 1: 50 injections in 30 s (expected 50.0 +-1), 53 in the whole run
+  ok    injector 2: 50 injections in 30 s (expected 50.0 +-1), 53 in the whole run
+  ok    injector 3: 50 injections in 30 s (expected 50.0 +-1), 53 in the whole run
+  ok    injector 4: 50 injections in 30 s (expected 50.0 +-1), 53 in the whole run
+  ok    injector 5: 50 injections in 30 s (expected 50.0 +-1), 53 in the whole run
+  ok    injector 6: 50 injections in 30 s (expected 50.0 +-1), 53 in the whole run
+  ok    start of injection vs TDC - 10 deg: 318 injections, 0 off by more than 0.5 deg; |error| p50 0.0007, p99 0.0030 (<= 0.1), max 0.0035 deg; mean error +0.0003 deg
+  ok    width vs 521.404 us +-1: 0 outside; min 521.111, mean 521.352, max 521.630 us
+  ok    captures lost: 0 (bridge overflow 0, queue 0); before step 0 or on an unknown channel: 0
+
+open-crank-ecu-check: every criterion met

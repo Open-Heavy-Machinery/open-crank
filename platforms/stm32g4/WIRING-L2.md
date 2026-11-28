@@ -8,7 +8,7 @@ The CAN bus stays wired as in [README.md](README.md#hardware). The pins below do
 - The pin map is decided.
 - First wiring: crank, cam, the six injectors and ground (column "First wiring"). On the maintainer's bench they are wired and were checked wire by wire on 2026-11-27, all eight lines right, with the continuity check described [below](#checking-the-harness).
 - Analog 1 and 2 are wired on the maintainer's bench, with one MCP6022 (2026-11-28), but no check has measured them yet. Analog 3 and 4 are *(planned)*. Their pins and filter are fixed here.
-- The reference engine-ECU firmware that uses these pins is *(planned)*.
+- The reference engine-ECU firmware uses these pins: `oc-stm32g4-ecu` ([README.md](README.md#the-engine-ecu-level-2)). It does not read the analog channels yet *(planned)*.
 
 ## Diagrams
 

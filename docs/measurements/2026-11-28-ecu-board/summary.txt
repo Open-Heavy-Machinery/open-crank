@@ -1,0 +1,11 @@
+ok    injections 200 rpm: 300 rows, 0 not FULL; ECU reads 200.5 rpm (median); during the window 299 injections fired, 0 sync losses, 0 missed, 0 refused, 0 overruns
+ok    injections 750 rpm: 299 rows, 0 not FULL; ECU reads 752.0 rpm (median); during the window 1120 injections fired, 0 sync losses, 0 missed, 0 refused, 0 overruns
+ok    injections 1500 rpm: 299 rows, 0 not FULL; ECU reads 1503.9 rpm (median); during the window 2241 injections fired, 0 sync losses, 0 missed, 0 refused, 0 overruns
+ok    injections 2400 rpm: 299 rows, 0 not FULL; ECU reads 2406.3 rpm (median); during the window 3585 injections fired, 0 sync losses, 0 missed, 0 refused, 0 overruns
+ok    EEC1 200 rpm: 1538 frames, period mean 10.0265 ms, max 10.32 ms; speed / rpm over 947 frames: min 1.00250, max 1.00313 (want 1.0027 +- 0.002), 0 outside; hard run exit 1
+ok    EEC1 750 rpm: 1538 frames, period mean 10.0269 ms, max 10.29 ms; speed / rpm over 947 frames: min 1.00233, max 1.00300 (want 1.0027 +- 0.002), 0 outside; hard run exit 1
+ok    EEC1 1500 rpm: 1538 frames, period mean 10.0271 ms, max 10.33 ms; speed / rpm over 947 frames: min 1.00233, max 1.00317 (want 1.0027 +- 0.002), 0 outside; hard run exit 1
+ok    EEC1 2400 rpm: 1539 frames, period mean 10.0269 ms, max 10.37 ms; speed / rpm over 947 frames: min 1.00219, max 1.00318 (want 1.0027 +- 0.002), 0 outside; hard run exit 1
+worst cycles seen on USART2 (fixed-fuel build): tooth interrupt 3555 (20.9 us), ecu_step 5518 (32.5 us)
+ecucheck: every check ok
+the NUCLEO now runs oc-stm32g4-ecu

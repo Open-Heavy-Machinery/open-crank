@@ -1,0 +1,16 @@
+open-crank-ecu-check: 200 rpm (crank_phase_inc 17374999) for 12.5 s, judged over [2.0, 12.0) s
+hard run ok: 12499 steps (12500 of 12500 computed), 0 underruns, 0 late, 2082 exchanges, 0 timeouts, 0 crc errors, 0 sequence errors, round trip p99 1305 us; 117 captures, 0 lost
+step 0 at monotonic 39374245657797 ns
+
+criteria (200 rpm):
+  ok    injector 1: 17 injections in 10 s (expected 16.7 +-1), 19 in the whole run
+  ok    injector 2: 17 injections in 10 s (expected 16.7 +-1), 20 in the whole run
+  ok    injector 3: 16 injections in 10 s (expected 16.7 +-1), 20 in the whole run
+  ok    injector 4: 17 injections in 10 s (expected 16.7 +-1), 19 in the whole run
+  ok    injector 5: 16 injections in 10 s (expected 16.7 +-1), 19 in the whole run
+  ok    injector 6: 17 injections in 10 s (expected 16.7 +-1), 20 in the whole run
+  ok    start of injection vs TDC - 10 deg: 117 injections, 0 off by more than 0.5 deg; |error| p50 0.0009, p99 0.0036 (<= 0.1), max 0.0041 deg; mean error +0.0004 deg
+  FAIL  width vs 521.404 us +-1: 117 outside; min 681.556, mean 681.808, max 682.111 us
+  ok    captures lost: 0 (bridge overflow 0, queue 0); before step 0 or on an unknown channel: 0
+
+open-crank-ecu-check: FAILED
