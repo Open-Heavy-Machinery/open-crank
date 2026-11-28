@@ -22,7 +22,11 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     add_executable(open-crank-accept linux-socketcan/accept_main.c linux-socketcan/frames_sock.c)
     target_link_libraries(open-crank-accept PRIVATE opencrank_sim opencrank_accept opentick::host)
 
+    # Level 2 on the board without a plant: where the ECU's injections land at a constant speed.
+    add_executable(open-crank-ecu-check linux-socketcan/ecu_check_main.c)
+    target_link_libraries(open-crank-ecu-check PRIVATE opencrank_sim opentick::host m)
+
     # Executables land next to each other in the top of the build tree.
-    set_target_properties(open-crank-sil open-crank-mc open-crank-accept PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
+    set_target_properties(open-crank-sil open-crank-mc open-crank-accept open-crank-ecu-check PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 endif()
 set_target_properties(open-crank-run open-crank-l2-run open-crank-accept-loop PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})

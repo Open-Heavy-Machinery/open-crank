@@ -3,7 +3,7 @@
 """Worst-case stack of the controller's public functions, from GCC's call graph.
 
 Usage:
-  tools/stack_budget.py [--limit BYTES] CI_FILE [CI_FILE ...]
+  tools/stack_budget.py [--limit BYTES] [--roots F1,F2,...] CI_FILE [CI_FILE ...]
 
 CI_FILE are the .ci files GCC writes with -fcallgraph-info=su (one per
 object, VCG format). A node whose label ends in "N bytes (qualifier)" is a
@@ -14,7 +14,8 @@ files are merged by function name.
 Roots are the public functions of portable/machine_ctrl (mc_init,
 mc_init_after_watchdog, mc_handle_frame, mc_step and mc_clear_fault) and of
 portable/engine_ecu (the wheel's ecu_wheel_*, run in the capture interrupt,
-and the governor's ecu_init, ecu_handle_frame, ecu_step and ecu_width_ticks).
+and the governor's ecu_init, ecu_handle_frame, ecu_step and ecu_width_ticks),
+unless --roots names others (the ECU firmware's TIM2_IRQHandler, in CI).
 The worst-case stack of a
 function is its own stack plus the largest worst-case stack among the
 functions it calls. memcpy, memmove, memset and memcmp count as 0 bytes and
@@ -80,10 +81,18 @@ def main(argv):
                     "from -fcallgraph-info=su .ci files.")
     parser.add_argument("--limit", type=int, default=1024, metavar="BYTES",
                         help="maximum worst-case stack per root (default 1024)")
+    parser.add_argument("--roots", metavar="F1,F2,...",
+                        help="these functions instead of the controller's and the ECU's public ones "
+                             "(for example a firmware's interrupt handler)")
     parser.add_argument("ci_files", metavar="CI_FILE", nargs="+")
     args = parser.parse_args(argv)
     if args.limit <= 0:
         parser.error("--limit must be positive")
+    roots = ROOTS
+    if args.roots is not None:
+        roots = tuple(r for r in args.roots.split(",") if r)
+        if not roots:
+            parser.error("--roots names no function")
 
     try:
         defined, calls = read_graph(args.ci_files)
@@ -142,14 +151,14 @@ def main(argv):
         return result
 
     results = []
-    for root in ROOTS:
+    for root in roots:
         if root not in defined:
             errors.append("root '%s' is defined in no .ci file" % root)
             continue
         r = worst(root, [])
         results.append((root, r))
 
-    width = max(len(r) for r in ROOTS)
+    width = max(len(r) for r in roots)
     for root, r in results:
         if r is None:
             continue

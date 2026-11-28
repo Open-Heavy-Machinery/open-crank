@@ -7,7 +7,8 @@
 # or simply tools/board/flash.sh, which also programs the board. Outputs:
 # oc-stm32g4-demo.elf/.bin/.map (the reference controller) and
 # oc-stm32g4-echo.elf/.bin/.map (the round-trip echo) and
-# oc-stm32g4-wirecheck.elf/.bin/.map (the Level 2 harness check).
+# oc-stm32g4-wirecheck.elf/.bin/.map (the Level 2 harness check) and
+# oc-stm32g4-ecu.elf/.bin/.map (the Level 2 reference engine ECU).
 #
 # ST's CMSIS and HAL are downloaded at configure time from STMicroelectronics'
 # repositories, pinned by tag and SHA-256, and never copied into this
@@ -112,3 +113,15 @@ target_compile_definitions(oc-stm32g4-demo-hangtest PRIVATE OC_WDG_HANG_TEST=1)
 oc_firmware(oc-stm32g4-echo ${CMAKE_CURRENT_SOURCE_DIR}/echo/main.c)
 # Harness check for the Level 2 wiring (WIRING-L2.md, tools/board/wirecheck.py).
 oc_firmware(oc-stm32g4-wirecheck ${CMAKE_CURRENT_SOURCE_DIR}/wirecheck/main.c)
+# The Level 2 reference engine ECU (ecu/main.c, portable/engine_ecu).
+oc_firmware(oc-stm32g4-ecu ${CMAKE_CURRENT_SOURCE_DIR}/ecu/main.c opencrank_portable)
+# Test build only: the ECU with the injector width fixed at 20 % fuel instead of
+# the governor's, for the injection check at a constant bridge speed
+# (tools/board/ecucheck.py). Never the reference.
+oc_firmware(oc-stm32g4-ecu-fixedfuel ${CMAKE_CURRENT_SOURCE_DIR}/ecu/main.c opencrank_portable)
+target_compile_definitions(oc-stm32g4-ecu-fixedfuel PRIVATE OC_ECU_FIXED_FUEL=1)
+# Call graphs with stack sizes (no change to the code generated), so that CI can
+# give the worst-case stack of the ECU's interrupt handler, TIM2_IRQHandler,
+# through portable/engine_ecu (tools/stack_budget.py --roots).
+target_compile_options(oc-stm32g4-ecu PRIVATE -fstack-usage -fcallgraph-info=su)
+target_compile_options(opencrank_portable PRIVATE -fstack-usage -fcallgraph-info=su)
