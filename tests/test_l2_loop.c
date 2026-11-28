@@ -190,7 +190,13 @@ static void test_deterministic(void) {
     run_until(&L, 12000U);
     run_until(&M, 12000U);
     CHECK(memcmp(&L.plant, &M.plant, sizeof(L.plant)) == 0);
-    CHECK(memcmp(&L.wheel, &M.wheel, sizeof(L.wheel)) == 0);
+    /* field by field: EcuWheel has padding, which a struct assignment need not copy */
+    const EcuWheelStatus *a = &L.wheel.st, *b = &M.wheel.st;
+    CHECK(a->sync == b->sync && a->rpm == b->rpm && a->tooth == b->tooth && a->rev == b->rev);
+    CHECK(a->teeth == b->teeth && a->cam_edges == b->cam_edges && a->gaps == b->gaps);
+    CHECK(a->sync_losses == b->sync_losses && a->stops == b->stops && a->arms == b->arms);
+    CHECK(L.wheel.last_t == M.wheel.last_t && L.wheel.last_dt == M.wheel.last_dt && L.wheel.pos == M.wheel.pos);
+    CHECK(L.ecu.fuel_pct == M.ecu.fuel_pct && L.ecu.integrator_pct == M.ecu.integrator_pct);
     CHECK(L.plant.plant.rpm == M.plant.plant.rpm);
 }
 
