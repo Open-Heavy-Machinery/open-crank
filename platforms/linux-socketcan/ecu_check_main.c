@@ -168,14 +168,15 @@ int main(int argc, char **argv) {
         }
         oom = oom || !drain();
     }
+    const uint32_t computed = otk_hard_loop_computed(&g_hard);
     const OtkHardResult result = otk_hard_loop_stop(&g_hard);
     oom = oom || !drain();
     const uint64_t t_start = g_hard.aim.t_start;
     const OtkHardStats *st = &g_hard.stats;
     const uint32_t lost = st->capture_lost + g_hard.cap_dropped;
-    printf("hard run %s: %u steps, %u underruns, %u late, %llu exchanges, %u timeouts, %u crc errors, "
-           "%u sequence errors, round trip p99 %.0f us; %zu captures, %u lost\n",
-           otk_hard_result_name(result), st->steps, st->underruns, st->late, (unsigned long long)st->exchanges,
+    printf("hard run %s: %u steps (%u of %u computed), %u underruns, %u late, %llu exchanges, %u timeouts, "
+           "%u crc errors, %u sequence errors, round trip p99 %.0f us; %zu captures, %u lost\n",
+           otk_hard_result_name(result), st->steps, computed, steps, st->underruns, st->late, (unsigned long long)st->exchanges,
            st->timeouts, st->crc_errors, st->seq_errors, (double)otk_hard_loop_rtt_pct(&g_hard, 99.0) / 1e3, g_n,
            lost);
     /* for tools/board/ecucheck.py: when step 0 began on the host's CLOCK_MONOTONIC */

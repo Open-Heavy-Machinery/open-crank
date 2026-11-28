@@ -115,7 +115,7 @@ def injections(a, tang, reader, rpm, out, commit, bmd5):
                "--bitstream-md5", bmd5, "--commit", commit]
         r = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
         t1 = time.monotonic()
-        with open(os.path.join(out, f"check_{tag}.txt"), "w") as f:
+        with open(os.path.join(out, f"check_{tag}.txt" if attempt == 1 else f"check_{tag}.attempt2.txt"), "w") as f:
             f.write(r.stdout)
         if r.returncode != 3:
             break
@@ -128,6 +128,8 @@ def injections(a, tang, reader, rpm, out, commit, bmd5):
     s0 = int(m.group(1)) / 1e9
     rows = rows_between(reader, s0 + WARMUP_S, s0 + WARMUP_S + a.seconds)
     v_ok, v_text, worst = ecu_view(rows)
+    if attempt == 2:
+        v_text += "; the first hard run was not ok, this is the retry (check_" + tag + ".txt has the first)"
     print(f"  {'ok  ' if v_ok else 'FAIL'}  USART2: {v_text}", flush=True)
     return r.returncode == 0 and v_ok, r.returncode, v_text, worst, t1 - t0
 

@@ -109,7 +109,7 @@ tools/board/ecucheck.py --check build/open-crank-ecu-check \
    - every width 520 µs × 1.0027 ± 1 µs (the NUCLEO's HSI runs 0.27 % slow, so its pulses come out long; see [Clock](#stm32cubeide-project));
    - no capture lost.
 
-   The script adds the ECU's own view, from USART2 rows inside the judged window only (the ST-LINK keeps what was printed while the port was closed): sync FULL in every row, and no sync loss, missed or refused arming, or TIM2 overrun. A hard run that ends aborted is retried once.
+   The script adds the ECU's own view, from USART2 rows inside the judged window only (the ST-LINK keeps what was printed while the port was closed): sync FULL in every row, and no sync loss, missed or refused arming, or TIM2 overrun. A hard run that ends aborted is retried once, and the summary says so; both outputs are kept (`check_<rpm>rpm.txt`, `check_<rpm>rpm.attempt2.txt`).
 2. **EEC1**, with the reference build `oc-stm32g4-ecu`: at each speed, the ECU's EEC1 frames on the CAN interface (`candump`, kernel times) must come every 10 ms (mean within 1 %, no gap over 20 ms) with an engine speed of rpm × 1.0027 ± 0.2 % (the HSI again).
 
 It writes, per speed, the captures (`captures_<rpm>rpm.csv`, one row per injection with its angle and error), the jitter budget (`jitter_<rpm>rpm.csv`, the format of `open-crank-l2-run --jitter`), open-tick's budget of the hard run, the check's output and the EEC1 log, plus the NUCLEO's lines and a `summary.txt`. Exit 0 every check ok, 1 a check failed, 2 the bench is not ready. **The NUCLEO is left running `oc-stm32g4-ecu`**, the reference build (`--no-eec1` leaves the fixed-fuel build: program `ecu` afterwards).
