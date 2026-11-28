@@ -141,14 +141,16 @@ def main():
             run([os.path.join(HERE, "reset.sh")], "reset the NUCLEO: the ECU starts from rest")
             time.sleep(1.0)
             print(f"== {name} (attempt {attempt})", flush=True)
-            o = os.path.join(a.out, tag)
-            cmd = [a.hil, os.path.join(l2, name + ".csv"), "--dev", tang, "--can", a.iface, "--quiet",
-                   "--fidelity", os.path.join(ROOT, "sim/l2/fidelity.csv"), "--bridge-fidelity", a.bridge_fidelity,
+            o = os.path.join(os.path.abspath(a.out), tag)
+            # paths relative to the repository (run from its root): no home directory in the outputs
+            cmd = [os.path.abspath(a.hil), os.path.join("scenarios", "l2", name + ".csv"), "--dev", tang, "--can",
+                   a.iface, "--quiet", "--fidelity", os.path.join("sim", "l2", "fidelity.csv"),
+                   "--bridge-fidelity", os.path.relpath(os.path.abspath(a.bridge_fidelity), ROOT),
                    "--trace", o + ".trace.csv", "--frames", o + ".frames.csv", "--verdicts", o + ".verdicts.csv",
                    "--jitter", o + ".jitter.csv", "--budget", o + ".budget.csv",
                    "--bitstream-md5", bmd5, "--commit", commit]
             t0 = time.monotonic()
-            r = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+            r = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, cwd=ROOT)
             t1 = time.monotonic()
             time.sleep(0.3)
             with open(o + ".txt", "w") as f:
