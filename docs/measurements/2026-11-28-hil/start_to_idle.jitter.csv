@@ -1,0 +1,9 @@
+# oc-l2-jitter 1; source=open-crank-hil; scenario=scenarios/l2/start_to_idle.csv; capture_lag_max_steps=29; bitstream_md5=6659c249a3a8c779c0f7bb9cac6e6fa5; commit=2f636ef19b21e72f394240c2528ff460e338cb30
+quantity,declared,measured,unit,within
+injections,,357,count,
+soi_err_p50_deg,,0.001404,deg,
+soi_err_p99_deg,0.1,0.011305,deg,yes
+soi_err_max_deg,0.5,0.012544,deg,yes
+width_err_max_us,,,us,
+width_err_max_rel,,,,
+width_err_over_0.3pct_us,1,,us,

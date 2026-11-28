@@ -1,0 +1,7 @@
+open-crank-hil: fidelity: every signal is within what the bridge guarantees (lead 16000000 ns, DUT-to-plant delay 31200000 ns: H = 16 steps of 1 ms)
+open-crank-hil: hard run ok: 14999 bridge steps, 0 underruns, 0 late, 0 timeouts, 0 captures lost; round trip p99 1952 us
+open-crank-hil: 15.0 s, 1237 injections, 0 misplaced, 13 misfires, first injection after 2.64 rev, capture lag max 29 steps
+PASS  C1  every injection in its own cylinder's window (exit criterion 2: synchronises)  [0.00 s .. 15.00 s]
+PASS  C2  first injection within 3.5 revolutions from rest: FULL sync within three  [3.50 s .. 15.00 s]  reaction: 961 ms after start=1
+PASS  C3  no misfire once running  [4.50 s .. 15.00 s]  reaction: 2991 ms after start=1
+PASS  H1  the plant holds the requested 2100 rpm within 0.5 % (exit criterion 2)  [6.00 s .. 15.00 s]

@@ -1,0 +1,10 @@
+id,verdict,status,from_s,until_s,event,event_s,reaction,reaction_ms,fail_s,text
+C1,PASS,ok,0.000000,25.000000,,,,,,every injection in its own cylinder's window (exit criterion 2: synchronises)
+C2,PASS,ok,3.500000,25.000000,start=1,0.500000,measured,961,,first injection within 3.5 revolutions from rest: FULL sync within three
+C3a,PASS,ok,4.500000,18.000000,start=1,0.500000,measured,2991,,no misfire once running, until the load goes
+C3b,PASS,ok,20.000000,25.000000,hoist_demand_pct=0,18.000000,measured,1463,,no misfire once back from the release (the governor's fuel cut on the overshoot is not a misfire and the plant cannot tell them apart; misfires_1s counts the last second)
+H1,PASS,ok,6.000000,7.990000,,,,,,1500 rpm within 0.5 % before the load step
+D1,PASS,ok,8.000000,18.000000,,,,,,the dip under the load step stays within the in-memory loop's 244 rpm plus 20 % (exit criterion 2)
+R1,PASS,ok,11.000000,18.000000,hoist_demand_pct=85,8.000000,measured,1695,,back within 0.5 % of 1500 rpm within 3 s of the load step (exit criterion 2)
+D2,PASS,ok,18.000000,25.000000,,,,,,the overshoot when the load goes stays within the loop's 304 rpm plus 20 %
+R2,PASS,ok,21.000000,25.000000,hoist_demand_pct=0,18.000000,measured,988,,back within 0.5 % of 1500 rpm within 3 s of releasing the load

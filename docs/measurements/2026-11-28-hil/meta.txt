@@ -1,0 +1,7 @@
+commit=2f636ef19b21e72f394240c2528ff460e338cb30
+bitstream_md5=6659c249a3a8c779c0f7bb9cac6e6fa5
+bridge_fidelity_md5=cab32592b9a07197466fc2b4134a6aa6
+tang_usb=/sys/devices/pci0000:00/0000:00:14.0/usb3/3-2/3-2:1.1/ttyUSB1
+host=david-asus
+iface=can0
+scenarios=hoist_step,hold_1500,hold_2100,hold_750,overspeed,start_to_idle

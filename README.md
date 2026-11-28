@@ -4,7 +4,7 @@
 
 Part of [Open Heavy Machinery](https://open-heavy-machinery.github.io) ([open-crank's page](https://open-heavy-machinery.github.io/open-crank/)): open tools to practise and develop embedded control for machines you cannot keep at home, starting with heavy machinery.
 
-**Status: pre-alpha. v0.3.3 is done and on `main`: an acceptance suite of fifteen scenarios grades any controller by the CAN frames it sends, including transport faults and the engine's diagnostics, and every safety requirement ([docs/safety.md](docs/safety.md)) is traced to its tests. Every run can write its frames to a file, and the bus contract is a DBC ([open-crank.dbc](open-crank.dbc)). The controller reports its own faults as DM1, and the wiring for Level 2 (a Tang Nano 20K driving the board's crank and cam and capturing its injectors) is decided and checked wire by wire ([WIRING-L2.md](platforms/stm32g4/WIRING-L2.md)). The reference controller passes it on `vcan` and on an STM32G431 board with a watchdog, built, programmed and tested from the PC with one command ([Run the demo on a real board](#run-the-demo-on-a-real-board)).** Anything marked *(planned)* does not exist yet. The honest list of what works, what is verified and what is not is in [ROADMAP.md](ROADMAP.md).
+**Status: pre-alpha. v0.4.0 is done and on `main`: Level 2. Your firmware can now be the engine's own ECU: it reads a 60−2 crank wheel and a cam that open-tick's Tang Nano 20K generates from the simulated engine's angle, and drives six injectors whose pulses are captured and burnt, cylinder by cylinder. The reference engine ECU synchronises and holds a requested speed against the plant on a NUCLEO-G431KB in a closed loop, and every run measures where each injection landed ([Level 2](#level-2-your-firmware-as-the-engine-ecu)). Level 1 is as in v0.3.3: an acceptance suite of fifteen scenarios grades any machine controller by the CAN frames it sends, including transport faults and the engine's diagnostics, every safety requirement ([docs/safety.md](docs/safety.md)) is traced to its tests, and the reference controller passes it on `vcan` and on the board ([Run the demo on a real board](#run-the-demo-on-a-real-board)).** Anything marked *(planned)* does not exist yet. The honest list of what works, what is verified and what is not is in [ROADMAP.md](ROADMAP.md).
 
 `open-crank` is a simulated heavy-duty diesel engine that behaves enough like the real one to develop, test and break control software against it, on a laptop, in CI, on a real microcontroller board, and later on an FPGA rig. It speaks SAE J1939 over CAN, the same way a real engine does.
 
@@ -21,9 +21,9 @@ The plant can sit in front of two different devices under test (DUT). This disti
 | | **Level 1: machine controller** | **Level 2: engine ECU** |
 |---|---|---|
 | Your firmware is... | the supervisory controller of the machine (crane, vessel, generator set). It *asks* the engine for speed, *reads* its status and drives the machine's loads | the controller *inside* the engine. It reads sensors and commands fuel |
-| It talks to the plant via | CAN: J1939 to the engine (TSC1 in, EEC1 / ET1 / EFL-P1 out) plus two documented bench messages (operator controls in, pump command out) | crank and cam signals, analog and digital sensors, actuator outputs *(planned)* |
+| It talks to the plant via | CAN: J1939 to the engine (TSC1 in, EEC1 / ET1 / EFL-P1 out) plus two documented bench messages (operator controls in, pump command out) | pins: a 60−2 crank and a cam in, six injector pulses out; J1939 to the machine controller (TSC1 in, EEC1 out). Analog sensors *(planned)* |
 | Typical real-world analogue | crane controller, EMS, PMS | engine ECU |
-| Needs | a CAN bus (`vcan` is enough), or nothing at all for headless runs | microsecond-accurate waveforms: open-tick's Tang Nano 20K bridge *(planned)* |
+| Needs | a CAN bus (`vcan` is enough), or nothing at all for headless runs | nothing, in memory; on the pins, open-tick's Tang Nano 20K bridge and a CAN adapter |
 | Milestones | **v0.1–v0.3, v0.5–v0.7, Track R** | **v0.4** |
 
 EMS and PMS are supervisory controllers, so Level 1 is directly useful for them and is much cheaper to build first.
@@ -31,6 +31,7 @@ EMS and PMS are supervisory controllers, so Level 1 is directly useful for them 
 ## What this is
 
 - A **plant model** of a heavy-duty diesel engine: mean-value torque production with turbocharger lag, crankshaft dynamics, a starter, and a load-sensing hydraulic pump load. Detailed thermal, air-path and aftertreatment models are later work.
+- A **Level 2 plant** (v0.4): the same engine with a crank angle over the 720° cycle, stepped every 1 ms, fuelled cylinder by cylinder by the injector pulses your ECU sends; an injection outside its cylinder's window burns nothing. And a **reference engine ECU** in plain C (`portable/engine_ecu`) that synchronises on the 60−2 wheel and the cam and governs speed, running on a NUCLEO-G431KB with its injections in hardware timers.
 - A **simulated engine ECU** (starter control, idle and speed governor, limits, overspeed protection, command timeouts), so the plant stays pure physics and your controller faces a realistic engine-side peer.
 - A **J1939 peer**: the simulated engine publishes and consumes a small, documented set of PGNs. The full bus contract is in [docs/bus-interface.md](docs/bus-interface.md), and in machine-readable form in [open-crank.dbc](open-crank.dbc), which CI checks against the encoders. With `--frames`, the runners write every frame of a run with its logical and its bus time ([docs/acceptance.md](docs/acceptance.md#frame-logs---frames)).
 - A **portable reference controller** in plain C, written so the same source can run on the PC, in an emulator and on a real board (board: done in v0.2, see [platforms/stm32g4](platforms/stm32g4/README.md); emulator: *planned*). CI builds it for a Cortex-M4F on every push.
@@ -176,6 +177,37 @@ tools/board/bench.sh      # about 5 minutes
 3. It ends with `report.md`: your setup, the round trip, every verdict and every reaction time next to the reference bench's.
 
 **BENCH OK** means your bench behaves like the reference one, and is ready for your own firmware. The traces it leaves can be opened in [open-rig](https://github.com/Open-Heavy-Machinery/open-rig). Details are in [platforms/stm32g4/README.md](platforms/stm32g4/README.md#the-bench-check).
+
+## Level 2: your firmware as the engine ECU
+
+At Level 2 the device under test is the controller *inside* the engine. It reads the crankshaft's 60−2 tooth wheel and the camshaft's pulse, works out where each piston is, and fires each injector at the right angle for the right time; the machine's controller asks it for a speed over J1939 (TSC1) and it reports back (EEC1). open-crank simulates the engine around it: the crank turns at the speed the plant computes, and every injection your ECU makes is captured, placed at the crank angle where it began, and burnt in its cylinder if it landed in that cylinder's window. Fire at the wrong angle or on the wrong cylinder and the engine does not run.
+
+**In memory, no hardware.** The reference ECU's logic against the plant, through a model of the bridge, in a second:
+
+```sh
+./build/open-crank-l2-run scenarios/l2/hold_1500.csv
+./build/open-crank-l2-run scenarios/l2/hoist_step.csv --trace hoist_l2.csv --jitter hoist_l2.jitter.csv
+```
+
+Seven scenarios in `scenarios/l2/`, each with its criteria: start to idle, hold 750, 1500 and 2100 rpm, a 570 Nm load step, a lost crank tooth, an overspeed. `--jitter` writes where the injections landed against where they were commanded ([docs/acceptance.md](docs/acceptance.md#level-2-the-engine-ecu-v04)).
+
+**On the pins, with a board.** You need, besides the Level 1 bench ([Run the demo on a real board](#run-the-demo-on-a-real-board)): a Sipeed Tang Nano 20K running [open-tick](https://github.com/Open-Heavy-Machinery/open-tick)'s bridge, wired to the NUCLEO-G431KB as in [WIRING-L2.md](platforms/stm32g4/WIRING-L2.md) (crank, cam, six injectors, ground: nine jumper wires with a series resistor each).
+
+```sh
+eval "$(external/open-tick/tools/fpga_toolchain.sh)"     # the FPGA tools, into ~/.cache, no sudo
+external/open-tick/gateware/tang_nano_20k/build.sh     # the bridge's bitstream, into external/open-tick/build-gateware
+cmake --build build --target otk-hard-probe open-crank-ecu-check open-crank-hil
+B=external/open-tick/build-gateware/bridge.fs
+tools/board/wirecheck.py --probe build/open-tick/otk-hard-probe --bitstream $B          # every wire, about 15 s
+tools/board/ecucheck.py --check build/open-crank-ecu-check --bitstream $B               # the ECU at fixed speeds, about 4 min
+tools/board/hilrun.py --hil build/open-crank-hil --bitstream $B                         # the closed loop, about 4 min
+```
+
+1. `wirecheck.py` checks each wire on its own: a crossed or open one is named.
+2. `ecucheck.py` programs the reference ECU, turns the crank at 200, 750, 1500 and 2400 rpm, and checks where every injection lands (within 0.5° of 10° before its TDC), how wide it is, and the ECU's EEC1.
+3. `hilrun.py` runs every Level 2 scenario in a closed loop: the plant on the PC, one step per millisecond; the ECU on the board; TSC1 and EEC1 on `can0`. Each scenario's criteria are judged as in memory, and every run writes its trace, its frames, its verdicts, where its injections landed, and the link's own budget.
+
+On the reference bench (2026-11-28), every scenario passed every criterion, and the start of injection landed within 0.03° of its angle ([docs/measurements/2026-11-28-hil/](docs/measurements/2026-11-28-hil/)). To put your own ECU there, flash your firmware instead of `oc-stm32g4-ecu`, with the same pins and the same CAN bus, and run `hilrun.py --no-flash`. Details: [platforms/stm32g4/README.md](platforms/stm32g4/README.md#the-engine-ecu-level-2), [docs/acceptance.md](docs/acceptance.md#on-the-board-in-a-closed-loop).
 
 ## Checks
 

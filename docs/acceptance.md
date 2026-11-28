@@ -275,6 +275,24 @@ width_err_over_0.3pct_us,1,-0.052619,us,yes
 
 In memory the start of injection lands within 0.03° of its angle at every speed (the ECU extrapolates from its last tooth period; the timer ticks and the bridge's ticks add the rest), and every width is 0.27 % long, the HSI. On the board the same file comes from the bridge's captures (below).
 
+### On the board, in a closed loop
+
+`open-crank-hil` (`platforms/linux-socketcan/hil_main.c`) runs the same scenarios and criteria against a real engine ECU: the reference firmware `oc-stm32g4-ecu` on a NUCLEO-G431KB ([platforms/stm32g4/README.md](../platforms/stm32g4/README.md#the-engine-ecu-level-2)), wired to open-tick's Tang Nano 20K bridge ([WIRING-L2.md](../platforms/stm32g4/WIRING-L2.md)), with TSC1 and EEC1 on a CAN interface.
+
+- **The loop.** The machine side is the in-memory loop's own code with an external ECU (`oc_l2_loop_init_external()`): the plant, the pump, the controller and the operator panel, one step per 1 ms, through open-tick's hard loop (H = 16). Each step's crank speed goes to the bridge as its `crank_phase_inc`, so the bridge's crank and cam are the plant's angle; the bridge captures the six injector lines, and each capture fuels the plant by its own tick. The controller's TSC1 and DM1 go out at their step on the bridge's clock; the ECU's EEC1 comes back to the controller and to the oracle.
+- **The same criteria** as in memory, on the same observables; the jitter budget comes from the bridge's captures. Only the widths are not judged (the host does not know the width the ECU commanded): they are measured at constant speed by `tools/board/ecucheck.py`.
+- **The fidelity check** first (`--fidelity sim/l2/fidelity.csv --bridge-fidelity <open-tick>/gateware/tang_nano_20k/fidelity.csv`): crank up to 2400 Hz with 1 µs of jitter, cam 20 Hz, six captures at 20 a second with at most 40 ms from the DUT to the plant. A bridge that cannot guarantee them is refused before it is opened (exit 5).
+- **Outputs:** the trace, the frame log (`bus_clock=bridge`), the verdicts, the jitter budget and open-tick's budget of the hard run. Exit 0 pass, 1 a criterion failed, 2 an error, 3 the hard run was not ok, 5 refused by the fidelity check.
+
+`tools/board/hilrun.py` runs every scenario the board can play (all but `crank_tooth_lost`, a fault of the in-memory edge model): it programs the ECU, loads the bridge fresh and resets the NUCLEO before each scenario, keeps the ECU's USART2 rows next to each run, and retries once a hard run that was not ok.
+
+```sh
+eval "$(external/open-tick/tools/fpga_toolchain.sh)"   # openFPGALoader
+tools/board/hilrun.py --hil build/open-crank-hil --bitstream <open-tick>/build-gateware/bridge.fs --out hil-out
+```
+
+**On the reference bench** (2026-11-28, [measurements/2026-11-28-hil/](measurements/2026-11-28-hil/)): every scenario passed every criterion, 29 of 29. Every injection in its own window; the first one within 2.31–2.64 revolutions; the plant at 747.8–748.2, 1496.1–1496.7 and 2093.8–2096.6 rpm for 750, 1500 and 2100; `hoist_step`'s dip to 1267.9 rpm and overshoot to 1787.5 rpm; the start of injection within 0.0264° at p99 and 0.0301° at most. The captures reached the plant 29–30 ms after they began. Two of the eight hard runs were `degraded` (3 underruns each, every criterion still passed) and were retried: at 1 ms steps with H = 16, a sender that wakes about 1 ms late can cost a few steps.
+
 ## Link faults
 
 The four scenarios added in v0.3 inject transport faults with open-tick's links ([open-tick `docs/link-faults.md`](https://github.com/Open-Heavy-Machinery/open-tick/blob/main/docs/link-faults.md)). The simulated machine has two:

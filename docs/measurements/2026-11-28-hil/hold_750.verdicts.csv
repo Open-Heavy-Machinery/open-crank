@@ -1,0 +1,5 @@
+id,verdict,status,from_s,until_s,event,event_s,reaction,reaction_ms,fail_s,text
+C1,PASS,ok,0.000000,15.000000,,,,,,every injection in its own cylinder's window (exit criterion 2: synchronises)
+C2,PASS,ok,3.500000,15.000000,start=1,0.500000,measured,961,,first injection within 3.5 revolutions from rest: FULL sync within three
+C3,PASS,ok,4.500000,15.000000,start=1,0.500000,measured,2968,,no misfire once running
+H1,PASS,ok,6.000000,15.000000,,,,,,the plant holds the requested 750 rpm within 0.5 % (exit criterion 2)

@@ -14,7 +14,7 @@ Scope is deliberately narrow. Each milestone is small enough to finish and usefu
 | **v0.3** (done, released as `v0.3.1`) | Robustness on the board | 1 |
 | **v0.3.2** (done) | Frame logs and the bus dictionary | 1 |
 | **v0.3.3** (done) | The controller's DM1; the Level 2 harness | 1 |
-| **v0.4** | Level 2: your firmware as the engine ECU | 2 |
+| **v0.4** (done, `v0.4.0`) | Level 2: your firmware as the engine ECU | 2 |
 | **v0.5** | Two engines on one machine | 1 |
 | **v0.6** | Marine 2-stroke plant | 1 |
 | **v0.7** | Electrical plant and power management | 1 |
@@ -258,10 +258,17 @@ Controller behaviour and firmware are unchanged since v0.3.1: the traces, verdic
 
 The plant stays on a CPU; the signal generator provides timing and I/O.
 
+**Status:** done, released as `v0.4.0` (2026-11-28), on open-tick v0.4.0.
+- The Level 2 plant (`sim/l2/`): the `d936la6` plant at 1 ms with the bridge's own crank angle, fuel by cylinder from the captured pulses (#50).
+- The reference engine ECU's logic (`portable/engine_ecu/`, #51), in memory against the plant (`open-crank-l2-run`, seven scenarios, #52) and on the board (`oc-stm32g4-ecu`, its injections in hardware timers, checked at constant speed by `tools/board/ecucheck.py`, #54).
+- The closed loop on the board (`open-crank-hil`, `tools/board/hilrun.py`, #55): the plant on the host, the ECU on a NUCLEO-G431KB, open-tick's Tang Nano 20K in between, TSC1 and EEC1 on CAN.
+- The harness (`WIRING-L2.md`, its diagrams, `tools/board/wirecheck.py`, #45, #46, #49, #53).
+- Not in it: the analog sensors (two wired, unmeasured), and a tooth fault on the bridge.
+
 **Exit criteria**
 
-1. A jitter budget is stated and measured.
-2. A reference engine-ECU firmware achieves crank synchronisation and holds a requested speed.
+- [x] 1. A jitter budget is stated and measured. *Stated in the Level 2 design (start of injection p99 ≤ 0.1°, max ≤ 0.5°; widths within 0.3 % + 1 µs) and in [docs/acceptance.md](docs/acceptance.md#level-2-the-engine-ecu-v04); every Level 2 run writes it (`--jitter`). Measured on the board: at constant speed with a known width, start p99 ≤ 0.0066°, max 0.0084°, widths 0.26 % long, at most 0.18 µs beyond 0.3 % (budget 1 µs) ([docs/measurements/2026-11-28-ecu-board/](docs/measurements/2026-11-28-ecu-board/)); in the closed loop, start p99 ≤ 0.0264°, max 0.0301° ([docs/measurements/2026-11-28-hil/](docs/measurements/2026-11-28-hil/)). open-tick's budget of every hard run (round trip, clock mapping, CAN, the DUT-to-plant delay, 30.9 ms against 31.2) is written next to it.*
+- [x] 2. A reference engine-ECU firmware achieves crank synchronisation and holds a requested speed. *`oc-stm32g4-ecu` on the board in the closed loop, every criterion of the six scenarios it can play (29 of 29): every injection in its own cylinder's window, the first within 2.64 revolutions from rest, no misfire once running; 750, 1500 and 2100 rpm held within ±0.5 % (the plant 0.27 % low, the HSI); back within 3 s of `hoist_step`'s load step and release, the dip within 1207 rpm; the overspeed trip held until stop ([docs/measurements/2026-11-28-hil/](docs/measurements/2026-11-28-hil/)).*
 
 ---
 
