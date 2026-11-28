@@ -67,13 +67,18 @@ The build type defaults to Debug (`-O0 -g`), as CubeIDE's, which is how the exec
 
 ### The Level 2 harness check
 
-For v0.4's wiring to a Tang Nano 20K, `tools/board/wirecheck.py` checks each wire on its own. The NUCLEO runs `oc-stm32g4-wirecheck`: it counts the crank and cam edges it receives and reports them on its virtual COM port once a second, and every 100 ms it sends injector k a pulse of k × 100 µs. open-tick's `otk-hard-probe wires` turns a 60-2 crank on the bridge and captures the six injector lines.
+For v0.4's wiring to a Tang Nano 20K, `tools/board/wirecheck.py` checks each wire on its own. The NUCLEO runs `oc-stm32g4-wirecheck`: it counts the crank and cam edges it receives, sums the crank's tooth periods, and reports both on its virtual COM port once a second. open-tick's `otk-hard-probe wires` turns a 60-2 crank on the bridge and captures the six injector lines. Once the bridge is running, the script asks the NUCLEO, over the same virtual COM port, for a counted series of bursts (`bursts <hz> <n>`): in each, injector k goes high for k × 100 µs. Every channel must then capture exactly n pulses, so a single lost capture shows.
 
 ```sh
 eval "$(<open-tick>/tools/fpga_toolchain.sh)"     # openFPGALoader
 tools/board/wirecheck.py --probe <open-tick build>/otk-hard-probe \
-    --bitstream <open-tick>/build-gateware/bridge.fs [--lines crank,cam,inj1]
+    --bitstream <open-tick>/build-gateware/bridge.fs [--seconds 10] [--rpm 1500] \
+    [--inj-hz 10] [--lines crank,cam,inj1] [--out DIR]
 ```
+
+- `--inj-hz` sets the bursts a second (1–100, dividing 1000; default 10). The bursts start 3 s into the run and end 2 s before it, so `--seconds` must be over 5.
+- The crank line also gives the tooth period as TIM2 reads it, the gap excluded, over the seconds wholly inside the steady run: mean, standard deviation, max − min and the largest deviation from the mean, in ns of the NUCLEO's clock. That clock is the HSI ([Clock](#stm32cubeide-project): about −0.27 % against the host), so these numbers are the bridge's jitter plus the NUCLEO's own: an upper bound for the bridge.
+- `--out DIR` keeps the NUCLEO's lines (`nucleo.log`) and the probe's output (`probe.txt`).
 
 One line per wire, `ok` or `FAIL` with the reason: no pulse (open), the wrong width (crossed with the injector that width belongs to), or the wrong tooth count or speed. Exit 0 every checked line ok, 1 a line failed, 2 the bench is not ready. Program `demo` again afterwards for the bench check.
 
