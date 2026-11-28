@@ -5,6 +5,7 @@ set(OC_TESTS
     test_j1939
     test_machine_ctrl
     test_plant
+    test_plant_l2
     test_hydraulic_pump
     test_engine_ecu
     test_bench

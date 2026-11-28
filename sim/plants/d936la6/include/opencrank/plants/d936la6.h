@@ -11,6 +11,7 @@
 #define OPEN_CRANK_PLANTS_D936LA6_H
 
 #include <opencrank/engine_ecu.h>
+#include <opencrank/l2/plant_l2.h>
 #include <opencrank/plant.h>
 
 /** @brief Physical parameters of the d936la6 plant. */
@@ -18,5 +19,8 @@ extern const PlantParams PLANT_D936LA6;
 
 /** @brief Calibration of the simulated engine ECU for the d936la6 plant. */
 extern const EngineEcuParams ENGINE_ECU_D936LA6;
+
+/** @brief Level 2 parameters of the d936la6 plant: injector model and cylinder windows. */
+extern const OcL2Params L2_D936LA6;
 
 #endif /* OPEN_CRANK_PLANTS_D936LA6_H */
