@@ -16,10 +16,11 @@ This file documents every finding that `tools/check_misra.sh` still reports and 
 
 | Baseline pair (rule, file) | Count | Deviation |
 |---|---|---|
-| 8.7, `portable/j1939/src/j1939.c` | 7 | DEV-001 |
+| 8.7, `portable/j1939/src/j1939.c` | 5 | DEV-001 |
 | 8.7, `portable/j1939/src/oc_msgs.c` | 2 | DEV-001 |
 | 8.7, `portable/machine_ctrl/src/machine_ctrl.c` | 6 | DEV-001 |
-| 2.5, `portable/j1939/include/opencrank/j1939.h` | 3 | DEV-002 |
+| 8.7, `portable/engine_ecu/src/ecu.c` | 9 | DEV-001 |
+| 2.5, `portable/j1939/include/opencrank/j1939.h` | 1 | DEV-002 |
 | 2.5, `portable/j1939/include/opencrank/oc_msgs.h` | 1 | DEV-002 |
 | 15.5, `portable/j1939/src/j1939.c` | 4 | DEV-003 |
 | 15.5, `portable/j1939/src/oc_msgs.c` | 2 | DEV-003 |
@@ -32,28 +33,28 @@ All four rules are advisory.
 ## DEV-001: Public API functions called from outside the analysed code
 
 - **Rule:** MISRA C:2012 Rule 8.7 (Advisory): limiting external linkage to what is referenced from more than one translation unit.
-- **Scope:** the 15 functions declared in the public headers `portable/j1939/include/opencrank/j1939.h`, `oc_msgs.h` and `portable/machine_ctrl/include/opencrank/machine_ctrl.h` that cppcheck reports:
-  - `portable/j1939/src/j1939.c`: `j1939_id_priority`, `j1939_decode_tsc1`, `j1939_encode_eec1`, `j1939_encode_et1`, `j1939_decode_et1`, `j1939_encode_eflp1`, `j1939_decode_eflp1`
+- **Scope:** the 22 functions declared in the public headers `portable/j1939/include/opencrank/j1939.h`, `oc_msgs.h`, `portable/machine_ctrl/include/opencrank/machine_ctrl.h` and `portable/engine_ecu/include/opencrank/ecu.h` that cppcheck reports:
+  - `portable/j1939/src/j1939.c`: `j1939_id_priority`, `j1939_encode_et1`, `j1939_decode_et1`, `j1939_encode_eflp1`, `j1939_decode_eflp1`
   - `portable/j1939/src/oc_msgs.c`: `oc_encode_operator`, `oc_decode_pump_cmd`
   - `portable/machine_ctrl/src/machine_ctrl.c`: `mc_init`, `mc_handle_frame`, `mc_clear_fault`, `mc_step`, `mc_state_name`, `mc_fault_name`
-- **Justification:** `portable/` is a pair of libraries. Their purpose is to be linked with code that the check does not analyse: the simulator (`sim/runtime/src/bench.c`, `loop.c`, `trace.c`), the platforms (`platforms/host/run_main.c`, `platforms/linux-socketcan/mc_main.c`), the tests, and from v0.2 the board firmware and anyone's own firmware. cppcheck sees only `portable/`, so a function that the library itself does not call looks as if it had a single user. Giving these functions internal linkage would remove the API.
-- **Risk and mitigation:** the risk the rule addresses, an identifier visible more widely than needed, does not apply to an interface that exists to be visible. Each function has a prototype in a public header, is documented there, and is exercised by `tests/test_j1939.c` or `tests/test_machine_ctrl.c`. Functions that are not part of the API stay `static` (for example `clampf`, `override_rejected`, `enter_run`).
+  - `portable/engine_ecu/src/ecu.c` (since v0.4, the reference engine ECU; extended with the maintainer's approval, 2026-11-28): `ecu_wheel_tooth`, `ecu_wheel_cam`, `ecu_wheel_poll`, `ecu_wheel_set_width`, `ecu_wheel_status`, `ecu_init`, `ecu_handle_frame`, `ecu_step`, `ecu_width_ticks`
+  - `j1939_decode_tsc1` and `j1939_encode_eec1` left this list in v0.4: the engine ECU calls them.
+- **Justification:** `portable/` is a pair of libraries. Their purpose is to be linked with code that the check does not analyse: the simulator (`sim/runtime/src/bench.c`, `loop.c`, `trace.c`), the platforms (`platforms/host/run_main.c`, `platforms/linux-socketcan/mc_main.c`), the tests, from v0.2 the board firmware and anyone's own firmware, and from v0.4 the engine ECU's board firmware and the in-memory Level 2 loop *(planned)*. cppcheck sees only `portable/`, so a function that the library itself does not call looks as if it had a single user. Giving these functions internal linkage would remove the API.
+- **Risk and mitigation:** the risk the rule addresses, an identifier visible more widely than needed, does not apply to an interface that exists to be visible. Each function has a prototype in a public header, is documented there, and is exercised by `tests/test_j1939.c`, `tests/test_machine_ctrl.c` or `tests/test_ecu.c`. Functions that are not part of the API stay `static` (for example `clampf`, `override_rejected`, `enter_run`).
 - **Status:** approved by the maintainer.
 
 ## DEV-002: Public macros used outside the analysed code
 
 - **Rule:** MISRA C:2012 Rule 2.5 (Advisory): macro definitions that the analysed code does not use.
-- **Scope:** four macros in the public headers:
+- **Scope:** two macros in the public headers:
 
   | Macro | Header | Used by |
   |---|---|---|
   | `J1939_ADDR_NULL` | `j1939.h` | nobody yet; J1939-81 address claiming, open-crank v0.5 |
-  | `J1939_TORQUE_MODE_LOW_IDLE` | `j1939.h` | `sim/runtime/src/bench.c`, `tests/test_j1939.c` |
-  | `J1939_TORQUE_MODE_NA` | `j1939.h` | `sim/runtime/src/bench.c` |
   | `OC_ADDR_BENCH` | `oc_msgs.h` | `sim/runtime/src/bench.c`, `tests/test_j1939.c`, `tests/test_machine_ctrl.c` |
 
 - **Justification:** these are named values of the bus contract ([`docs/bus-interface.md`](bus-interface.md)). They are offered to code that builds or reads frames, which here is the simulator, the tests or a user's firmware, and not to `portable/` itself. `J1939_ADDR_NULL` is kept by the maintainer's decision as part of the J1939 vocabulary the API offers, ahead of address claiming in v0.5. Private macros that nobody used (`J1939_U8_NA`, `J1939_U16_NA` in `j1939_scaling.h`) were removed instead of deviated.
-- **Risk and mitigation:** an unused macro has no effect on the generated code. The three macros in use carry the values documented in `docs/bus-interface.md` (SPN 899 torque modes `0` and `0xF`, bench address `0xFC`) and are checked by known test vectors in `tests/test_j1939.c`. `J1939_ADDR_NULL` (`0xFE`) is not used yet; its documentation and tests come with address claiming in v0.5.
+- **Risk and mitigation:** an unused macro has no effect on the generated code. The macro in use carries the value documented in `docs/bus-interface.md` (bench address `0xFC`) and is checked by known test vectors in `tests/test_j1939.c`. The two SPN 899 torque modes (`0` and `0xF`) left this list in v0.4: the engine ECU uses them. `J1939_ADDR_NULL` (`0xFE`) is not used yet; its documentation and tests come with address claiming in v0.5.
 - **Status:** approved by the maintainer
 
 ## DEV-003: Early-return guard clause in message decoders

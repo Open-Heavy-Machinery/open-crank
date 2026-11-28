@@ -65,6 +65,7 @@ EOF
 ECU=sim/engine_ecu/src/engine_ecu.c
 MC=portable/machine_ctrl/src/machine_ctrl.c
 PLANT=sim/core/src/plant.c
+ECU2=portable/engine_ecu/src/ecu.c
 L2=sim/l2/src/plant_l2.c
 
 mutate "plant: combustion torque on a stationary shaft (self-start)" $PLANT \
@@ -90,6 +91,46 @@ mutate "L2 plant: windows judged before their injection can arrive" $L2 \
     "while (s->checked_through + d < s->step) {" "while (s->checked_through < s->step) { (void)d;"
 mutate "L2 plant: the captured fuel is not burnt" $L2 \
     ".fuel_pct = oc_l2_fuel_mean(s)," ".fuel_pct = 0.0,"
+mutate "L2 ECU: CRANK without checking 58 teeth between gaps" $ECU2 \
+    "} else if (w->counting && (idx_of_gap_edge == (uint8_t)ECU_TEETH)) {" "} else if (w->counting) { (void)idx_of_gap_edge;"
+mutate "L2 ECU: a long period is a gap without the next one confirming it" $ECU2 \
+    "if (((uint64_t)dt * 2U) < (uint64_t)w->gap_dt) {" "if (true) {"
+mutate "L2 ECU: a gap where none belongs keeps the sync" $ECU2 \
+    "if ((w->st.sync >= ECU_SYNC_CRANK) && (w->idx != (uint8_t)ECU_TEETH)) {" "if (false) {"
+mutate "L2 ECU: no gap where one belongs keeps the sync" $ECU2 \
+    "if ((w->st.sync >= ECU_SYNC_CRANK) && (w->idx >= (uint8_t)ECU_TEETH)) {" "if (false) {"
+mutate "L2 ECU: one cycle without the cam loses the sync" $ECU2 \
+    "if (w->cam_errors >= 2U) {" "if (w->cam_errors >= 1U) {"
+mutate "L2 ECU: a missing cam never loses the sync" $ECU2 \
+    "if (w->cam_errors >= 2U) {" "if (w->cam_errors >= 200U) {"
+mutate "L2 ECU: the cam's window is not checked" $ECU2 \
+    "const bool in_window = (off >= -w->p->cam_window_deg) && (off <= w->p->cam_window_deg);" "const bool in_window = (off == off);"
+mutate "L2 ECU: injection before FULL sync" $ECU2 \
+    "if ((w->st.sync == ECU_SYNC_FULL) && (w->width_ticks != 0U)) {" "if ((w->st.sync >= ECU_SYNC_CRANK) && (w->width_ticks != 0U)) {"
+mutate "L2 ECU: the injection delay ignores the tooth period" $ECU2 \
+    "const float delay = (a->delay_deg / PITCH_DEG) * (float)w->last_dt;" "const float delay = (a->delay_deg / PITCH_DEG) * 1000.0f;"
+mutate "L2 ECU: the reference tooth one too late" $ECU2 \
+    "uint32_t ref = (uint32_t)ref_f;" "uint32_t ref = (uint32_t)ref_f + 1U;"
+mutate "L2 ECU: the speed counts the gap as one tooth" $ECU2 \
+    "speed_update(w, t, positions_gap ? (uint32_t)GAP_POSITIONS : 1U);" "speed_update(w, t, 1U); (void)positions_gap;"
+mutate "L2 ECU: a stop is never detected" $ECU2 \
+    "if (w->have_edge && ((now - w->last_t) > limit)) {" "if (false && (now > limit)) {"
+mutate "L2 ECU: a TSC1 with a wrong checksum is accepted" $ECU2 \
+    "if (!m.checksum_valid || repeated) {" "if (repeated) {"
+mutate "L2 ECU: a repeated TSC1 counter is accepted" $ECU2 \
+    "if (!m.checksum_valid || repeated) {" "if (!m.checksum_valid) {"
+mutate "L2 ECU: a stale TSC1 never times out" $ECU2 \
+    "const bool fresh = e->request_seen && ((now_ms - e->request_ms) <= p->request_timeout_ms);" "const bool fresh = e->request_seen;"
+mutate "L2 ECU: the request is not clamped to the governed range" $ECU2 \
+    "e->target_rpm = ecu_clampf(e->request_rpm, p->low_idle_rpm, p->high_idle_rpm);" "e->target_rpm = e->request_rpm;"
+mutate "L2 ECU: overspeed never trips" $ECU2 \
+    "if (rpm > p->overspeed_trip_rpm) {" "if (false) {"
+mutate "L2 ECU: the overspeed trip is not latched until the engine stops" $ECU2 \
+    "} else if (ws->sync == ECU_SYNC_NONE) {" "} else if (true) {"
+mutate "L2 ECU: fuel without FULL sync" $ECU2 \
+    "if (phase_known && !e->overspeed_tripped) {" "if (!e->overspeed_tripped) {"
+mutate "L2 ECU: no anti-windup" $ECU2 \
+    "if (!up_into_limit && !down_into_limit) {" "if (true) {"
 mutate "engine ECU: stale speed requests never time out" $ECU \
     "age_ms <= p->request_timeout_ms" "(age_ms <= p->request_timeout_ms || true)"
 mutate "engine ECU: overspeed never trips" $ECU \

@@ -18,10 +18,12 @@ add_library(opencrank_portable STATIC
     j1939/src/j1939_diag.c
     j1939/src/oc_msgs.c
     machine_ctrl/src/machine_ctrl.c
+    engine_ecu/src/ecu.c
 )
 target_include_directories(opencrank_portable PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/j1939/include
     ${CMAKE_CURRENT_SOURCE_DIR}/machine_ctrl/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/engine_ecu/include
 )
 # Stricter than the rest of the tree: narrowing and float->double promotion
 # are bugs on a single-precision FPU.

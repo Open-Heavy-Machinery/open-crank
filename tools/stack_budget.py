@@ -11,8 +11,11 @@ function defined in that object, with its own stack; a node without bytes
 ("shape : ellipse") is a function called there but defined elsewhere. The
 files are merged by function name.
 
-Roots are the public functions of portable/machine_ctrl: mc_init,
-mc_init_after_watchdog, mc_handle_frame, mc_step and mc_clear_fault. The worst-case stack of a
+Roots are the public functions of portable/machine_ctrl (mc_init,
+mc_init_after_watchdog, mc_handle_frame, mc_step and mc_clear_fault) and of
+portable/engine_ecu (the wheel's ecu_wheel_*, run in the capture interrupt,
+and the governor's ecu_init, ecu_handle_frame, ecu_step and ecu_width_ticks).
+The worst-case stack of a
 function is its own stack plus the largest worst-case stack among the
 functions it calls. memcpy, memmove, memset and memcmp count as 0 bytes and
 are listed as not counted (C library).
@@ -28,7 +31,9 @@ import argparse
 import re
 import sys
 
-ROOTS = ("mc_init", "mc_init_after_watchdog", "mc_handle_frame", "mc_step", "mc_clear_fault")
+ROOTS = ("mc_init", "mc_init_after_watchdog", "mc_handle_frame", "mc_step", "mc_clear_fault",
+         "ecu_wheel_init", "ecu_wheel_tooth", "ecu_wheel_cam", "ecu_wheel_poll", "ecu_wheel_set_width",
+         "ecu_wheel_status", "ecu_init", "ecu_handle_frame", "ecu_step", "ecu_width_ticks")
 ALLOWED_EXTERNAL = {"memcpy", "memmove", "memset", "memcmp"}
 INDIRECT = "__indirect_call"
 
