@@ -26,7 +26,11 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     add_executable(open-crank-ecu-check linux-socketcan/ecu_check_main.c)
     target_link_libraries(open-crank-ecu-check PRIVATE opencrank_sim opentick::host m)
 
+    # Level 2 in a closed loop: the plant and the machine controller against a real engine ECU, through a bridge.
+    add_executable(open-crank-hil linux-socketcan/hil_main.c)
+    target_link_libraries(open-crank-hil PRIVATE opencrank_sim opencrank_accept opentick::host m)
+
     # Executables land next to each other in the top of the build tree.
-    set_target_properties(open-crank-sil open-crank-mc open-crank-accept open-crank-ecu-check PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
+    set_target_properties(open-crank-sil open-crank-mc open-crank-accept open-crank-ecu-check open-crank-hil PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 endif()
 set_target_properties(open-crank-run open-crank-l2-run open-crank-accept-loop PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})

@@ -1,4 +1,4 @@
-# STM32G4 reference board (v0.2)
+# STM32G4 reference board (v0.2; the engine ECU since v0.4)
 
 ## What this is
 
@@ -94,7 +94,7 @@ One line per wire, `ok` or `FAIL` with the reason: no pulse (open), the wrong wi
 
 #### Checking it on the board
 
-`tools/board/ecucheck.py` runs the ECU against the Tang Nano 20K at constant crank speeds, without a plant (the closed loop with the plant is the hard-run runner, *(planned)*):
+`tools/board/ecucheck.py` runs the ECU against the Tang Nano 20K at constant crank speeds, without a plant (the closed loop with the plant is `tools/board/hilrun.py`, in [docs/acceptance.md](../../docs/acceptance.md#on-the-board-in-a-closed-loop)):
 
 ```sh
 eval "$(<open-tick>/tools/fpga_toolchain.sh)"     # openFPGALoader

@@ -1,0 +1,12 @@
+open-crank-hil: fidelity: every signal is within what the bridge guarantees (lead 16000000 ns, DUT-to-plant delay 31200000 ns: H = 16 steps of 1 ms)
+open-crank-hil: hard run ok: 24999 bridge steps, 0 underruns, 0 late, 0 timeouts, 0 captures lost; round trip p99 1938 us
+open-crank-hil: 25.0 s, 1668 injections, 0 misplaced, 21 misfires, first injection after 2.64 rev, capture lag max 30 steps
+PASS  C1  every injection in its own cylinder's window (exit criterion 2: synchronises)  [0.00 s .. 25.00 s]
+PASS  C2  first injection within 3.5 revolutions from rest: FULL sync within three  [3.50 s .. 25.00 s]  reaction: 961 ms after start=1
+PASS  C3a  no misfire once running, until the load goes  [4.50 s .. 18.00 s]  reaction: 2991 ms after start=1
+PASS  C3b  no misfire once back from the release (the governor's fuel cut on the overshoot is not a misfire and the plant cannot tell them apart; misfires_1s counts the last second)  [20.00 s .. 25.00 s]  reaction: 1463 ms after hoist_demand_pct=0
+PASS  H1  1500 rpm within 0.5 % before the load step  [6.00 s .. 7.99 s]
+PASS  D1  the dip under the load step stays within the in-memory loop's 244 rpm plus 20 % (exit criterion 2)  [8.00 s .. 18.00 s]
+PASS  R1  back within 0.5 % of 1500 rpm within 3 s of the load step (exit criterion 2)  [11.00 s .. 18.00 s]  reaction: 1695 ms after hoist_demand_pct=85
+PASS  D2  the overshoot when the load goes stays within the loop's 304 rpm plus 20 %  [18.00 s .. 25.00 s]
+PASS  R2  back within 0.5 % of 1500 rpm within 3 s of releasing the load  [21.00 s .. 25.00 s]  reaction: 988 ms after hoist_demand_pct=0

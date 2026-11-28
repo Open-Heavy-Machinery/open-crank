@@ -1,0 +1,7 @@
+open-crank-hil: fidelity: every signal is within what the bridge guarantees (lead 16000000 ns, DUT-to-plant delay 31200000 ns: H = 16 steps of 1 ms)
+open-crank-hil: hard run ok: 24999 bridge steps, 0 underruns, 0 late, 0 timeouts, 0 captures lost; round trip p99 1911 us
+open-crank-hil: 25.0 s, 271 injections, 0 misplaced, 689 misfires, first injection after 2.31 rev, capture lag max 29 steps
+PASS  C1  every injection in its own cylinder's window  [0.00 s .. 25.00 s]
+PASS  C2  first injection within 3.5 revolutions from rest  [3.50 s .. 25.00 s]  reaction: 859 ms after start=1
+PASS  H1  1500 rpm within 0.5 % before the external torque  [5.00 s .. 5.99 s]
+PASS  O1  the overspeed trip keeps the fuel cut until the engine has stopped, after the torque is gone  [9.00 s .. 25.00 s]

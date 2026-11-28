@@ -12,5 +12,5 @@ const OcL2Params L2_D936LA6 = {
     .injector_full_us = 1600.0,
     .window_before_deg = 40.0,
     .window_after_deg = 20.0,
-    .capture_delay_steps = 20u,
+    .capture_delay_steps = 40u,
 };

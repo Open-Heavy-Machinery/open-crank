@@ -1,0 +1,26 @@
+# otk-hard-budget 1; result=ok; H=16; step_ns=1000000; margin_ns=1200000; tick_hz=27000000; link=bl616-3mbaud; usb=3-2@480M; bitstream_md5=6659c249a3a8c779c0f7bb9cac6e6fa5; commit=2f636ef19b21e72f394240c2528ff460e338cb30; source=open-crank-hil
+quantity,declared,measured,unit,within
+steps,,11999,steps,
+exchanges,,1615,exchanges,
+underruns,0,0,steps,yes
+late_setpoints,0,0,setpoints,yes
+applied_wrong,0,0,setpoints,yes
+applied_checked,,1092,setpoints,
+timeouts,,0,attempts,
+min_fill,,15,setpoints,
+plant_lead_ns,16000000,16000000,ns,yes
+rtt_p50_ns,,1709576,ns,
+rtt_p99_ns,2200000,1940938,ns,yes
+rtt_max_ns,,2364160,ns,
+dut_to_plant_delay_ns,31200000,30939282,ns,yes
+capture_lag_max_ns,31200000,29000000,ns,yes
+mapping_bound_ns,1000000,676213,ns,yes
+realtime_to_monotonic_err_ns,10000,569,ns,yes
+realtime_to_monotonic_rejected,,0,samples,
+bus_clock_err_ns,1010000,676782,ns,yes
+send_late_max_ns,,78961,ns,
+cycle_ns,,5999172,ns,
+can_frames,,1212,frames,
+can_tx_err_p50_ns,,532065,ns,
+can_tx_err_p99_ns,1100000,605111,ns,yes
+can_tx_err_max_ns,,4531376,ns,

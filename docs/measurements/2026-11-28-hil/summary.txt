@@ -1,0 +1,9 @@
+scenario | criteria | hard run | injections | misplaced | first injection | capture lag max | start of injection p99 / max | round trip p99
+hoist_step | 9 of 9 | ok | 1668 | 0 | 2.64 rev | 30 steps | 0.0158 / 0.0296 deg | 1.94 ms
+hold_1500 | 4 of 4 | ok | 928 | 0 | 2.64 rev | 29 steps | 0.0241 / 0.0296 deg | 1.94 ms
+hold_2100 | 4 of 4 | ok | 1237 | 0 | 2.64 rev | 29 steps | 0.0196 / 0.0301 deg | 1.95 ms
+hold_750 | 4 of 4 | ok | 491 | 0 | 2.64 rev | 29 steps | 0.0114 / 0.0140 deg | 1.94 ms
+overspeed | 4 of 4 | ok (retried) | 271 | 0 | 2.31 rev | 29 steps | 0.0264 / 0.0288 deg | 1.91 ms
+start_to_idle | 4 of 4 | ok (retried) | 379 | 0 | 2.64 rev | 29 steps | 0.0101 / 0.0126 deg | 1.94 ms
+hilrun: every scenario passed
+the NUCLEO runs oc-stm32g4-ecu

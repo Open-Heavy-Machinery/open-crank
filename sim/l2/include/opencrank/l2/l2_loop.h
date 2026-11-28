@@ -20,6 +20,13 @@
  *      every 20 ms the operator panel; the pump follows its command with the
  *      bench's 200 ms timeout.
  *
+ * With an external ECU (oc_l2_loop_init_external(), the hard-run runner,
+ * open-crank-hil) steps 3 and the ECU's half of 4 are left out: the real
+ * ECU reads the bridge's edges, its injections come back through
+ * oc_l2_loop_capture(), its EEC1 through oc_l2_loop_rx(), and the frames the
+ * controller puts on the bus (TSC1, its DM1) are what oc_l2_loop_step()
+ * returns. The machine side is the same code in both modes.
+ *
  * The bridge's crank output follows its gateware (open-tick rotary.v): tooth i
  * of a revolution begins where the top 32 bits of the accumulator, less
  * crank_offset, reach ceil(i * 2^31 / 60); the cam where they reach cam_start.
@@ -124,6 +131,11 @@ typedef struct {
     double ecu_eec1_rpm;
     bool ecu_eec1_seen;
 
+    /* With an external ECU (a hard run). */
+    bool external_ecu;
+    OtkCanQueue to_bus;       /**< the controller's frames for the bus (TSC1, its DM1), returned by the step */
+    uint32_t capture_lag_max; /**< the most steps between a capture's start and the step it was handed in */
+
     /* For the jitter budget: every counted injection after the first second of FULL sync. */
     double *soi_err;          /**< caller's buffer, or NULL */
     size_t soi_cap;
@@ -136,10 +148,33 @@ typedef struct {
 
 void oc_l2_loop_init(OcL2Loop *l, const OcL2LoopConfig *cfg, const OcScenario *scenario);
 
+/**
+ * @brief The same loop with an external ECU (a board on the bus, through a
+ *        bridge): no edge model and no ECU in memory.
+ */
+void oc_l2_loop_init_external(OcL2Loop *l, const OcL2LoopConfig *cfg, const OcScenario *scenario);
+
+/**
+ * @brief An injection the bridge captured (external ECU): @p start_tick in
+ *        bridge ticks from the beginning of step 0, @p width_ticks, on capture
+ *        channel @p channel (0-5). It reaches the plant at the next step; it is
+ *        placed by its own tick. Its commanded width is not known here, so the
+ *        width errors are not measured in this mode.
+ * @return false if the in-flight list is full (counted in captures_lost)
+ */
+bool oc_l2_loop_capture(OcL2Loop *l, unsigned channel, uint64_t start_tick, uint32_t width_ticks);
+
+/** @brief A frame from the bus (external ECU): to the controller at its next step; an EEC1 also gives ecu_rpm. */
+void oc_l2_loop_rx(OcL2Loop *l, const OtkCanFrame *f);
+
 /** @brief Keeps every injection's start error in @p buf (up to @p cap) for the jitter budget. */
 void oc_l2_loop_keep_errors(OcL2Loop *l, double *buf, size_t cap);
 
-/** @brief One 1 ms step. Returns the frames the ECU sent this step (EEC1) in @p ecu_tx, at most @p cap. */
+/**
+ * @brief One 1 ms step. Returns in @p ecu_tx, at most @p cap, the frames the
+ *        ECU sent this step (EEC1); with an external ECU, the frames the
+ *        controller sends on the bus this step (TSC1, its DM1).
+ */
 size_t oc_l2_loop_step(OcL2Loop *l, OtkCanFrame *ecu_tx, size_t cap);
 
 /** @brief True once the scenario's `end` is reached. */

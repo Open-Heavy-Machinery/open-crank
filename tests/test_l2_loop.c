@@ -98,7 +98,7 @@ static void test_injection_end_to_end(void) {
         }
     }
     CHECK(L.plant.injections == 1u);
-    CHECK(first_cap_due == first_cap_end_step + 17u);
+    CHECK(first_cap_due == first_cap_end_step + OC_L2_LOOP_D936LA6.capture_delay_steps);
     CHECK(L.plant.step == first_cap_due + 1u); /* delivered at the start of step `due` */
     run_until(&L, 8000U);
     CHECK(L.plant.misplaced == 0u);
@@ -200,6 +200,64 @@ static void test_deterministic(void) {
     CHECK(L.plant.plant.rpm == M.plant.plant.rpm);
 }
 
+/* With an external ECU: no edge model; the controller's frames come out of the step; a capture handed
+ * in is placed by its own tick; an EEC1 from the bus gives ecu_rpm. */
+static void test_external_ecu(void) {
+    OcScenario s;
+    scenario(&s, 1500.0, 0);
+    oc_l2_loop_init_external(&M, &OC_L2_LOOP_D936LA6, &s);
+    OtkCanFrame tx[4];
+    unsigned tsc1 = 0;
+    while (M.t_ms < 2000U) {
+        const size_t n = oc_l2_loop_step(&M, tx, 4U);
+        for (size_t i = 0; i < n; i++) {
+            J1939Frame f;
+            CHECK(oc_frame_from_otk(&tx[i], &f));
+            tsc1 += j1939_id_pgn(f.id) == J1939_PGN_TSC1;
+        }
+    }
+    CHECK(tsc1 > 100u);                                  /* one every 10 ms from the controller */
+    CHECK(M.teeth_seen == 0u && M.wheel.st.teeth == 0u); /* no ECU in memory */
+    CHECK(!M.ecu_eec1_seen && M.plant.plant.rpm > 50.0);  /* the starter turns it */
+    /* a tick in the last 200 steps (240 degrees or more) at which the plant's angle was some cylinder's
+     * TDC - 10 degrees: the start of that cylinder's injection */
+    const uint32_t k0 = M.plant.step - 230U;
+    double best = 1e9;
+    uint64_t at = 0U;
+    unsigned cyl = 0U;
+    for (uint64_t t = (uint64_t)k0 * OC_L2_STEP_TICKS; t < (uint64_t)(k0 + 200U) * OC_L2_STEP_TICKS; t += 9U) {
+        double u = 0.0;
+        if (!oc_l2_angle_at(&M.plant, t, &u)) {
+            continue;
+        }
+        for (unsigned c = 1U; c <= 6U; c++) {
+            const double e = fabs(fmod(u - (oc_l2_tdc_deg(c) - 10.0) + 1080.0, 720.0) - 360.0);
+            if (e < best) {
+                best = e;
+                at = t;
+                cyl = c;
+            }
+        }
+    }
+    CHECK(best < 0.01 && cyl >= 1U);
+    const uint32_t lag = M.plant.step - (uint32_t)(at / OC_L2_STEP_TICKS);
+    CHECK(oc_l2_loop_capture(&M, cyl - 1U, at, 14040U)); /* 520 us, on that cylinder's channel */
+    CHECK(M.capture_lag_max == lag);
+    (void)oc_l2_loop_step(&M, tx, 4U);
+    CHECK(M.plant.injections == 1u && M.plant.misplaced == 0u);
+    CHECK(M.last.valid && fabs(M.last.soi_err_deg) < 0.02);
+    CHECK(!M.width_measured); /* the commanded width is not known with an external ECU */
+    /* an EEC1 from the engine's address */
+    const J1939Eec1 e = { .torque_mode = 0, .engine_speed_valid = true, .engine_speed_rpm = 1234.0f,
+                          .controlling_address = 0x27 };
+    J1939Frame f;
+    j1939_encode_eec1(&e, 0x00U, &f);
+    OtkCanFrame o;
+    oc_frame_to_otk(&f, &o);
+    oc_l2_loop_rx(&M, &o);
+    CHECK(M.ecu_eec1_seen && fabs(M.ecu_eec1_rpm - 1234.0) < 0.2);
+}
+
 int main(void) {
     RUN_TEST(test_edges_at_the_plants_angle);
     RUN_TEST(test_hsi_bias_in_the_ecus_speed);
@@ -207,5 +265,6 @@ int main(void) {
     RUN_TEST(test_lost_tooth);
     RUN_TEST(test_observables);
     RUN_TEST(test_deterministic);
+    RUN_TEST(test_external_ecu);
     return check_report();
 }

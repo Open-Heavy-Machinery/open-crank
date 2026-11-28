@@ -1,0 +1,5 @@
+id,verdict,status,from_s,until_s,event,event_s,reaction,reaction_ms,fail_s,text
+C1,PASS,ok,0.000000,25.000000,,,,,,every injection in its own cylinder's window
+C2,PASS,ok,3.500000,25.000000,start=1,0.500000,measured,859,,first injection within 3.5 revolutions from rest
+H1,PASS,ok,5.000000,5.990000,,,,,,1500 rpm within 0.5 % before the external torque
+O1,PASS,ok,9.000000,25.000000,,,,,,the overspeed trip keeps the fuel cut until the engine has stopped, after the torque is gone

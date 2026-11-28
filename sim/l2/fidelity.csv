@@ -1,0 +1,10 @@
+# otk-fidelity 1; side=machine; source=open-crank sim/l2 (Level 2, d936la6 on the 60-2 wheel)
+signal,direction,transport,max_rate_hz,resolution_ns,latency_ns,jitter_ns,logic_v
+crank,to_dut,rotary,2400,100,,1000,3.3
+cam,to_dut,rotary,20,,,,3.3
+inj1,from_dut,capture,20,1000,40000000,,3.3
+inj2,from_dut,capture,20,1000,40000000,,3.3
+inj3,from_dut,capture,20,1000,40000000,,3.3
+inj4,from_dut,capture,20,1000,40000000,,3.3
+inj5,from_dut,capture,20,1000,40000000,,3.3
+inj6,from_dut,capture,20,1000,40000000,,3.3
