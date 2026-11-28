@@ -1,0 +1,96 @@
+# The Level 2 harness, the four analog channels: Tang Nano 20K sigma-delta
+# outputs through a unity-gain Sallen-Key low-pass (MCP6022, R = 10 kOhm,
+# C = 100 nF, about 159 Hz) to the NUCLEO-G431KB's ADC. Analog 1 and 2 are
+# wired on the maintainer's bench (2026-11-28) but not yet checked; analog 3
+# and 4 are planned. The filter's schematic is in WIRING-L2.md. Regenerate:
+# tools/wireviz.sh
+metadata:
+  title: Level 2 harness, analog channels (open-crank v0.4)
+
+options:
+  fontname: DejaVu Sans
+
+connectors:
+  TangR:
+    type: Tang Nano 20K, right header
+    subtype: position from the USB-C end
+    pins: [3, 13, 17, 18]
+    pinlabels: [76 analog1, 86 analog2, 72 analog3, 71 analog4]
+  U1:
+    type: MCP6022 no. 1, two Sallen-Key filters
+    subtype: wired on the maintainer's bench, not yet checked
+    pins: [A_in, A_out, B_in, B_out, VDD, VSS]
+    notes: 100 nF between VDD (pin 8) and VSS (pin 4)
+  U2:
+    type: MCP6022 no. 2, two Sallen-Key filters
+    subtype: (planned)
+    pins: [A_in, A_out, B_in, B_out, VDD, VSS]
+    notes: 100 nF between VDD (pin 8) and VSS (pin 4)
+  SUP:
+    type: NUCLEO-G431KB supply to the filters
+    pins: [CN3-14, CN4-4]
+    pinlabels: [3V3, GND]
+  CN3:
+    type: NUCLEO-G431KB CN3
+    pins: [9, 6, 8]
+    pinlabels: [A3 PA4 ADC2_IN17, A6 PA7 ADC2_IN4, A4 PA5 ADC2_IN13]
+  CN4:
+    type: NUCLEO-G431KB CN4
+    pins: [6]
+    pinlabels: [D3 PB0 ADC1_IN15]
+    notes: D4 (CN4-7, PB7) left unwired; it is A4's partner through SB2
+
+cables:
+  A1:
+    wirecount: 2
+    category: bundle
+    notes: analog 1 and 2, wired, not yet checked
+    wirelabels: [analog1, analog2]
+  A2:
+    wirecount: 2
+    category: bundle
+    notes: analog 1 and 2 filtered, wired, not yet checked
+    wirelabels: [analog1, analog2]
+  A3:
+    wirecount: 2
+    category: bundle
+    notes: analog 3 and 4 (planned)
+    wirelabels: [analog3, analog4]
+  A4:
+    wirecount: 2
+    category: bundle
+    notes: analog 3 and 4 filtered (planned)
+    wirelabels: [analog3, analog4]
+  P1:
+    wirecount: 2
+    category: bundle
+    notes: supply of MCP6022 no. 1, wired
+    wirelabels: [3V3, GND]
+  P2:
+    wirecount: 2
+    category: bundle
+    notes: supply of MCP6022 no. 2 (planned)
+    wirelabels: [3V3, GND]
+
+connections:
+  - - SUP: [CN3-14, CN4-4]
+    - P1: [1, 2]
+    - U1: [VDD, VSS]
+  - - SUP: [CN3-14, CN4-4]
+    - P2: [1, 2]
+    - U2: [VDD, VSS]
+  - - TangR: [3, 13]
+    - A1: [1, 2]
+    - U1: [A_in, B_in]
+  - - U1: [A_out, B_out]
+    - A2: [1, 2]
+    - CN3: [9, 6]
+  - - TangR: [17, 18]
+    - A3: [1, 2]
+    - U2: [A_in, B_in]
+  - - U2: [A_out]
+    - A4: [1]
+    - CN4: [6]
+  - - U2: [B_out]
+    - A4: [2]
+    - CN3: [8]
