@@ -20,6 +20,9 @@ play), this script:
     hard run;
   - keeps the ECU's USART2 lines received during the run next to them.
 A hard run that is not ok (exit 3) is retried once; both outputs are kept.
+The BL616 on the Tang resets its USB now and then (about every 15 min of
+running on the reference bench, 2026-11-28): such a run ends aborted with
+abort=io in its budget, and the next load of the bridge is retried.
 
 scenarios/l2/crank_tooth_lost is left out: it removes crank teeth in the
 in-memory edge model, and the bridge has no such fault.
@@ -75,6 +78,21 @@ def budget_row(path, quantity):
     return None
 
 
+def load_bridge(bitstream):
+    """Loads the bridge fresh. The BL616 sometimes resets its USB (it is gone for about a second), so a
+    failed load is tried again, up to three times."""
+    for attempt in range(3):
+        print("== load the bridge into the Tang's SRAM (fresh)", flush=True)
+        r = subprocess.run(["openFPGALoader", "-b", "tangnano20k", bitstream], stdout=subprocess.PIPE,
+                           stderr=subprocess.STDOUT, text=True)
+        if r.returncode == 0:
+            return
+        print(f"   openFPGALoader failed (exit {r.returncode}); the BL616 may be re-enumerating", flush=True)
+        time.sleep(3.0)
+    print(r.stdout)
+    sys.exit("hilrun: cannot load the bridge")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--hil", required=True, help="open-crank-hil")
@@ -119,7 +137,7 @@ def main():
     for name in names:
         for attempt in (1, 2):
             tag = name if attempt == 1 else name + ".attempt2"
-            run(["openFPGALoader", "-b", "tangnano20k", a.bitstream], "load the bridge into the Tang's SRAM (fresh)")
+            load_bridge(a.bitstream)
             run([os.path.join(HERE, "reset.sh")], "reset the NUCLEO: the ECU starts from rest")
             time.sleep(1.0)
             print(f"== {name} (attempt {attempt})", flush=True)
