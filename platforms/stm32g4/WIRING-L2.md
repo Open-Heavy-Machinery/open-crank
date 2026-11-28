@@ -4,11 +4,26 @@ At [Level 2](../../ROADMAP.md#v04-level-2-your-firmware-as-the-engine-ecu) the N
 
 The CAN bus stays wired as in [README.md](README.md#hardware). The pins below do not touch it.
 
-**Status (2026-11-27):**
+**Status (2026-11-28):**
 - The pin map is decided.
 - First wiring: crank, cam, the six injectors and ground (column "First wiring"). On the maintainer's bench they are wired and were checked wire by wire on 2026-11-27, all eight lines right, with the continuity check described [below](#checking-the-harness).
-- The four analog channels come later *(planned)*: their pins and filter are fixed here.
+- Analog 1 and 2 are wired on the maintainer's bench, with one MCP6022 (2026-11-28), but no check has measured them yet. Analog 3 and 4 are *(planned)*. Their pins and filter are fixed here.
 - The reference engine-ECU firmware that uses these pins is *(planned)*.
+
+## Diagrams
+
+The table below is the reference; these diagrams are drawn from it with [WireViz](https://github.com/wireviz/WireViz), from [`wiring-l2.yml`](wiring-l2.yml) and [`wiring-l2-analog.yml`](wiring-l2-analog.yml).
+
+**The digital lines and ground** (wired and checked):
+
+![Level 2 harness, digital lines: Tang Nano 20K left header to NUCLEO-G431KB CN3 and CN4, each line through a 220–330 Ω resistor](wiring-l2.svg)
+
+**The analog channels** (analog 1 and 2 wired but not yet checked, analog 3 and 4 *(planned)*):
+
+![Level 2 harness, analog channels: Tang Nano 20K right header through two MCP6022 Sallen-Key filters to the NUCLEO-G431KB's ADC pins](wiring-l2-analog.svg)
+
+- **Regenerate** after editing a `.yml`: `tools/wireviz.sh`. It installs WireViz 0.4.1 and its dependencies into `~/.cache/open-crank/wireviz` (no sudo, every file pinned by SHA-256 in `tools/wireviz-requirements.lock`, CPython 3.10–3.14). Graphviz (`dot`) comes from the system: `apt install graphviz`.
+- **CI checks** (`tools/wireviz.sh --check`, job `wiring`): each committed `.gv` is byte for byte what the pinned WireViz makes of its `.yml`; each `.svg` is the render of its `.gv` (the same nodes, edges and texts; not the same bytes, because Graphviz's output depends on the machine's fonts); and every signal in the diagrams agrees with this page's tables and with open-tick's `tang_nano_20k.cst` (`tools/check_wiring.py`).
 
 ## Pin map
 
@@ -24,12 +39,12 @@ The Tang pins are those of open-tick's `gateware/tang_nano_20k/tang_nano_20k.cst
 | Injector 4 | 26 | NUCLEO → Tang | CN4-15 (D12) | PB4 | TIM3_CH1 (AF2) | 220–330 Ω | yes |
 | Injector 5 | 29 | NUCLEO → Tang | CN4-14 (D11) | PB5 | TIM3_CH2 (AF2) | 220–330 Ω | yes |
 | Injector 6 | 30 | NUCLEO → Tang | CN4-9 (D6) | PB6 | TIM4_CH1 (AF2) | 220–330 Ω | yes |
-| Analog 1 | 76 | Tang → NUCLEO | CN3-9 (A3) | PA4 | ADC2_IN17 | [filter](#analog-filter) | *(planned)* |
-| Analog 2 | 86 | Tang → NUCLEO | CN3-6 (A6) | PA7 | ADC2_IN4 | [filter](#analog-filter) | *(planned)* |
+| Analog 1 | 76 | Tang → NUCLEO | CN3-9 (A3) | PA4 | ADC2_IN17 | [filter](#analog-filter) | wired, not yet checked |
+| Analog 2 | 86 | Tang → NUCLEO | CN3-6 (A6) | PA7 | ADC2_IN4 | [filter](#analog-filter) | wired, not yet checked |
 | Analog 3 | 72 | Tang → NUCLEO | CN4-6 (D3) | PB0 | ADC1_IN15 | [filter](#analog-filter) | *(planned)* |
 | Analog 4 | 71 | Tang → NUCLEO | CN3-8 (A4) | PA5 | ADC2_IN13 | [filter](#analog-filter) | *(planned)*; see [A4 and D4](#a4-and-d4) |
 | Ground | GND | | CN4-4 (GND) | | | short, direct wire | yes |
-| Filter supply | | | CN3-14 (3V3) | | | 100 nF next to each MCP6022 | *(planned)* |
+| Filter supply | | | CN3-14 (3V3) | | | 100 nF next to each MCP6022 | the first MCP6022 wired; the second *(planned)* |
 
 The Tang's analog channels are `analog[0]` to `analog[3]` in the gateware, and its injector captures `inj[0]` to `inj[5]`.
 

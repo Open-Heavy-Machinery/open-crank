@@ -217,6 +217,25 @@ jobs:
           BEHAVIOUR_CHANGE: ${{ contains(github.event.pull_request.labels.*.name, 'behaviour-change') }}
         run: head/tools/compare_traces.sh build-base build-head head/scenarios
 
+  wiring:
+    name: Level 2 wiring diagrams (WireViz) agree with WIRING-L2.md
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Graphviz, from the runner's packages (not pinned; the .svg is checked by content)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends graphviz
+      - name: Cache the pinned WireViz venv
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/open-crank/wireviz
+          key: wireviz-${{ runner.os }}-${{ hashFiles('tools/wireviz-requirements.lock') }}
+      - name: The .gv byte for byte, the .svg by content, every signal against the tables and the .cst
+        run: tools/wireviz.sh --check
+
   vcan-demo:
     name: vcan demo, as the README describes
     runs-on: ubuntu-latest

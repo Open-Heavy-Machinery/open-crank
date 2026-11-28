@@ -1,0 +1,60 @@
+# The Level 2 harness, Tang Nano 20K <-> NUCLEO-G431KB: the eight digital
+# lines and ground, wired and checked wire by wire (tools/board/wirecheck.py).
+# The reference is the table in WIRING-L2.md; tools/check_wiring.py checks this
+# file against it and against open-tick's tang_nano_20k.cst. The analog
+# channels are in wiring-l2-analog.yml. Regenerate: tools/wireviz.sh
+metadata:
+  title: Level 2 harness, digital lines (open-crank v0.4)
+
+options:
+  fontname: DejaVu Sans
+
+connectors:
+  TangL:
+    type: Tang Nano 20K, left header
+    subtype: position from the USB-C end
+    pins: [1, 2, 8, 9, 10, 11, 12, 13, 20]
+    pinlabels: [73 crank, 74 cam, 27 inj1, 28 inj2, 25 inj3, 26 inj4, 29 inj5, 30 inj6, GND]
+  CN3:
+    type: NUCLEO-G431KB CN3
+    pins: [12, 11]
+    pinlabels: [A0 PA0 TIM2_CH1, A1 PA1 TIM2_CH2]
+  CN4:
+    type: NUCLEO-G431KB CN4
+    pins: [12, 1, 2, 15, 14, 9, 4]
+    pinlabels: [D9 PA8 TIM1_CH1, D1 PA9 TIM1_CH2, D0 PA10 TIM1_CH3, D12 PB4 TIM3_CH1, D11 PB5 TIM3_CH2, D6 PB6 TIM4_CH1, GND]
+  R:
+    style: simple
+    type: 220-330 Ω in series
+
+cables:
+  T1:
+    wirecount: 8
+    category: bundle
+    notes: from the Tang
+    wirelabels: [crank, cam, inj1, inj2, inj3, inj4, inj5, inj6]
+  N1:
+    wirecount: 8
+    category: bundle
+    notes: to the NUCLEO
+    wirelabels: [crank, cam, inj1, inj2, inj3, inj4, inj5, inj6]
+  G1:
+    wirecount: 1
+    category: bundle
+    notes: short, direct
+    wirelabels: [GND]
+
+connections:
+  - - TangL: [1, 2]
+    - T1: [1, 2]
+    - [R., R.]
+    - N1: [1, 2]
+    - CN3: [12, 11]
+  - - TangL: [8, 9, 10, 11, 12, 13]
+    - T1: [3-8]
+    - [R., R., R., R., R., R.]
+    - N1: [3-8]
+    - CN4: [12, 1, 2, 15, 14, 9]
+  - - TangL: [20]
+    - G1: [1]
+    - CN4: [4]
