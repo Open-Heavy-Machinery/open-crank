@@ -2,6 +2,12 @@
 
 All notable changes to this project. The project is pre-alpha; nothing here is a stable API yet.
 
+## Unreleased
+
+### Changed
+
+- open-tick submodule: `v0.3.1` to `v0.4.0-beta.1` (the Tang Nano 20K bridge, the hard driver and the fidelity contract), which Level 2's runner will use. Nothing in open-crank uses them yet: the fifteen scenarios' traces are byte-identical to `v0.3.3` (CI `traces`).
+
 ## v0.3.3: the controller's DM1, and the Level 2 harness (2026-11-28)
 
 The last release before Level 2: the reference controller reports its own faults as DM1 (SR-14), the board bench measures `mc_step`, and the wiring to the Tang Nano 20K is decided and checked wire by wire on the board. open-crank still pins open-tick v0.3.1; Level 2's plant and ECU firmware come in v0.4.
