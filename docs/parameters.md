@@ -50,6 +50,21 @@ Provenance labels:
 | `request_timeout_ms` | 200 ms | Choice | 20 missed TSC1 periods. Verify against the behaviour of the engine you target. |
 | `source_address` | 0x00 | J1939 | Preferred address of Engine #1. |
 
+## Level 2 plant for `d936la6` (`sim/plants/d936la6/src/d936la6_l2.c`, `sim/l2/`, v0.4)
+
+The Level 2 plant is the same `d936la6` plant above, stepped every 1 ms, with a crank angle and fuel from captured injector pulses ([ARCHITECTURE.md §4.1](../ARCHITECTURE.md#41-plant-core-simcore-simplants)). These are its own numbers.
+
+| Parameter | Value | Provenance | Notes |
+|---|---|---|---|
+| `injector_dead_us` | 200 µs | Estimate | A pulse this short delivers no fuel. Of the order of a common-rail solenoid injector's opening delay. |
+| `injector_full_us` | 1600 µs | Estimate | Width above the dead time for 100 % fuel, so full load is a 1.8 ms pulse: about 16° at 1500 rpm and 26° at 2400 rpm, plausible for a heavy-duty diesel at full load. The model is linear: fuel_pct = 100 × (width − dead) / full. |
+| `window_before_deg`, `window_after_deg` | 40°, 20° | Choice | An injection counts for a cylinder when it begins between 40° before and 20° after that cylinder's compression TDC. Wide enough for any sensible start of injection, narrow enough that an injection on the wrong cylinder, or 360° off, never counts. The windows of two cylinders never overlap (one TDC every 120°). |
+| `capture_delay_steps` | 20 steps (20 ms) | Choice | How long a window waits for its injection before it is judged a misfire. Above a hard run's DUT-to-plant delay with H = 16 (17.3 ms, open-tick `docs/bridge-protocol.md` §2). |
+| step | 1 ms | Choice | Level 2's step (`ROADMAP.md` v0.4): 27 000 ticks of the bridge's 27 MHz clock. |
+| wheel | 60−2; the first tooth after the gap begins 60° before TDC 1 | Choice | TDC 1 is the start of tooth 10; the gap lies 48°–60° after the previous TDC, away from every window. |
+| cam | high from 90° to 120° of the 720° cycle | Choice | One pulse per cycle, in its first revolution, away from the gap. |
+| firing order | 1-5-3-6-2-4 | Choice | The usual inline-six order: TDCs at 0°, 120°, 240°, 360°, 480°, 600° for cylinders 1, 5, 3, 6, 2, 4. |
+
 ## Hydraulic hoist pump (`sim/loads/src/hydraulic_pump.c`)
 
 | Parameter | Value | Provenance | Notes |

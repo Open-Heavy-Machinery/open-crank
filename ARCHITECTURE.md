@@ -128,6 +128,13 @@ Rules: no I/O, no clock, no allocation, no global state, fixed step. Same inputs
 
 **Why mean-value.** Cycle-resolved combustion is out of scope (see the README's non-goals). Every number needs provenance: [`docs/parameters.md`](docs/parameters.md).
 
+**Level 2 (`sim/l2`, v0.4).** The same plant, stepped every 1 ms, with a crank angle and fuel from the device under test's injector pulses instead of the simulated ECU (`plant_l2.h`):
+- **The angle is the bridge's.** open-tick's bridge turns the crank and cam from a 48-bit phase accumulator, 2⁴⁸ = 720°, that gains the step's `crank_phase_inc` every tick of its 27 MHz clock ([bridge-protocol.md](https://github.com/Open-Heavy-Machinery/open-tick/blob/v0.4.0-beta.1/docs/bridge-protocol.md) §3.2). The plant keeps the same accumulator with the same quantised increment (`otk_bridge_phase_inc()`), so its angle equals the bridge's tick for tick, from a freshly loaded bitstream. A capture's start tick gives the exact angle of the injection.
+- **Fuel by cylinder.** A linear injector model turns a pulse's width into fuel. An injection counts for a cylinder when it begins inside that cylinder's window around its compression TDC and arrives on that cylinder's channel; each cylinder keeps the fuel of its last counted injection, and a window that closes without one is a misfire, which drops it to zero. The mean of the six goes into `plant_step()` unchanged. A wrong phase (360° off) or a crossed channel therefore burns nothing, and the engine does not run.
+- **Late captures.** On a hard run a capture reaches the plant H steps of look-ahead plus a round trip after it happened (the DUT-to-plant delay, [bridge-protocol.md](https://github.com/Open-Heavy-Machinery/open-tick/blob/v0.4.0-beta.1/docs/bridge-protocol.md#2-look-ahead) §2). The plant keeps the last 256 steps, places each capture by its own tick, and judges a window only after `capture_delay_steps`.
+- **Why mean-value still.** With that dead time, per-cylinder torque would land in the next cylinder's interval: it would not be faithful. Mean speed control is (bridge-protocol.md §2).
+- The wheel, the windows and the injector model are in [`docs/parameters.md`](docs/parameters.md). The in-memory Level 2 loop, the engine-ECU firmware and the hard-run runner that use it are *(planned)*.
+
 ### 4.2 Loads (`sim/loads`)
 
 A load is a torque source: `torque = f(command, environment, rpm, dt)`. v0.1 ships a load-sensing variable-displacement hoist pump: the machine controller commands displacement (flow), the load on the hook sets pressure, and
@@ -383,7 +390,7 @@ The migration itself is recorded in [ROADMAP.md](ROADMAP.md), section "v0.1".
 
 - **Generic plant plugin contract.** With one plant, any abstraction would be a guess. Extract it from what the second plant needs (v0.6). The first slice's function-pointer hooks were removed for this reason.
 - **Protocol abstraction.** J1939 is the right protocol for the current plant. The 2-stroke uses a different control scheme; separate it then.
-- **Level 2 signal layer** (crank and cam waveforms, analog I/O), including crank angle. Designing it now would be speculation; it arrives with the HIL backend in v0.4.
+- **Level 2 signal layer.** The crank angle and the captured fuel exist (`sim/l2`, §4.1); the in-memory loop, the analog sensors and the hard-run runner arrive with the rest of v0.4 *(planned)*.
 - **RTS/CTS transport.** After v0.3.1.
 - **Smarter reference controller** (power limiting, anti-stall). The interface allows it; the reference stays minimal until the basics are proven.
 - **YAML profiles.** When added, they load in `sim/` only. `portable/` never reads files.

@@ -12,6 +12,8 @@ add_library(opencrank_sim STATIC
     core/src/plant.c
     plants/d936la6/src/d936la6.c
     plants/d936la6/src/d936la6_ecu.c
+    plants/d936la6/src/d936la6_l2.c
+    l2/src/plant_l2.c
     loads/src/hydraulic_pump.c
     engine_ecu/src/engine_ecu.c
     engine_ecu/src/j1939_diag_tx.c
@@ -23,6 +25,7 @@ add_library(opencrank_sim STATIC
 )
 target_include_directories(opencrank_sim PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/core/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/l2/include
     ${CMAKE_CURRENT_SOURCE_DIR}/plants/d936la6/include
     ${CMAKE_CURRENT_SOURCE_DIR}/loads/include
     ${CMAKE_CURRENT_SOURCE_DIR}/engine_ecu/include

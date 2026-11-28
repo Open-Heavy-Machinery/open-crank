@@ -6,6 +6,7 @@ All notable changes to this project. The project is pre-alpha; nothing here is a
 
 ### Added
 
+- **The Level 2 plant** (`sim/l2/`, v0.4 step 3), in memory: the `d936la6` plant stepped every 1 ms, with the crank angle of open-tick's bridge (the same 48-bit accumulator and quantised increment, so the angles are equal tick for tick) and fuel from captured injector pulses. A linear injector model (200 µs dead time, 1.6 ms more for full fuel); each cylinder fuelled by its last injection inside its window (−40° … +20° of its compression TDC, on its own channel); a window closed without one is a misfire; misplaced injections burn nothing. Late captures are placed by their own tick, from a 256-step history. `oc_l2_bridge_config()` gives the bridge the wheel: 60−2, TDC 1 at tooth 10, cam 90°–120°. Not used by any runner yet. `test_plant_l2`; 8 mutations (40 in all). Parameters in `docs/parameters.md`.
 - **The harness check counts every capture and measures the crank's tooth period.** `tools/board/wirecheck.py --inj-hz N` asks `oc-stm32g4-wirecheck`, over its virtual COM port, for a counted series of injector bursts once the bridge is running; each channel must capture exactly that many pulses. The NUCLEO also sums the crank's tooth periods (TIM2, 170 MHz, the gap excluded), and the crank line gives their mean, standard deviation and spread. `--out DIR` keeps the raw lines. The firmware no longer sends bursts on its own: the script asks for them.
 
 ### Changed

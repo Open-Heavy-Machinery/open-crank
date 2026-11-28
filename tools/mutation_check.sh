@@ -65,6 +65,7 @@ EOF
 ECU=sim/engine_ecu/src/engine_ecu.c
 MC=portable/machine_ctrl/src/machine_ctrl.c
 PLANT=sim/core/src/plant.c
+L2=sim/l2/src/plant_l2.c
 
 mutate "plant: combustion torque on a stationary shaft (self-start)" $PLANT \
     "if (rpm > 0.0) {" "if (rpm >= 0.0) {"
@@ -73,6 +74,22 @@ mutate "plant: friction subtracted twice from the full-load table" $PLANT \
     "plant_full_load_brake_nm(p, rpm);"
 mutate "plant: no air-path lag" $PLANT \
     "const double burnt_frac = min2(fuel_pct / 100.0, air_frac);" "const double burnt_frac = fuel_pct / 100.0; (void)air_frac;"
+mutate "L2 plant: a capture's angle ignores its time inside the step" $L2 \
+    "(uint64_t)r->inc * (start_tick - j64 * OC_L2_STEP_TICKS)" "0u"
+mutate "L2 plant: the accumulator gains one tick less per step than the bridge" $L2 \
+    "const uint64_t phase = s->acc + (uint64_t)inc * OC_L2_STEP_TICKS;" "const uint64_t phase = s->acc + (uint64_t)inc * (OC_L2_STEP_TICKS - 1u);"
+mutate "L2 plant: an injection on another cylinder's channel is counted" $L2 \
+    "if (channel != c) {" "if (0) {"
+mutate "L2 plant: the window's closing edge is ignored" $L2 \
+    "rel > p->window_after_deg" "rel > p->window_after_deg + 30.0"
+mutate "L2 plant: cylinder 1's window does not wrap into the next cycle" $L2 \
+    "            k += 1;" "            (void)0;"
+mutate "L2 plant: a misfire keeps the cylinder's fuel" $L2 \
+    "                s->cyl_fuel_pct[c] = 0.0;" "                (void)0;"
+mutate "L2 plant: windows judged before their injection can arrive" $L2 \
+    "while (s->checked_through + d < s->step) {" "while (s->checked_through < s->step) { (void)d;"
+mutate "L2 plant: the captured fuel is not burnt" $L2 \
+    ".fuel_pct = oc_l2_fuel_mean(s)," ".fuel_pct = 0.0,"
 mutate "engine ECU: stale speed requests never time out" $ECU \
     "age_ms <= p->request_timeout_ms" "(age_ms <= p->request_timeout_ms || true)"
 mutate "engine ECU: overspeed never trips" $ECU \
