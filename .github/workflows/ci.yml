@@ -216,6 +216,10 @@ jobs:
         env:
           BEHAVIOUR_CHANGE: ${{ contains(github.event.pull_request.labels.*.name, 'behaviour-change') }}
         run: head/tools/compare_traces.sh build-base build-head head/scenarios
+      - name: Level 2 traces (scenarios/l2, open-crank-l2-run) unchanged versus the base branch
+        env:
+          BEHAVIOUR_CHANGE: ${{ contains(github.event.pull_request.labels.*.name, 'behaviour-change') }}
+        run: RUNNER=open-crank-l2-run head/tools/compare_traces.sh build-base build-head head/scenarios/l2
 
   wiring:
     name: Level 2 wiring diagrams (WireViz) agree with WIRING-L2.md

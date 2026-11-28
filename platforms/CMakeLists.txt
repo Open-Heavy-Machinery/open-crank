@@ -5,6 +5,9 @@ add_executable(open-crank-run host/run_main.c)
 target_link_libraries(open-crank-run PRIVATE opencrank_sim)
 
 # The acceptance suite on the in-memory loop, with the reference controller. Builds anywhere.
+add_executable(open-crank-l2-run host/l2_run_main.c)
+target_link_libraries(open-crank-l2-run PRIVATE opencrank_sim opencrank_accept m)
+
 add_executable(open-crank-accept-loop host/accept_loop_main.c)
 target_link_libraries(open-crank-accept-loop PRIVATE opencrank_sim opencrank_accept)
 
@@ -22,4 +25,4 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     # Executables land next to each other in the top of the build tree.
     set_target_properties(open-crank-sil open-crank-mc open-crank-accept PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 endif()
-set_target_properties(open-crank-run open-crank-accept-loop PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
+set_target_properties(open-crank-run open-crank-l2-run open-crank-accept-loop PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})

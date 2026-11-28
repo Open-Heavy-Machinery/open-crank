@@ -188,3 +188,14 @@ OcL2CaptureResult oc_l2_capture(OcL2Plant *s, const OcL2Params *p, unsigned chan
     s->misplaced++;
     return OC_L2_CAPTURE_MISPLACED;
 }
+
+bool oc_l2_angle_at(const OcL2Plant *s, uint64_t tick, double *deg) {
+    const uint64_t j64 = tick / OC_L2_STEP_TICKS;
+    if (j64 >= s->step || s->step - j64 > OC_L2_HISTORY) {
+        return false;
+    }
+    const OcL2StepRecord *r = &s->hist[j64 % OC_L2_HISTORY];
+    const uint64_t phase = r->acc + (uint64_t)r->inc * (tick - j64 * OC_L2_STEP_TICKS);
+    *deg = (double)(r->cycle + (phase >> ACC_BITS)) * CYCLE_DEG + oc_l2_acc_deg(phase);
+    return true;
+}

@@ -1,0 +1,12 @@
+# Level 2: the Level 1 hoist step. At 1500 rpm the operator pulls the hoist
+# lever to 85 % with 250 bar on the hook (about 570 Nm at the crankshaft),
+# holds it for 10 s, and releases it.
+time_s,signal,value
+0.0,key_on,1
+0.0,target_rpm,1500
+0.0,hoist_load_bar,250
+0.5,start,1
+3.0,start,0
+8.0,hoist_demand_pct,85
+18.0,hoist_demand_pct,0
+25.0,end,0
