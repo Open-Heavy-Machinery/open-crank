@@ -25,7 +25,7 @@ const OcL2LoopConfig OC_L2_LOOP_D936LA6 = {
     .mc = &MC_DEFAULT_PARAMS,
     .ecu = &ECU_DEFAULT_PARAMS,
     .hsi_bias = OC_L2_HSI_BIAS_DEFAULT,
-    .capture_delay_steps = 17U,
+    .capture_delay_steps = 30U,
     .pump_cmd_timeout_ms = 200U,
 };
 
@@ -147,7 +147,8 @@ static void deliver_captures(OcL2Loop *l) {
         l->last.valid = true;
         l->last.soi_err_deg = err;
         l->last.width_us = (double)c.width * 1e6 / (double)OC_L2_TICK_HZ;
-        l->last.width_err_us = l->last.width_us - (double)c.width_us_commanded;
+        const bool commanded = c.width_us_commanded > 0.0f; /* not known with an external ECU */
+        l->last.width_err_us = commanded ? l->last.width_us - (double)c.width_us_commanded : 0.0;
         if (!l->first_injection_seen) {
             double u = 0.0;
             l->first_injection_seen = oc_l2_angle_at(&l->plant, c.start, &u);
@@ -157,19 +158,21 @@ static void deliver_captures(OcL2Loop *l) {
             if (l->soi_err != NULL && l->soi_n < l->soi_cap) {
                 l->soi_err[l->soi_n++] = err;
             }
-            const double werr = fabs(l->last.width_err_us);
-            if (werr > l->width_err_max_us) {
-                l->width_err_max_us = werr;
+            if (commanded) { /* the width errors need the commanded width */
+                const double werr = fabs(l->last.width_err_us);
+                if (werr > l->width_err_max_us) {
+                    l->width_err_max_us = werr;
+                }
+                const double rel = werr / (double)c.width_us_commanded;
+                if (rel > l->width_rel_err_max) {
+                    l->width_rel_err_max = rel;
+                }
+                const double excess = werr - 0.003 * (double)c.width_us_commanded;
+                if (!l->width_measured || excess > l->width_excess_max_us) {
+                    l->width_excess_max_us = excess;
+                }
+                l->width_measured = true;
             }
-            const double rel = werr / (double)c.width_us_commanded;
-            if (rel > l->width_rel_err_max) {
-                l->width_rel_err_max = rel;
-            }
-            const double excess = werr - 0.003 * (double)c.width_us_commanded;
-            if (!l->width_measured || excess > l->width_excess_max_us) {
-                l->width_excess_max_us = excess;
-            }
-            l->width_measured = true;
         } else {
             /* the first second after the first injection: run-up, not counted */
         }
@@ -190,8 +193,9 @@ static size_t controllers(OcL2Loop *l, OtkCanFrame *ecu_tx, size_t cap) {
     size_t n_tx = 0U;
     J1939Frame f;
 
-    /* The ECU: the TSC1 sent at the controller's last step, then its governor. */
-    for (size_t i = 0U; i < otk_can_queue_count(&l->to_ecu); i++) {
+    /* The ECU: the TSC1 sent at the controller's last step, then its governor
+     * (in memory only; an external ECU sends its EEC1 through oc_l2_loop_rx()). */
+    for (size_t i = 0U; !l->external_ecu && i < otk_can_queue_count(&l->to_ecu); i++) {
         if (oc_frame_from_otk(otk_can_queue_at(&l->to_ecu, i), &f)) {
             ecu_handle_frame(&l->ecu, &f, now);
         }
@@ -200,7 +204,7 @@ static size_t controllers(OcL2Loop *l, OtkCanFrame *ecu_tx, size_t cap) {
     EcuWheelStatus ws;
     ecu_wheel_status(&l->wheel, &ws);
     J1939Frame eec1[1];
-    if (ecu_step(&l->ecu, &ws, now, eec1, 1U) == 1U) {
+    if (!l->external_ecu && ecu_step(&l->ecu, &ws, now, eec1, 1U) == 1U) {
         push(&l->to_mc, &eec1[0]);
         if (n_tx < cap) {
             oc_frame_to_otk(&eec1[0], &ecu_tx[n_tx++]);
@@ -211,7 +215,9 @@ static size_t controllers(OcL2Loop *l, OtkCanFrame *ecu_tx, size_t cap) {
             l->ecu_eec1_seen = true;
         }
     }
-    ecu_wheel_set_width(&l->wheel, ecu_width_ticks(&l->ecu));
+    if (!l->external_ecu) {
+        ecu_wheel_set_width(&l->wheel, ecu_width_ticks(&l->ecu));
+    }
 
     /* The operator panel, every 20 ms, as the Level 1 bench. */
     if ((now % 20U) == 0U) {
@@ -241,6 +247,10 @@ static size_t controllers(OcL2Loop *l, OtkCanFrame *ecu_tx, size_t cap) {
             l->pump_cmd_pct = pump.displacement_valid ? (double)pump.displacement_pct : 0.0;
             l->pump_cmd_seen = true;
             l->pump_cmd_ms = now;
+        } else if (l->external_ecu) {
+            if (n_tx < cap) {
+                oc_frame_to_otk(&out[i], &ecu_tx[n_tx++]); /* TSC1 and its DM1, onto the bus */
+            }
         } else {
             push(&l->to_ecu, &out[i]); /* TSC1 and the controller's DM1; the ECU takes TSC1 */
         }
@@ -273,6 +283,41 @@ void oc_l2_loop_init(OcL2Loop *l, const OcL2LoopConfig *cfg, const OcScenario *s
     l->next_cam_u = (uint64_t)bc.cam_start << 16;
 }
 
+void oc_l2_loop_init_external(OcL2Loop *l, const OcL2LoopConfig *cfg, const OcScenario *scenario) {
+    oc_l2_loop_init(l, cfg, scenario);
+    l->external_ecu = true;
+}
+
+bool oc_l2_loop_capture(OcL2Loop *l, unsigned channel, uint64_t start_tick, uint32_t width_ticks) {
+    if (l->n_cap >= OC_L2_CAPTURES) {
+        l->captures_lost++;
+        return false;
+    }
+    const uint64_t began = start_tick / OC_L2_STEP_TICKS;
+    const uint32_t lag = (l->plant.step > began) ? (uint32_t)(l->plant.step - began) : 0U;
+    if (lag > l->capture_lag_max) {
+        l->capture_lag_max = lag;
+    }
+    OcL2Capture *c = &l->cap[l->n_cap++];
+    c->start = start_tick;
+    c->width = width_ticks;
+    c->channel = (uint8_t)channel;
+    c->due = l->plant.step; /* the next step */
+    c->width_us_commanded = 0.0f;
+    return true;
+}
+
+void oc_l2_loop_rx(OcL2Loop *l, const OtkCanFrame *f) {
+    (void)otk_can_queue_push(&l->to_mc, f);
+    J1939Frame j;
+    J1939Eec1 m;
+    if (oc_frame_from_otk(f, &j) && j1939_id_source(j.id) == l->cfg->ecu->source_address &&
+        j1939_decode_eec1(&j, &m) && m.engine_speed_valid) {
+        l->ecu_eec1_rpm = (double)m.engine_speed_rpm;
+        l->ecu_eec1_seen = true;
+    }
+}
+
 void oc_l2_loop_keep_errors(OcL2Loop *l, double *buf, size_t cap) {
     l->soi_err = buf;
     l->soi_cap = cap;
@@ -303,9 +348,11 @@ size_t oc_l2_loop_step(OcL2Loop *l, OtkCanFrame *ecu_tx, size_t cap) {
     const OcL2Inputs in = { .load_torque_nm = l->load_torque_nm, .starter_engaged = l->sig.start };
     (void)oc_l2_step(&l->plant, cfg->plant, cfg->l2, &in);
 
-    /* The ECU in the capture interrupt: the step's edges, then its poll. */
-    ecu_wheel_poll(&l->wheel, ecu_ticks(l, (double)k * OC_L2_STEP_TICKS));
-    edges_of_step(l, k);
+    /* The ECU in the capture interrupt: the step's edges, then its poll (in memory only). */
+    if (!l->external_ecu) {
+        ecu_wheel_poll(&l->wheel, ecu_ticks(l, (double)k * OC_L2_STEP_TICKS));
+        edges_of_step(l, k);
+    }
 
     size_t n_tx = 0U;
     if ((l->t_ms % 10U) == 0U) {

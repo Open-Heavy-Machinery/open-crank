@@ -231,8 +231,8 @@ At Level 2 the device under test is the engine's own ECU: it reads the crank and
 build/open-crank-l2-run scenarios/l2/hoist_step.csv --trace hoist_l2.csv --verdicts hoist_l2.verdicts.csv --jitter hoist_l2.jitter.csv
 ```
 
-- **The bridge, modelled.** The crank and cam edges are those the Tang Nano 20K's gateware puts out for the plant's accumulator, each at its exact tick, converted to the ECU's 170 MHz timer with the reference board's HSI bias (−2658 ppm, so the ECU reads 0.27 % fast). An injection the ECU arms starts on the next crank edge it sees, plus its delay; it reaches the plant as a capture 17 steps after it ends (H = 16 steps of look-ahead and a round trip on a hard run).
-- **Criteria on the engine.** The criteria are about what the engine does, not only what crosses the bus, so the runner hands the oracle the plant's state every step as *observation frames*: 11-bit frames from `0x7F0`, which exist only between the runner and the oracle, never on a bus or in a frame log (`sim/l2/l2_accept.h`). A hard run (v0.4 step 7) computes the same observables from the same plant.
+- **The bridge, modelled.** The crank and cam edges are those the Tang Nano 20K's gateware puts out for the plant's accumulator, each at its exact tick, converted to the ECU's 170 MHz timer with the reference board's HSI bias (−2658 ppm, so the ECU reads 0.27 % fast). An injection the ECU arms starts on the next crank edge it sees, plus its delay; it reaches the plant as a capture 30 steps after it ends: the delay the board's captures had on the hard runs (H = 16 steps of look-ahead, up to two of the BL616's forwarding cycles, and a round trip; open-tick's bound is 31.2 ms).
+- **Criteria on the engine.** The criteria are about what the engine does, not only what crosses the bus, so the runner hands the oracle the plant's state every step as *observation frames*: 11-bit frames from `0x7F0`, which exist only between the runner and the oracle, never on a bus or in a frame log (`sim/l2/l2_accept.h`). On the board, `open-crank-hil` computes the same observables from the same plant (below).
 
 | Observable | Value | Default |
 |---|---|---|
@@ -255,25 +255,25 @@ build/open-crank-l2-run scenarios/l2/hoist_step.csv --trace hoist_l2.csv --verdi
 | `overspeed` | an external torque drives the engine past 2400 rpm; the fuel stays cut until it stops |
 
 **The exit criteria of v0.4** (Level 2 design, decision 13), in every scenario's criteria:
-- **"Synchronises":** `misplaced == 0` throughout; `first_injection_rev <= 3.5` (FULL sync within three revolutions of rest, plus the way to the next start of injection); `misfires_1s == 0` once running.
+- **"Synchronises":** `misplaced == 0` throughout; `first_injection_rev <= 3.5` (FULL sync within three revolutions of rest, plus the way to the next start of injection); `misfires_1s == 0` once running. In `hoist_step` the second after the release is left out of that last one (C3a until the release, C3b from 2 s after it): on the overshoot the governor cuts the fuel to 0 for about 60 ms, the plant cannot tell a cut from a misfire, and `misfires_1s` counts the last second. D2 and R2 judge the release.
 - **"Holds a requested speed":** `plant_rpm` within ±0.5 % of the request from 6 s on. The band covers the HSI: the ECU holds what it reads, so the plant runs about 0.27 % low (1496 rpm for 1500).
-- **The load step** (`hoist_step`): back within ±0.5 % within 3 s of the step and of its release. The dip may not go below 1227 rpm: the in-memory loop's own dip (227 rpm, to 1272.8 rpm, 0.39 s after the step) plus 20 %. The overshoot on release is held to the loop's 281 rpm plus 20 %, 1837 rpm.
+- **The load step** (`hoist_step`): back within ±0.5 % within 3 s of the step and of its release. The dip may not go below 1207 rpm: the in-memory loop's own dip (244 rpm, to 1255.8 rpm, 0.39 s after the step) plus 20 %. The overshoot on release is held to the loop's 304 rpm plus 20 %, 1865 rpm.
 
 **The jitter budget** (v0.4 exit criterion 1), written by `--jitter` for every injection counted after the first second of running, in the style of open-tick's hard-run budget:
 
 ```
-# oc-l2-jitter 1; source=open-crank-l2-run; scenario=scenarios/l2/hold_1500.csv; hsi_bias_ppm=-2658; delay_steps=17
+# oc-l2-jitter 1; source=open-crank-l2-run; scenario=scenarios/l2/hold_1500.csv; hsi_bias_ppm=-2658; delay_steps=30
 quantity,declared,measured,unit,within
 injections,,908,count,
-soi_err_p50_deg,,0.000217,deg,
-soi_err_p99_deg,0.1,0.019444,deg,yes
-soi_err_max_deg,0.5,0.027724,deg,yes
-width_err_max_us,,1.636194,us,
-width_err_max_rel,,0.002721,,
-width_err_over_0.3pct_us,1,-0.063139,us,yes
+soi_err_p50_deg,,0.000225,deg,
+soi_err_p99_deg,0.1,0.019792,deg,yes
+soi_err_max_deg,0.5,0.028448,deg,yes
+width_err_max_us,,1.725505,us,
+width_err_max_rel,,0.002745,,
+width_err_over_0.3pct_us,1,-0.052619,us,yes
 ```
 
-In memory the start of injection lands within 0.03° of its angle at every speed (the ECU extrapolates from its last tooth period; the timer ticks and the bridge's ticks add the rest), and every width is 0.27 % long, the HSI. On the board the same file will come from the bridge's captures (v0.4 step 7).
+In memory the start of injection lands within 0.03° of its angle at every speed (the ECU extrapolates from its last tooth period; the timer ticks and the bridge's ticks add the rest), and every width is 0.27 % long, the HSI. On the board the same file comes from the bridge's captures (below).
 
 ## Link faults
 

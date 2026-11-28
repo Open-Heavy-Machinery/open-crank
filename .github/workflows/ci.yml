@@ -60,6 +60,7 @@ jobs:
           ./build/open-crank-run scenarios/hoist_step.csv
           ./build/open-crank-run scenarios/overspeed.csv --trace overspeed.csv
           ./build/open-crank-run scenarios/overspeed.csv --trace overspeed.csv --frames overspeed.frames.csv
+          ./build/open-crank-l2-run scenarios/l2/hold_1500.csv
 
   sanitizers:
     name: sanitizers (ASan, UBSan, float-cast-overflow)

@@ -59,7 +59,7 @@ The Level 2 plant is the same `d936la6` plant above, stepped every 1 ms, with a 
 | `injector_dead_us` | 200 µs | Estimate | A pulse this short delivers no fuel. Of the order of a common-rail solenoid injector's opening delay. |
 | `injector_full_us` | 1600 µs | Estimate | Width above the dead time for 100 % fuel, so full load is a 1.8 ms pulse: about 16° at 1500 rpm and 26° at 2400 rpm, plausible for a heavy-duty diesel at full load. The model is linear: fuel_pct = 100 × (width − dead) / full. |
 | `window_before_deg`, `window_after_deg` | 40°, 20° | Choice | An injection counts for a cylinder when it begins between 40° before and 20° after that cylinder's compression TDC. Wide enough for any sensible start of injection, narrow enough that an injection on the wrong cylinder, or 360° off, never counts. The windows of two cylinders never overlap (one TDC every 120°). |
-| `capture_delay_steps` | 20 steps (20 ms) | Choice | How long a window waits for its injection before it is judged a misfire. Above a hard run's DUT-to-plant delay with H = 16 (17.3 ms, open-tick `docs/bridge-protocol.md` §2). |
+| `capture_delay_steps` | 40 steps (40 ms) | Choice | How long a window waits for its injection before it is judged a misfire. Above the DUT-to-plant delay a capture can have on a hard run with H = 16: (H + 1) steps, two of the BL616's 6 ms forwarding cycles and a 2.2 ms round trip, 31.2 ms (open-tick `otk_hard_dut_to_plant_ns()`, `docs/bridge-protocol.md` §2); 29–30 ms measured on the board (2026-11-28). Was 20 until the board showed the delay (the maintainer's decision, 2026-11-28). |
 | step | 1 ms | Choice | Level 2's step (`ROADMAP.md` v0.4): 27 000 ticks of the bridge's 27 MHz clock. |
 | wheel | 60−2; the first tooth after the gap begins 60° before TDC 1 | Choice | TDC 1 is the start of tooth 10; the gap lies 48°–60° after the previous TDC, away from every window. |
 | cam | high from 90° to 120° of the 720° cycle | Choice | One pulse per cycle, in its first revolution, away from the gap. |
@@ -70,11 +70,12 @@ The Level 2 plant is the same `d936la6` plant above, stepped every 1 ms, with a 
 | Parameter | Value | Provenance | Notes |
 |---|---|---|---|
 | `hsi_bias` | −2658 ppm | Measured | The reference board's HSI against a host clock: 29 677 TSC1 frames over 297.5 s on the bus (2026-11-26); the harness check reads 1503 rpm for 1500 (2026-11-27). The ECU's timer runs that much slow, so it reads speeds 0.27 % high and injector widths come out 0.27 % long. |
-| `capture_delay_steps` | 17 steps | Derived | A hard run's DUT-to-plant delay with H = 16: 16 ms of look-ahead plus a 1.3 ms round trip (open-tick `docs/bridge-protocol.md` §2, §9), rounded up to whole steps. |
+| `capture_delay_steps` | 30 steps | Measured | The DUT-to-plant delay the board's captures had in the hard runs of 2026-11-28 (29–30 steps, `capture_lag_max`), within open-tick's bound of 31.2 ms. Was 17 (H + a round trip) until those runs showed that a capture also waits for the next exchange and that the plant runs up to a cycle further ahead (the maintainer's decision, 2026-11-28). |
 | ECU and controller periods | 10 ms each; TSC1 and EEC1 one period apart | Choice | As the Level 1 loop (`sim/runtime/loop.c`). |
 | operator panel | every 20 ms | Derived | As the Level 1 bench. |
 | pump command timeout | 200 ms | Derived | As the Level 1 bench. |
-| dip limit (`hoist_step`) | 1227 rpm | Derived | The loop's dip, 227 rpm below 1500 (to 1272.8 rpm), plus 20 % (decision 13 of the Level 2 design). |
+| dip limit (`hoist_step`) | 1207 rpm | Derived | The loop's dip with the 30-step delay, 244 rpm below 1500 (to 1255.8 rpm), plus 20 % (decision 13 of the Level 2 design). With 17 steps it was 227 rpm and 1227. |
+| overshoot limit (`hoist_step`) | 1865 rpm | Derived | The loop's overshoot on release with the 30-step delay, 304 rpm (to 1804.4 rpm), plus 20 %. With 17 steps it was 281 rpm and 1837. |
 
 ## Reference engine ECU, Level 2 (`portable/engine_ecu/src/ecu.c`, `ECU_DEFAULT_PARAMS`, v0.4)
 
