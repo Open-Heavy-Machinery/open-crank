@@ -1,0 +1,11 @@
+# Level 2: at 1500 rpm an external torque drives the crankshaft past the ECU's
+# overspeed trip (2400 rpm). The ECU cuts fuel and keeps it cut until the
+# engine has stopped, even after the torque is gone.
+time_s,signal,value
+0.0,key_on,1
+0.0,target_rpm,1500
+0.5,start,1
+3.0,start,0
+6.0,fault.overrun_torque_nm,300
+9.0,fault.overrun_torque_nm,0
+25.0,end,0

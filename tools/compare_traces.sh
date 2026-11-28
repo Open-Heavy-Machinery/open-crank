@@ -12,6 +12,8 @@
 #
 # Usage: tools/compare_traces.sh <base build dir> <head build dir> <scenario dir>
 #   BEHAVIOUR_CHANGE=true   differences are expected: warn instead of failing
+#   RUNNER=open-crank-l2-run  the runner in each build dir (default open-crank-run); Level 2's
+#                           scenarios (scenarios/l2) run with open-crank-l2-run
 #   GITHUB_STEP_SUMMARY     if set, a table of results is appended to it
 set -euo pipefail
 
@@ -19,8 +21,9 @@ if [[ $# -ne 3 ]]; then
     echo "usage: $0 <base build dir> <head build dir> <scenario dir>" >&2
     exit 2
 fi
-BASE=$1/open-crank-run
-HEAD=$2/open-crank-run
+RUNNER=${RUNNER:-open-crank-run}
+BASE=$1/$RUNNER
+HEAD=$2/$RUNNER
 SCENARIOS=$3
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT

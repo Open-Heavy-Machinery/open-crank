@@ -1,0 +1,6 @@
+# Acceptance criteria. Level 2 observables: docs/acceptance.md, "Level 2".
+id,from,until,tolerance_ms,condition,text
+C1,begin,end,0,misplaced == 0,every injection in its own cylinder's window (exit criterion 2: synchronises)
+C2,start=1+3000ms,end,0,first_injection_rev <= 3.5,first injection within 3.5 revolutions from rest: FULL sync within three
+C3,start=1+4000ms,end,0,misfires_1s == 0,no misfire once running
+H1,6.0,end,0,plant_rpm >= 1492.5 && plant_rpm <= 1507.5,the plant holds the requested 1500 rpm within 0.5 % (exit criterion 2)

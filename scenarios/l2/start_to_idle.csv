@@ -1,0 +1,6 @@
+# Level 2: from rest to low idle; no speed asked by the operator.
+time_s,signal,value
+0.0,key_on,1
+0.5,start,1
+3.0,start,0
+12.0,end,0

@@ -21,6 +21,7 @@ static const char *const NAMES[OC_SIG_END] = {
     [OC_SIG_FAULT_ENGINE_DTC_RED] = "fault.engine_dtc_red",
     [OC_SIG_FAULT_ENGINE_DTC_AMBER] = "fault.engine_dtc_amber",
     [OC_SIG_TEST_DUT_HANG] = "test.dut_hang",
+    [OC_SIG_FAULT_CRANK_TEETH_LOST] = "fault.crank_teeth_lost",
     [OC_SIG_LINK_MC] = OTK_LINK_SIGNAL_NAMES("mc"),
     [OC_SIG_LINK_ENGINE] = OTK_LINK_SIGNAL_NAMES("engine"),
 };
@@ -88,6 +89,9 @@ void oc_signals_set(OcSignals *s, OcSignalId id, double value) {
         break;
     case OC_SIG_TEST_DUT_HANG:
         s->test_dut_hang = on;
+        break;
+    case OC_SIG_FAULT_CRANK_TEETH_LOST:
+        s->fault_crank_teeth_lost = value;
         break;
     case OC_SIG_END:
     case OC_SIG_COUNT:

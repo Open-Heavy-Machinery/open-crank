@@ -1,0 +1,7 @@
+# Level 2: start from rest and hold 2100 rpm (high idle) with no load.
+time_s,signal,value
+0.0,key_on,1
+0.0,target_rpm,2100
+0.5,start,1
+3.0,start,0
+15.0,end,0

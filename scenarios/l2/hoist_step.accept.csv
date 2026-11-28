@@ -1,0 +1,10 @@
+# Acceptance criteria. Level 2 observables: docs/acceptance.md, "Level 2".
+id,from,until,tolerance_ms,condition,text
+C1,begin,end,0,misplaced == 0,every injection in its own cylinder's window (exit criterion 2: synchronises)
+C2,start=1+3000ms,end,0,first_injection_rev <= 3.5,first injection within 3.5 revolutions from rest: FULL sync within three
+C3,start=1+4000ms,end,0,misfires_1s == 0,no misfire once running
+H1,6.0,hoist_demand_pct=85-10ms,0,plant_rpm >= 1492.5 && plant_rpm <= 1507.5,1500 rpm within 0.5 % before the load step
+D1,hoist_demand_pct=85,hoist_demand_pct=0,0,plant_rpm >= 1227,the dip under the load step stays within the in-memory loop's 227 rpm plus 20 % (exit criterion 2)
+R1,hoist_demand_pct=85+3000ms,hoist_demand_pct=0,0,plant_rpm >= 1492.5 && plant_rpm <= 1507.5,back within 0.5 % of 1500 rpm within 3 s of the load step (exit criterion 2)
+D2,hoist_demand_pct=0,end,0,plant_rpm <= 1837,the overshoot when the load goes stays within the loop's 281 rpm plus 20 %
+R2,hoist_demand_pct=0+3000ms,end,0,plant_rpm >= 1492.5 && plant_rpm <= 1507.5,back within 0.5 % of 1500 rpm within 3 s of releasing the load

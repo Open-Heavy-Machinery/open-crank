@@ -65,6 +65,17 @@ The Level 2 plant is the same `d936la6` plant above, stepped every 1 ms, with a 
 | cam | high from 90° to 120° of the 720° cycle | Choice | One pulse per cycle, in its first revolution, away from the gap. |
 | firing order | 1-5-3-6-2-4 | Choice | The usual inline-six order: TDCs at 0°, 120°, 240°, 360°, 480°, 600° for cylinders 1, 5, 3, 6, 2, 4. |
 
+## In-memory Level 2 loop (`sim/l2/src/l2_loop.c`, `OC_L2_LOOP_D936LA6`, v0.4)
+
+| Parameter | Value | Provenance | Notes |
+|---|---|---|---|
+| `hsi_bias` | −2658 ppm | Measured | The reference board's HSI against a host clock: 29 677 TSC1 frames over 297.5 s on the bus (2026-11-26); the harness check reads 1503 rpm for 1500 (2026-11-27). The ECU's timer runs that much slow, so it reads speeds 0.27 % high and injector widths come out 0.27 % long. |
+| `capture_delay_steps` | 17 steps | Derived | A hard run's DUT-to-plant delay with H = 16: 16 ms of look-ahead plus a 1.3 ms round trip (open-tick `docs/bridge-protocol.md` §2, §9), rounded up to whole steps. |
+| ECU and controller periods | 10 ms each; TSC1 and EEC1 one period apart | Choice | As the Level 1 loop (`sim/runtime/loop.c`). |
+| operator panel | every 20 ms | Derived | As the Level 1 bench. |
+| pump command timeout | 200 ms | Derived | As the Level 1 bench. |
+| dip limit (`hoist_step`) | 1227 rpm | Derived | The loop's dip, 227 rpm below 1500 (to 1272.8 rpm), plus 20 % (decision 13 of the Level 2 design). |
+
 ## Reference engine ECU, Level 2 (`portable/engine_ecu/src/ecu.c`, `ECU_DEFAULT_PARAMS`, v0.4)
 
 The reference engine-ECU logic that runs on the board at Level 2. Its wheel and injector numbers are the Level 2 plant's above, and its governor is the simulated ECU's (`tests/test_ecu.c` checks both), in `float`.
